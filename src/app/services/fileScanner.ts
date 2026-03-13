@@ -1,14 +1,18 @@
-import type { FolderNode, Track } from './types'
+import type { FolderNode, Track, AudioMetadata } from './types'
 
 
 declare global {
   interface Window {
     readonly electronAPI?: {
       readonly scanDirectory:       (path: string) => Promise<readonly string[]>
-      readonly getAudioMetadata:    (path: string) => Promise<{ readonly title?: string; readonly artist?: string; readonly album?: string; readonly duration?: number }>
+      readonly getAudioMetadata:    (path: string) => Promise<AudioMetadata>
       readonly selectDirectory:     () => Promise<string | null>
       readonly getMusicLibraryPath: () => Promise<string>
       readonly readFile:            (path: string) => Promise<ArrayBuffer>
+      readonly minimizeWindow:       () => void
+      readonly maximizeWindow:       () => void
+      readonly closeWindow:         () => void
+      readonly isMaximized:         () => Promise<boolean>
     }
   }
 }
@@ -119,7 +123,7 @@ function buildFolderTree (rootPath: string, files: readonly string[]): FolderNod
   return [ folderMap.get(rootPath) as FolderNode ]
 }
 
-export async function getAudioMetadata (filePath: string): Promise<{ title?: string; artist?: string; album?: string; duration?: number }> {
+export async function getAudioMetadata (filePath: string): Promise<AudioMetadata> {
   if (window.electronAPI?.getAudioMetadata) {
     try {
       return await window.electronAPI.getAudioMetadata(filePath)

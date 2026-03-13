@@ -21,6 +21,7 @@ interface AudioContextValue extends AudioState {
   readonly setVolume:    (volume: number) => void
   readonly playNext:     (tracks: readonly Track[]) => void
   readonly playPrevious: (tracks: readonly Track[]) => void
+  readonly analyzer:     AnalyserNode | null
 }
 
 const AudioContext = createContext<AudioContextValue | null>(null)
@@ -36,6 +37,9 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   })
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const analyzerRef = useRef<AnalyserNode | null>(null)
+  const audioContextRef = useRef<globalThis.AudioContext | null>(null)
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null)
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -100,12 +104,37 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
       }
     }, [])
 
+  const setupAnalyzer = useCallback(() => {
+    if (!audioRef.current) return analyzerRef.current
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new globalThis.AudioContext()
+    }
+
+    const ctx = audioContextRef.current
+    if (!analyzerRef.current) {
+      analyzerRef.current = ctx.createAnalyser()
+      analyzerRef.current.fftSize = 256
+      analyzerRef.current.connect(ctx.destination)
+    }
+
+    if (!sourceRef.current && audioRef.current) {
+      sourceRef.current = ctx.createMediaElementSource(audioRef.current)
+      sourceRef.current.connect(analyzerRef.current)
+    }
+
+    return analyzerRef.current
+  }, [])
+
   const play = useCallback(async (track: Track) => {
     const audio = audioRef.current
     if (!audio)
       return
 
     try {
+      // Setup analyzer for waveform
+      setupAnalyzer()
+
       // Read file via Electron API and create a Blob URL
       const buffer = await window.electronAPI?.readFile(track.path)
       if (!buffer) {
@@ -136,7 +165,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
         isPlaying:    true,
         currentTime:  0,
       }))
-  }, [])
+  }, [ setupAnalyzer ])
 
   const pause = useCallback(() => {
     const audio = audioRef.current
@@ -239,6 +268,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
         setVolume,
         playNext,
         playPrevious,
+        analyzer: analyzerRef.current,
       }}
     >
       {children}

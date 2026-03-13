@@ -4,53 +4,68 @@
   width: 100%;
   height: 100vh;
   overflow: hidden;
+  background: rgba(18, 18, 18, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: var(--radius-lg);
 }
 
-.top-menu {
-  height: 56px;
-  min-height: 56px;
+.titlebar {
+  height: 40px;
+  min-height: 40px;
   background: var(--bg-raised);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  padding: 0 var(--sp-4);
-  gap: var(--sp-6);
+  justify-content: space-between;
+  -webkit-app-region: drag;
+  user-select: none;
 }
 
-.top-menu-logo {
+.titlebar-drag {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+}
+
+.titlebar-logo {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding-right: var(--sp-4);
-  border-right: 1px solid var(--border);
+  padding: 0 var(--sp-4);
+  -webkit-app-region: no-drag;
 }
 
 .logo-icon {
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   color: var(--accent);
 }
 
 .logo-text {
-  font-size: var(--text-lg);
+  font-size: var(--text-sm);
   font-weight: var(--font-semibold);
 }
 
-.top-menu-nav {
+.titlebar-nav {
   display: flex;
   gap: var(--sp-1);
+  -webkit-app-region: no-drag;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
   border-radius: var(--radius);
   color: var(--text-dim);
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease);
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
+  background: transparent;
+  border: none;
 }
 
 .nav-item:hover {
@@ -65,6 +80,33 @@
 
 .nav-icon {
   font-size: var(--text-base);
+}
+
+.titlebar-controls {
+  display: flex;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-btn {
+  width: 46px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease);
+}
+
+.titlebar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.titlebar-btn-close:hover {
+  background: var(--danger);
+  color: var(--text);
 }
 
 .main-content {

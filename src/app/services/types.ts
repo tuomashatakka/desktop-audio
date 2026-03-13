@@ -6,6 +6,9 @@ export interface Track {
   readonly album:    string
   readonly duration: number
   readonly format:   string
+  readonly albumArt?: string
+  readonly year?:    number
+  readonly genre?:   string
 }
 
 export interface FolderNode {
@@ -22,4 +25,7 @@ export interface AudioMetadata {
   readonly album?:    string
   readonly duration?: number
   readonly format?:   string
+  readonly albumArt?: string
+  readonly year?:    number
+  readonly genre?:   string
 }

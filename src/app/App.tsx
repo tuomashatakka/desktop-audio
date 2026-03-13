@@ -107,40 +107,60 @@ function AppContent () {
 
   return (
     <div className='app-layout'>
-      <header className='top-menu'>
-        <div className='top-menu-logo'>
-          <span className='logo-icon'>♫</span>
-          <span className='logo-text'>Desktop Audio</span>
+      <header className='titlebar'>
+        <div className='titlebar-drag'>
+          <div className='titlebar-logo'>
+            <span className='logo-icon'>♫</span>
+            <span className='logo-text'>Desktop Audio</span>
+          </div>
+
+          <nav className='titlebar-nav'>
+            <button
+              className={`nav-item ${currentView === 'library' ? 'active' : ''}`}
+              onClick={() =>
+                setView('library')}
+            >
+              <span className='nav-icon'>♫</span>
+              Library
+            </button>
+
+            <button
+              className={`nav-item ${currentView === 'settings' ? 'active' : ''}`}
+              onClick={() =>
+                setView('settings')}
+            >
+              <span className='nav-icon'>⚙</span>
+              Settings
+            </button>
+          </nav>
         </div>
 
-        <nav className='top-menu-nav'>
+        <div className='titlebar-controls'>
           <button
-            className={`nav-item ${currentView === 'library' ? 'active' : ''}`}
+            className='titlebar-btn'
             onClick={() =>
-              setView('library')}
+              window.electronAPI?.minimizeWindow()}
+            aria-label='Minimize'
           >
-            <span className='nav-icon'>♫</span>
-            Library
+            ─
           </button>
-
           <button
-            className={`nav-item ${currentView === 'player' ? 'active' : ''}`}
+            className='titlebar-btn'
             onClick={() =>
-              setView('player')}
+              window.electronAPI?.maximizeWindow()}
+            aria-label='Maximize'
           >
-            <span className='nav-icon'>▶</span>
-            Now Playing
+            □
           </button>
-
           <button
-            className={`nav-item ${currentView === 'settings' ? 'active' : ''}`}
+            className='titlebar-btn titlebar-btn-close'
             onClick={() =>
-              setView('settings')}
+              window.electronAPI?.closeWindow()}
+            aria-label='Close'
           >
-            <span className='nav-icon'>⚙</span>
-            Settings
+            ✕
           </button>
-        </nav>
+        </div>
       </header>
 
       <main className='main-content'>
