@@ -3,14 +3,6 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect } f
 import type { Track } from './LibraryContext'
 
 
-function convertFilePathToUrl (filePath: string): string {
-  if (filePath.startsWith('file://') || filePath.startsWith('http://') || filePath.startsWith('https://')) {
-    return filePath
-  }
-  return `file://${filePath}`
-}
-
-
 interface AudioState {
   readonly isPlaying:    boolean
   readonly currentTime:  number
@@ -99,16 +91,44 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     }
   }, [ state.volume ])
 
-  const play = useCallback((track: Track) => {
+  useEffect(() =>
+    () => {
+      // Cleanup blob URLs on unmount
+      const audio = audioRef.current
+      if (audio && audio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(audio.src)
+      }
+    }, [])
+
+  const play = useCallback(async (track: Track) => {
     const audio = audioRef.current
     if (!audio)
       return
 
-    const audioUrl = convertFilePathToUrl(track.path)
-    audio.src = audioUrl
-    audio.play().catch(error => {
+    try {
+      // Read file via Electron API and create a Blob URL
+      const buffer = await window.electronAPI?.readFile(track.path)
+      if (!buffer) {
+        throw new Error('Failed to read file')
+      }
+
+      // Create a Blob from the ArrayBuffer and generate a URL
+      const blob = new Blob([ buffer ])
+      const audioUrl = URL.createObjectURL(blob)
+
+      // Store URL for cleanup
+      const oldUrl = audio.src
+      if (oldUrl && oldUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(oldUrl)
+      }
+
+      audio.src = audioUrl
+      await audio.play()
+    }
+    catch (error) {
       console.error('Error playing audio:', error)
-    })
+    }
+
     setState(s =>
       ({
         ...s,
@@ -145,6 +165,12 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
 
     audio.pause()
     audio.currentTime = 0
+
+    // Revoke any blob URL
+    if (audio.src.startsWith('blob:')) {
+      URL.revokeObjectURL(audio.src)
+    }
+
     setState(s =>
       ({
         ...s,
