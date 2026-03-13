@@ -1,24 +1,31 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import started from 'electron-squirrel-startup'
+import * as mm from 'music-metadata'
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
+
 if (started) {
   app.quit()
 }
 
 const createWindow = () => {
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width:          800,
-    height:         600,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+    width:           1200,
+    height:          800,
+    minWidth:        800,
+    minHeight:       600,
+    frame:           false,
+    titleBarStyle:   'hidden',
+    transparent:     true,
+    backgroundColor: '#00000000',
+    webPreferences:  {
+      preload:          path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration:  false,
     },
   })
 
-  // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL)
   }
@@ -28,7 +35,6 @@ const createWindow = () => {
     )
   }
 
-  // Open the DevTools.
   mainWindow.webContents.openDevTools()
 }
 
@@ -71,7 +77,7 @@ ipcMain.handle('get-music-library-path', () =>
   app.getPath('music'))
 
 ipcMain.handle('scan-directory', async (_event, dirPath: string) => {
-  const files: readonly string[] = []
+  const files: string[] = []
 
   function walkDir (dir: string, acc: string[]) {
     try {
@@ -91,16 +97,62 @@ ipcMain.handle('scan-directory', async (_event, dirPath: string) => {
     }
   }
 
-  const acc: readonly string[] = []
-  walkDir(dirPath, acc as string[])
+  const acc: string[] = []
+  walkDir(dirPath, acc)
   return acc as readonly string[]
 })
 
 ipcMain.handle('get-audio-metadata', async (_event, filePath: string) => {
-  return {}
+  try {
+    const metadata = await mm.parseFile(filePath)
+    const picture = metadata.common.picture?.[0]
+
+    // eslint-disable-next-line functional/no-let
+    let albumArt: string | undefined
+    if (picture) {
+      const base64 = Buffer.from(picture.data).toString('base64')
+      albumArt = `data:${picture.format};base64,${base64}`
+    }
+
+    return {
+      title:    metadata.common.title || undefined,
+      artist:   metadata.common.artist || undefined,
+      album:    metadata.common.album || undefined,
+      year:     metadata.common.year || undefined,
+      genre:    metadata.common.genre?.[0] || undefined,
+      track:    metadata.common.track?.no || undefined,
+      duration: metadata.format.duration || undefined,
+      albumArt,
+    }
+  }
+  catch (error) {
+    console.error('Error reading metadata:', error)
+    return {}
+  }
 })
 
 ipcMain.handle('read-file', async (_event, filePath: string) => {
   const buffer = fs.readFileSync(filePath)
   return buffer
 })
+
+ipcMain.on('window-minimize', () => {
+  BrowserWindow.getFocusedWindow()?.minimize()
+})
+
+ipcMain.on('window-maximize', () => {
+  const win = BrowserWindow.getFocusedWindow()
+  if (win?.isMaximized()) {
+    win.unmaximize()
+  }
+  else {
+    win?.maximize()
+  }
+})
+
+ipcMain.on('window-close', () => {
+  BrowserWindow.getFocusedWindow()?.close()
+})
+
+ipcMain.handle('window-is-maximized', () =>
+  BrowserWindow.getFocusedWindow()?.isMaximized() ?? false)

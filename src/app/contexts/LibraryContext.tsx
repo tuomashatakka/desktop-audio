@@ -3,13 +3,14 @@ import { createContext, useContext, useState, useCallback, useMemo } from 'react
 
 
 export interface Track {
-  readonly id:       string
-  readonly path:     string
-  readonly title:    string
-  readonly artist:   string
-  readonly album:    string
-  readonly duration: number
-  readonly format:   string
+  readonly id:        string
+  readonly path:      string
+  readonly title:     string
+  readonly artist:    string
+  readonly album:     string
+  readonly duration:  number
+  readonly format:    string
+  readonly albumArt?: string;
 }
 
 export interface FolderNode {

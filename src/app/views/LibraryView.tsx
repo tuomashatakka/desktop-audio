@@ -1,5 +1,5 @@
 import { useUI, useLibrary, useAudio, useSettings } from '../contexts'
-import type { Track } from '../contexts'
+import type { Track, FolderNode } from '../contexts'
 import { useMemo, useEffect } from 'react'
 import { useLibraryScanner } from '../hooks'
 import { scanDirectory } from '../services'
@@ -8,7 +8,7 @@ import { Input } from '../components/atomic'
 
 export function LibraryView () {
   const { selectedFolderPath, selectFolder, setEditingTrack } = useUI()
-  const { folders, filteredTracks, searchQuery, setSearchQuery, selectTrack, setTracks, setFolders, setLoading, isLoading } = useLibrary()
+  const { folders, filteredTracks, searchQuery, setSearchQuery, selectTrack, setTracks, setFolders, setLoading, isLoading, toggleFolder } = useLibrary()
   const { play, currentTrack, isPlaying } = useAudio()
   const { libraryPaths } = useSettings()
   const { scanLibrary } = useLibraryScanner()
@@ -26,6 +26,10 @@ export function LibraryView () {
     const { tracks } = await scanDirectory(path)
     setTracks(tracks)
     setLoading(false)
+  }
+
+  const handleFolderToggle = (path: string) => {
+    toggleFolder(path)
   }
 
   const handleTrackPlay = (track: Track, index: number) => {
@@ -47,7 +51,7 @@ export function LibraryView () {
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
-      <div style={{ width: 240, borderRight: '1px solid var(--border)', overflow: 'auto' }}>
+      <div style={{ width: 260, borderRight: '1px solid var(--border)', overflow: 'auto', background: 'var(--bg-raised)' }}>
         <div style={{ padding: 'var(--sp-3)' }}>
           <h5>Folders</h5>
         </div>
@@ -56,6 +60,7 @@ export function LibraryView () {
           folders={folders}
           selectedPath={selectedFolderPath}
           onSelect={handleFolderSelect}
+          onToggle={handleFolderToggle}
         />
       </div>
 
@@ -134,19 +139,21 @@ export function LibraryView () {
 }
 
 interface FolderTreeProps {
-  readonly folders:      ReadonlyArray<{ readonly id: string; readonly name: string; readonly path: string; readonly children: FolderTreeProps['folders']; readonly expanded: boolean }>
+  readonly folders:      ReadonlyArray<FolderNode>
   readonly selectedPath: string | null
   readonly onSelect:     (path: string) => void
+  readonly onToggle:     (path: string) => void
   readonly level?:       number
 }
 
-function FolderTree ({ folders, selectedPath, onSelect, level = 0 }: FolderTreeProps) {
+function FolderTree ({ folders, selectedPath, onSelect, onToggle, level = 0 }: FolderTreeProps) {
   return (
-    <div>
+    <div className='folder-tree'>
       {folders.map(folder =>
 
-        <div key={folder.id}>
+        <div key={folder.id} className='folder-tree-node'>
           <button
+            className={`folder-row ${selectedPath === folder.path ? 'active' : ''}`}
             onClick={() =>
               onSelect(folder.path)}
             style={{
@@ -161,9 +168,33 @@ function FolderTree ({ folders, selectedPath, onSelect, level = 0 }: FolderTreeP
               color:        selectedPath === folder.path ? 'var(--accent)' : 'var(--text-dim)',
               borderRadius: 'var(--radius)',
               cursor:       'pointer',
+              border:       'none',
             }}
           >
-            <span>{folder.children.length > 0 ? folder.expanded ? '📂' : '📁' : '🎵'}</span>
+            {folder.children.length > 0 &&
+              <span
+                className='folder-toggle'
+                onClick={e => {
+                  e.stopPropagation()
+                  onToggle(folder.path)
+                }}
+                style={{
+                  width:     16,
+                  textAlign: 'center',
+                  fontSize:  'var(--text-xs)',
+                }}
+              >
+                {folder.expanded ? '▼' : '▶'}
+              </span>
+            }
+
+            <span className='folder-icon'>
+              {folder.children.length > 0
+                ? folder.expanded ? '📂' : '📁'
+                : '🎵'
+              }
+            </span>
+
             <span style={{ fontSize: 'var(--text-sm)' }}>{folder.name}</span>
           </button>
 
@@ -172,6 +203,7 @@ function FolderTree ({ folders, selectedPath, onSelect, level = 0 }: FolderTreeP
               folders={folder.children}
               selectedPath={selectedPath}
               onSelect={onSelect}
+              onToggle={onToggle}
               level={level + 1}
             />
           }

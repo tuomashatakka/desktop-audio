@@ -12,4 +12,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('get-audio-metadata', path),
   readFile: (path: string) =>
     ipcRenderer.invoke('read-file', path),
+  minimizeWindow: () =>
+    ipcRenderer.send('window-minimize'),
+  maximizeWindow: () =>
+    ipcRenderer.send('window-maximize'),
+  closeWindow: () =>
+    ipcRenderer.send('window-close'),
+  isMaximized: () =>
+    ipcRenderer.invoke('window-is-maximized'),
 })

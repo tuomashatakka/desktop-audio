@@ -54,7 +54,7 @@ async function loadSettings (): Promise<Settings> {
   }
 
   const musicPath = await getDefaultLibraryPath()
-  return { ...defaultSettings, libraryPaths: musicPath ? [ musicPath ] : [] }
+  return { ...defaultSettings, libraryPaths: musicPath ? [ musicPath ] : []}
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
@@ -73,7 +73,8 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
   }, [])
 
   useEffect(() => {
-    if (!initialized) return
+    if (!initialized)
+      return
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
     }

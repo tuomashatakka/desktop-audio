@@ -21,6 +21,7 @@ interface AudioContextValue extends AudioState {
   readonly setVolume:    (volume: number) => void
   readonly playNext:     (tracks: readonly Track[]) => void
   readonly playPrevious: (tracks: readonly Track[]) => void
+  readonly analyzer:     AnalyserNode | null
 }
 
 const AudioContext = createContext<AudioContextValue | null>(null)
@@ -36,6 +37,9 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   })
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const analyzerRef = useRef<AnalyserNode | null>(null)
+  const audioContextRef = useRef<globalThis.AudioContext | null>(null)
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null)
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -91,13 +95,70 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     }
   }, [ state.volume ])
 
-  const play = useCallback((track: Track) => {
+  useEffect(() =>
+    () => {
+      // Cleanup blob URLs on unmount
+      const audio = audioRef.current
+      if (audio && audio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(audio.src)
+      }
+    }, [])
+
+  const setupAnalyzer = useCallback(() => {
+    if (!audioRef.current)
+      return analyzerRef.current
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new globalThis.AudioContext()
+    }
+
+    const ctx = audioContextRef.current
+    if (!analyzerRef.current) {
+      analyzerRef.current = ctx.createAnalyser()
+      analyzerRef.current.fftSize = 256
+      analyzerRef.current.connect(ctx.destination)
+    }
+
+    if (!sourceRef.current && audioRef.current) {
+      sourceRef.current = ctx.createMediaElementSource(audioRef.current)
+      sourceRef.current.connect(analyzerRef.current)
+    }
+
+    return analyzerRef.current
+  }, [])
+
+  const play = useCallback(async (track: Track) => {
     const audio = audioRef.current
     if (!audio)
       return
 
-    audio.src = track.path
-    audio.play().catch(console.error)
+    try {
+      // Setup analyzer for waveform
+      setupAnalyzer()
+
+      // Read file via Electron API and create a Blob URL
+      const buffer = await window.electronAPI?.readFile(track.path)
+      if (!buffer) {
+        throw new Error('Failed to read file')
+      }
+
+      // Create a Blob from the ArrayBuffer and generate a URL
+      const blob = new Blob([ buffer ])
+      const audioUrl = URL.createObjectURL(blob)
+
+      // Store URL for cleanup
+      const oldUrl = audio.src
+      if (oldUrl && oldUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(oldUrl)
+      }
+
+      audio.src = audioUrl
+      await audio.play()
+    }
+    catch (error) {
+      console.error('Error playing audio:', error)
+    }
+
     setState(s =>
       ({
         ...s,
@@ -105,7 +166,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
         isPlaying:    true,
         currentTime:  0,
       }))
-  }, [])
+  }, [ setupAnalyzer ])
 
   const pause = useCallback(() => {
     const audio = audioRef.current
@@ -134,6 +195,12 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
 
     audio.pause()
     audio.currentTime = 0
+
+    // Revoke any blob URL
+    if (audio.src.startsWith('blob:')) {
+      URL.revokeObjectURL(audio.src)
+    }
+
     setState(s =>
       ({
         ...s,
@@ -202,6 +269,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
         setVolume,
         playNext,
         playPrevious,
+        analyzer: analyzerRef.current,
       }}
     >
       {children}

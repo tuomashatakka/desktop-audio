@@ -1,11 +1,14 @@
 export interface Track {
-  readonly id:       string
-  readonly path:     string
-  readonly title:    string
-  readonly artist:   string
-  readonly album:    string
-  readonly duration: number
-  readonly format:   string
+  readonly id:        string
+  readonly path:      string
+  readonly title:     string
+  readonly artist:    string
+  readonly album:     string
+  readonly duration:  number
+  readonly format:    string
+  readonly albumArt?: string
+  readonly year?:     number
+  readonly genre?:    string
 }
 
 export interface FolderNode {
@@ -22,4 +25,7 @@ export interface AudioMetadata {
   readonly album?:    string
   readonly duration?: number
   readonly format?:   string
+  readonly albumArt?: string
+  readonly year?:     number
+  readonly genre?:    string
 }

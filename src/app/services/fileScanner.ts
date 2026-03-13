@@ -1,14 +1,18 @@
-import type { FolderNode, Track } from './types'
+import type { FolderNode, Track, AudioMetadata } from './types'
 
 
 declare global {
   interface Window {
     readonly electronAPI?: {
       readonly scanDirectory:       (path: string) => Promise<readonly string[]>
-      readonly getAudioMetadata:    (path: string) => Promise<{ readonly title?: string; readonly artist?: string; readonly album?: string; readonly duration?: number }>
+      readonly getAudioMetadata:    (path: string) => Promise<AudioMetadata>
       readonly selectDirectory:     () => Promise<string | null>
       readonly getMusicLibraryPath: () => Promise<string>
       readonly readFile:            (path: string) => Promise<ArrayBuffer>
+      readonly minimizeWindow:      () => void
+      readonly maximizeWindow:      () => void
+      readonly closeWindow:         () => void
+      readonly isMaximized:         () => Promise<boolean>
     }
   }
 }
@@ -80,13 +84,11 @@ function buildFolderTree (rootPath: string, files: readonly string[]): FolderNod
   for (const file of files) {
     const relativePath = file.slice(rootPath.length).replace(/^[\\/]/, '')
     const parts = relativePath.split(/[/\\]/)
+
+    // eslint-disable-next-line functional/no-let
     let currentPath = rootPath
-
-    for (const [ index, part ] of parts.entries()) {
-      if (index === parts.length - 1)
-        continue
-
-      currentPath = currentPath + '/' + part
+    for (let i = 0; i < parts.length - 1; i++) {
+      currentPath = currentPath + '/' + parts[i]
       folderPaths.add(currentPath)
     }
   }
@@ -107,18 +109,21 @@ function buildFolderTree (rootPath: string, files: readonly string[]): FolderNod
     folderMap.set(folderPath, folder)
   }
 
-  for (const [ path, folder ] of folderMap.entries()) {
+  const foldersByPath = Array.from(folderMap.entries())
+
+  for (const [ path, folder ] of foldersByPath) {
     const parentPath = path.slice(0, Math.max(0, path.lastIndexOf('/'))) || path.slice(0, Math.max(0, path.lastIndexOf('\\')))
     const parent = folderMap.get(parentPath)
     if (parent && parentPath !== path) {
-      parent.children.push(folder)
+      const updatedChildren = [ ...parent.children, folder ] as readonly FolderNode[]
+      folderMap.set(parentPath, { ...parent, children: updatedChildren })
     }
   }
 
-  return [ root ]
+  return [ folderMap.get(rootPath) as FolderNode ]
 }
 
-export async function getAudioMetadata (filePath: string): Promise<{ title?: string; artist?: string; album?: string; duration?: number }> {
+export async function getAudioMetadata (filePath: string): Promise<AudioMetadata> {
   if (window.electronAPI?.getAudioMetadata) {
     try {
       return await window.electronAPI.getAudioMetadata(filePath)

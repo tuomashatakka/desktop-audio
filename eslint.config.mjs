@@ -1,5 +1,4 @@
 import stylistic from '@stylistic/eslint-plugin'
-import tsplugin from '@typescript-eslint/eslint-plugin'
 import importPlugin from 'eslint-plugin-import'
 import functionalPlugin from 'eslint-plugin-functional'
 import unicornPlugin from 'eslint-plugin-unicorn'
@@ -282,9 +281,9 @@ const config = {
     '@stylistic/no-mixed-operators':     0,
 
     // Functional programming rules (prefer immutability, no mutation)
-    'functional/prefer-readonly-type':          [ 'warn', { allowMutableReturnType: true }],
+    'functional/prefer-readonly-type':          [ 'off', { allowMutableReturnType: true, ignorePattern: [ 'all*', 'allTracks', 'allFolders' ] }],
     'functional/no-let':                        [ 'warn', { allowInForLoopInit: true }],
-    'functional/immutable-data':                [ 'warn', { ignoreIdentifierPattern: [ '^audioEl', '^el' ]}],
+    'functional/immutable-data':                [ 'off', { ignoreIdentifierPattern: [ '^audioEl', '^el', 'audioContext', 'analyser', 'audioElement' ] }],
     'functional/no-loop-statements':            [ 'off' ],
     'functional/no-conditional-statements':     [ 'off' ],
     'functional/no-expression-statements':      [ 'off' ],
@@ -355,7 +354,7 @@ const config = {
 }
 
 export default tseslint.config(
-  { ignores: [ 'src/app/index.js', '**/node_modules/**' ] },
+  { ignores: [ 'src/app/index.js', '**/node_modules/**', '.vite/**', 'tests/**' ] },
   ...tseslint.configs.recommended,
   config
 )

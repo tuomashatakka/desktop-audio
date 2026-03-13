@@ -70,6 +70,21 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
       
+      - name: Create macOS arm64 artifact
+        run: |
+          mkdir -p artifacts
+          cp out/make/zip/darwin/arm64/*.zip artifacts/ || true
+      
+      - name: Create macOS x64 artifact
+        run: |
+          mkdir -p artifacts
+          cp out/make/zip/darwin/x64/*.zip artifacts/ || true
+      
+      - name: Create Windows artifact
+        run: |
+          mkdir -p artifacts
+          cp out/make/zip/win32/x64/*.zip artifacts/ || true
+      
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -78,8 +93,10 @@ jobs:
           prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
           generate_release_notes: true
           files: |
-            out/make/zip/darwin/arm64/desktop-audio-*-darwin-arm64.zip
-            out/make/zip/darwin/x64/desktop-audio-*-darwin-x64.zip
-            out/make/zip/win32/x64/desktop-audio-*-win32-x64.zip
+            out/make/zip/darwin/arm64/*.zip
+            out/make/zip/darwin/x64/*.zip
+            out/make/zip/win32/x64/*.zip
+            out/make/deb/*.deb
+            out/make/rpm/*.rpm
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
