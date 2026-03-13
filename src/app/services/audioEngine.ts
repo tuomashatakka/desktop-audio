@@ -1,8 +1,8 @@
 export class AudioEngine {
-  private static readonly instance: AudioEngine
-  private readonly audioContext:    AudioContext | null = null
-  private readonly analyser:        AnalyserNode | null = null
-  private readonly audioElement:    HTMLAudioElement | null = null
+  private static instance: AudioEngine | null = null
+  private audioContext:    AudioContext | null = null
+  private analyser:        AnalyserNode | null = null
+  private audioElement:    HTMLAudioElement | null = null
 
   private constructor () {}
 
@@ -158,7 +158,7 @@ export class AudioEngine {
   dispose (): void {
     this.audioElement?.pause()
     this.audioElement = null
-    this.audioContext?.close()
+    this.audioContext?.close().catch(console.error)
     this.audioContext = null
     this.analyser = null
   }

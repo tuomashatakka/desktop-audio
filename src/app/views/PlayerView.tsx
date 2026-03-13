@@ -7,7 +7,7 @@ export function PlayerView () {
   const { filteredTracks } = useLibrary()
 
   const formatTime = (seconds: number) => {
-    if (!seconds || !isFinite(seconds))
+    if (!seconds || !Number.isFinite(seconds))
       return '0:00'
 
     const mins = Math.floor(seconds / 60)

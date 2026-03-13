@@ -71,7 +71,7 @@ ipcMain.handle('get-music-library-path', () =>
   app.getPath('music'))
 
 ipcMain.handle('scan-directory', async (_event, dirPath: string) => {
-  const files: readonly string[] = []
+  const files: string[] = []
 
   function walkDir (dir: string, acc: string[]) {
     try {
@@ -91,14 +91,13 @@ ipcMain.handle('scan-directory', async (_event, dirPath: string) => {
     }
   }
 
-  const acc: readonly string[] = []
-  walkDir(dirPath, acc as string[])
+  const acc: string[] = []
+  walkDir(dirPath, acc)
   return acc as readonly string[]
 })
 
-ipcMain.handle('get-audio-metadata', async (_event, filePath: string) => {
-  return {}
-})
+ipcMain.handle('get-audio-metadata', async (_event, filePath: string) =>
+  ({}))
 
 ipcMain.handle('read-file', async (_event, filePath: string) => {
   const buffer = fs.readFileSync(filePath)

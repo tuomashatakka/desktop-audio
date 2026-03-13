@@ -3,6 +3,14 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect } f
 import type { Track } from './LibraryContext'
 
 
+function convertFilePathToUrl (filePath: string): string {
+  if (filePath.startsWith('file://') || filePath.startsWith('http://') || filePath.startsWith('https://')) {
+    return filePath
+  }
+  return `file://${filePath}`
+}
+
+
 interface AudioState {
   readonly isPlaying:    boolean
   readonly currentTime:  number
@@ -96,8 +104,11 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     if (!audio)
       return
 
-    audio.src = track.path
-    audio.play().catch(console.error)
+    const audioUrl = convertFilePathToUrl(track.path)
+    audio.src = audioUrl
+    audio.play().catch(error => {
+      console.error('Error playing audio:', error)
+    })
     setState(s =>
       ({
         ...s,

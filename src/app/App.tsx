@@ -15,6 +15,7 @@ function AppContent () {
   const [ isAnimating, setIsAnimating ] = useState(false)
   const [ showExpanded, setShowExpanded ] = useState(false)
 
+  // eslint-disable-next-line complexity
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       return
@@ -24,7 +25,7 @@ function AppContent () {
       case 'Space':
         e.preventDefault()
         if (currentTrack) {
-          isPlaying ? pause() : resume()
+          void (isPlaying ? pause() : resume())
         }
         break
       case 'ArrowRight':
@@ -92,7 +93,7 @@ function AppContent () {
   }
 
   const formatTime = (seconds: number) => {
-    if (!seconds || !isFinite(seconds))
+    if (!seconds || !Number.isFinite(seconds))
       return '0:00'
 
     const mins = Math.floor(seconds / 60)

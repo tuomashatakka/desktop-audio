@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useLibrary, useSettings, useAudio } from '../contexts'
 import { scanDirectory, selectDirectory } from '../services'
-import type { Track } from '../services'
+import type { Track, FolderNode } from '../services'
 
 
 export function useLibraryScanner () {
@@ -16,8 +16,8 @@ export function useLibraryScanner () {
 
     setLoading(true)
 
-    const allTracks: readonly Track[] = []
-    const allFolders: readonly { readonly id: string; readonly name: string; readonly path: string; readonly children: readonly unknown[]; readonly expanded: boolean }[] = []
+    const allTracks: Track[] = []
+    const allFolders: FolderNode[] = []
 
     for (const path of libraryPaths) {
       const { folders, tracks } = await scanDirectory(path)
@@ -25,7 +25,7 @@ export function useLibraryScanner () {
       allFolders.push(...folders)
     }
 
-    setFolders(allFolders as readonly never[])
+    setFolders(allFolders)
     setTracks(allTracks)
     setLoading(false)
   }, [ libraryPaths, setFolders, setTracks, setLoading ])

@@ -80,13 +80,11 @@ function buildFolderTree (rootPath: string, files: readonly string[]): FolderNod
   for (const file of files) {
     const relativePath = file.slice(rootPath.length).replace(/^[\\/]/, '')
     const parts = relativePath.split(/[/\\]/)
+
+    // eslint-disable-next-line functional/no-let
     let currentPath = rootPath
-
-    for (const [ index, part ] of parts.entries()) {
-      if (index === parts.length - 1)
-        continue
-
-      currentPath = currentPath + '/' + part
+    for (let i = 0; i < parts.length - 1; i++) {
+      currentPath = currentPath + '/' + parts[i]
       folderPaths.add(currentPath)
     }
   }
@@ -107,15 +105,18 @@ function buildFolderTree (rootPath: string, files: readonly string[]): FolderNod
     folderMap.set(folderPath, folder)
   }
 
-  for (const [ path, folder ] of folderMap.entries()) {
+  const foldersByPath = Array.from(folderMap.entries())
+
+  for (const [ path, folder ] of foldersByPath) {
     const parentPath = path.slice(0, Math.max(0, path.lastIndexOf('/'))) || path.slice(0, Math.max(0, path.lastIndexOf('\\')))
     const parent = folderMap.get(parentPath)
     if (parent && parentPath !== path) {
-      parent.children.push(folder)
+      const updatedChildren = [ ...parent.children, folder ] as readonly FolderNode[]
+      folderMap.set(parentPath, { ...parent, children: updatedChildren })
     }
   }
 
-  return [ root ]
+  return [ folderMap.get(rootPath) as FolderNode ]
 }
 
 export async function getAudioMetadata (filePath: string): Promise<{ title?: string; artist?: string; album?: string; duration?: number }> {
