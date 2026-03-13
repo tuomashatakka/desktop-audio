@@ -105,7 +105,8 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     }, [])
 
   const setupAnalyzer = useCallback(() => {
-    if (!audioRef.current) return analyzerRef.current
+    if (!audioRef.current)
+      return analyzerRef.current
 
     if (!audioContextRef.current) {
       audioContextRef.current = new globalThis.AudioContext()

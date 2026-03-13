@@ -3,24 +3,25 @@ import path from 'node:path'
 import fs from 'node:fs'
 import started from 'electron-squirrel-startup'
 
+
 if (started) {
   app.quit()
 }
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
-    width:          1200,
-    height:         800,
-    minWidth:       800,
-    minHeight:      600,
-    frame:          false,
-    titleBarStyle:  'hidden',
-    transparent:    true,
+    width:           1200,
+    height:          800,
+    minWidth:        800,
+    minHeight:       600,
+    frame:           false,
+    titleBarStyle:   'hidden',
+    transparent:     true,
     backgroundColor: '#00000000',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+    webPreferences:  {
+      preload:          path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration:   false,
+      nodeIntegration:  false,
     },
   })
 
@@ -106,6 +107,7 @@ ipcMain.handle('get-audio-metadata', async (_event, filePath: string) => {
     const metadata = await mm.parseFile(filePath)
     const picture = metadata.common.picture?.[0]
 
+    // eslint-disable-next-line functional/no-let
     let albumArt: string | undefined
     if (picture) {
       const base64 = Buffer.from(picture.data).toString('base64')
@@ -113,16 +115,17 @@ ipcMain.handle('get-audio-metadata', async (_event, filePath: string) => {
     }
 
     return {
-      title: metadata.common.title || undefined,
-      artist: metadata.common.artist || undefined,
-      album: metadata.common.album || undefined,
-      year: metadata.common.year || undefined,
-      genre: metadata.common.genre?.[0] || undefined,
-      track: metadata.common.track?.no || undefined,
+      title:    metadata.common.title || undefined,
+      artist:   metadata.common.artist || undefined,
+      album:    metadata.common.album || undefined,
+      year:     metadata.common.year || undefined,
+      genre:    metadata.common.genre?.[0] || undefined,
+      track:    metadata.common.track?.no || undefined,
       duration: metadata.format.duration || undefined,
       albumArt,
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error reading metadata:', error)
     return {}
   }
@@ -151,6 +154,5 @@ ipcMain.on('window-close', () => {
   BrowserWindow.getFocusedWindow()?.close()
 })
 
-ipcMain.handle('window-is-maximized', () => {
-  return BrowserWindow.getFocusedWindow()?.isMaximized() ?? false
-})
+ipcMain.handle('window-is-maximized', () =>
+  BrowserWindow.getFocusedWindow()?.isMaximized() ?? false)

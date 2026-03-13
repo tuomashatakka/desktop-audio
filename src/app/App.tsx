@@ -144,6 +144,7 @@ function AppContent () {
           >
             ─
           </button>
+
           <button
             className='titlebar-btn'
             onClick={() =>
@@ -152,6 +153,7 @@ function AppContent () {
           >
             □
           </button>
+
           <button
             className='titlebar-btn titlebar-btn-close'
             onClick={() =>

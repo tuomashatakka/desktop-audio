@@ -7,7 +7,7 @@ import { Waveform } from '../components/atomic/Waveform'
 export function PlayerView () {
   const { currentTrack, isPlaying, currentTime, duration, volume, play, pause, resume, seek, setVolume, playNext, playPrevious, analyzer } = useAudio()
   const { filteredTracks } = useLibrary()
-  const [showWaveform, setShowWaveform] = useState(false)
+  const [ showWaveform, setShowWaveform ] = useState(false)
 
   const formatTime = (seconds: number) => {
     if (!seconds || !Number.isFinite(seconds))
@@ -35,31 +35,34 @@ export function PlayerView () {
       <div style={{ width: '100%', maxWidth: 500, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--sp-6)' }}>
         <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
           <button
-            onClick={() => setShowWaveform(false)}
-            data-variant={!showWaveform ? 'primary' : 'secondary'}
+            onClick={() =>
+              setShowWaveform(false)}
+            data-variant={showWaveform ? 'secondary' : 'primary'}
             data-size='sm'
             style={{
-              padding: 'var(--sp-2) var(--sp-3)',
+              padding:      'var(--sp-2) var(--sp-3)',
               borderRadius: 'var(--radius)',
-              border: 'none',
-              cursor: 'pointer',
-              background: !showWaveform ? 'var(--accent)' : 'var(--bg-raised)',
-              color: !showWaveform ? 'var(--text)' : 'var(--text-dim)',
+              border:       'none',
+              cursor:       'pointer',
+              background:   showWaveform ? 'var(--bg-raised)' : 'var(--accent)',
+              color:        showWaveform ? 'var(--text-dim)' : 'var(--text)',
             }}
           >
             Album Art
           </button>
+
           <button
-            onClick={() => setShowWaveform(true)}
+            onClick={() =>
+              setShowWaveform(true)}
             data-variant={showWaveform ? 'primary' : 'secondary'}
             data-size='sm'
             style={{
-              padding: 'var(--sp-2) var(--sp-3)',
+              padding:      'var(--sp-2) var(--sp-3)',
               borderRadius: 'var(--radius)',
-              border: 'none',
-              cursor: 'pointer',
-              background: showWaveform ? 'var(--accent)' : 'var(--bg-raised)',
-              color: showWaveform ? 'var(--text)' : 'var(--text-dim)',
+              border:       'none',
+              cursor:       'pointer',
+              background:   showWaveform ? 'var(--accent)' : 'var(--bg-raised)',
+              color:        showWaveform ? 'var(--text)' : 'var(--text-dim)',
             }}
           >
             Waveform
@@ -69,32 +72,32 @@ export function PlayerView () {
         {showWaveform
           ? <Waveform analyzer={analyzer} isPlaying={isPlaying} />
           : <div
-              style={{
-                width:          300,
-                height:         300,
-                background:     'var(--bg-raised)',
-                borderRadius:   'var(--radius-lg)',
-                display:        'flex',
-                alignItems:     'center',
-                justifyContent: 'center',
-                fontSize:       80,
-                boxShadow:      'var(--shadow-lg)',
-                overflow:       'hidden',
-              }}
-            >
-              {(currentTrack as any).albumArt
-                ? <img
-                    src={(currentTrack as any).albumArt}
-                    alt='Album art'
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                    }}
-                  />
-                : '♫'
-              }
-            </div>
+            style={{
+              width:          300,
+              height:         300,
+              background:     'var(--bg-raised)',
+              borderRadius:   'var(--radius-lg)',
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'center',
+              fontSize:       80,
+              boxShadow:      'var(--shadow-lg)',
+              overflow:       'hidden',
+            }}
+          >
+            {currentTrack.albumArt
+              ? <img
+                src={currentTrack.albumArt}
+                alt='Album art'
+                style={{
+                  width:     '100%',
+                  height:    '100%',
+                  objectFit: 'cover',
+                }}
+              />
+              : '♫'
+            }
+          </div>
         }
 
         <div style={{ textAlign: 'center' }}>

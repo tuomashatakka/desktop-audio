@@ -9,8 +9,8 @@ declare global {
       readonly selectDirectory:     () => Promise<string | null>
       readonly getMusicLibraryPath: () => Promise<string>
       readonly readFile:            (path: string) => Promise<ArrayBuffer>
-      readonly minimizeWindow:       () => void
-      readonly maximizeWindow:       () => void
+      readonly minimizeWindow:      () => void
+      readonly maximizeWindow:      () => void
       readonly closeWindow:         () => void
       readonly isMaximized:         () => Promise<boolean>
     }

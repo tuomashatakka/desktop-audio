@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 
 
 interface WaveformProps {
-  readonly analyzer: AnalyserNode | null
+  readonly analyzer:  AnalyserNode | null
   readonly isPlaying: boolean
 }
 
@@ -12,10 +12,12 @@ export function Waveform ({ analyzer, isPlaying }: WaveformProps) {
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || !analyzer) return
+    if (!canvas || !analyzer)
+      return
 
     const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    if (!ctx)
+      return
 
     const bufferLength = analyzer.frequencyBinCount
     const dataArray = new Uint8Array(bufferLength)
@@ -32,11 +34,12 @@ export function Waveform ({ analyzer, isPlaying }: WaveformProps) {
       ctx.fillStyle = 'rgba(18, 18, 18, 0.3)'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      const barWidth = (canvas.width / bufferLength) * 2.5
+      const barWidth = canvas.width / bufferLength * 2.5
+      // eslint-disable-next-line functional/no-let
       let x = 0
 
       for (let i = 0; i < bufferLength; i++) {
-        const barHeight = (dataArray[i] / 255) * canvas.height * 0.9
+        const barHeight = dataArray[i] / 255 * canvas.height * 0.9
 
         const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height)
         gradient.addColorStop(0, '#ff5500')
@@ -56,7 +59,7 @@ export function Waveform ({ analyzer, isPlaying }: WaveformProps) {
         cancelAnimationFrame(animationRef.current)
       }
     }
-  }, [analyzer, isPlaying])
+  }, [ analyzer, isPlaying ])
 
   return (
     <canvas
@@ -64,10 +67,10 @@ export function Waveform ({ analyzer, isPlaying }: WaveformProps) {
       width={300}
       height={100}
       style={{
-        width: 300,
-        height: 100,
+        width:        300,
+        height:       100,
         borderRadius: 'var(--radius-lg)',
-        background: 'rgba(18, 18, 18, 0.3)',
+        background:   'rgba(18, 18, 18, 0.3)',
       }}
     />
   )

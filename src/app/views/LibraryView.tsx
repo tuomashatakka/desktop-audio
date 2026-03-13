@@ -171,28 +171,30 @@ function FolderTree ({ folders, selectedPath, onSelect, onToggle, level = 0 }: F
               border:       'none',
             }}
           >
-            {folder.children.length > 0 && (
+            {folder.children.length > 0 &&
               <span
                 className='folder-toggle'
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation()
                   onToggle(folder.path)
                 }}
                 style={{
                   width:     16,
                   textAlign: 'center',
-                  fontSize: 'var(--text-xs)',
+                  fontSize:  'var(--text-xs)',
                 }}
               >
                 {folder.expanded ? '▼' : '▶'}
               </span>
-            )}
+            }
+
             <span className='folder-icon'>
               {folder.children.length > 0
-                ? (folder.expanded ? '📂' : '📁')
+                ? folder.expanded ? '📂' : '📁'
                 : '🎵'
               }
             </span>
+
             <span style={{ fontSize: 'var(--text-sm)' }}>{folder.name}</span>
           </button>
 
