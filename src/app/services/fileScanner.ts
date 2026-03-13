@@ -4,10 +4,11 @@ import type { FolderNode, Track } from './types'
 declare global {
   interface Window {
     readonly electronAPI?: {
-      readonly scanDirectory:    (path: string) => Promise<readonly string[]>
-      readonly getAudioMetadata: (path: string) => Promise<{ readonly title?: string; readonly artist?: string; readonly album?: string; readonly duration?: number }>
-      readonly selectDirectory:  () => Promise<string | null>
-      readonly readFile:         (path: string) => Promise<ArrayBuffer>
+      readonly scanDirectory:       (path: string) => Promise<readonly string[]>
+      readonly getAudioMetadata:    (path: string) => Promise<{ readonly title?: string; readonly artist?: string; readonly album?: string; readonly duration?: number }>
+      readonly selectDirectory:     () => Promise<string | null>
+      readonly getMusicLibraryPath: () => Promise<string>
+      readonly readFile:            (path: string) => Promise<ArrayBuffer>
     }
   }
 }

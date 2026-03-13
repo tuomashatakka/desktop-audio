@@ -2,6 +2,7 @@ import { useUI, useLibrary, useAudio, useSettings } from '../contexts'
 import type { Track } from '../contexts'
 import { useMemo, useEffect } from 'react'
 import { useLibraryScanner } from '../hooks'
+import { scanDirectory } from '../services'
 import { Input } from '../components/atomic'
 
 
@@ -18,18 +19,13 @@ export function LibraryView () {
     }
   }, [ libraryPaths, folders.length, scanLibrary ])
 
-  const handleFolderSelect = (path: string) => {
+  const handleFolderSelect = async (path: string) => {
     selectFolder(path)
     setLoading(true)
-    setTimeout(() => {
-      const mockTracks: readonly Track[] = [
-        { id: '1', path: '/music/track1.mp3', title: 'Sample Track 1', artist: 'Artist 1', album: 'Album 1', duration: 180, format: 'mp3' },
-        { id: '2', path: '/music/track2.mp3', title: 'Sample Track 2', artist: 'Artist 2', album: 'Album 2', duration: 240, format: 'mp3' },
-        { id: '3', path: '/music/track3.mp3', title: 'Sample Track 3', artist: 'Artist 3', album: 'Album 3', duration: 200, format: 'mp3' },
-      ]
-      setTracks(mockTracks)
-      setLoading(false)
-    }, 300)
+
+    const { tracks } = await scanDirectory(path)
+    setTracks(tracks)
+    setLoading(false)
   }
 
   const handleTrackPlay = (track: Track, index: number) => {
@@ -57,19 +53,7 @@ export function LibraryView () {
         </div>
 
         <FolderTree
-          folders={folders.length > 0
-            ? folders
-            : [
-              { id:       '1',
-                name:     'Music',
-                path:     '/music',
-                children: [
-                  { id: '2', name: 'Rock', path: '/music/rock', children: [], expanded: false },
-                  { id: '3', name: 'Jazz', path: '/music/jazz', children: [], expanded: false },
-                ],
-                expanded: true },
-              { id: '4', name: 'Podcasts', path: '/podcasts', children: [], expanded: false },
-            ]}
+          folders={folders}
           selectedPath={selectedFolderPath}
           onSelect={handleFolderSelect}
         />

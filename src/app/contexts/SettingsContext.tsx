@@ -30,7 +30,19 @@ const defaultSettings: Settings = {
 
 const STORAGE_KEY = 'desktop-audio-settings'
 
-function loadSettings (): Settings {
+async function getDefaultLibraryPath (): Promise<string | null> {
+  if (window.electronAPI?.getMusicLibraryPath) {
+    try {
+      return await window.electronAPI.getMusicLibraryPath()
+    }
+    catch {
+      // Ignore errors
+    }
+  }
+  return null
+}
+
+async function loadSettings (): Promise<Settings> {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
@@ -40,22 +52,35 @@ function loadSettings (): Settings {
   catch {
     // Ignore errors
   }
-  return defaultSettings
+
+  const musicPath = await getDefaultLibraryPath()
+  return { ...defaultSettings, libraryPaths: musicPath ? [ musicPath ] : [] }
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
 
 export function SettingsProvider ({ children }: { readonly children: ReactNode }) {
-  const [ settings, setSettings ] = useState<Settings>(loadSettings)
+  const [ settings, setSettings ] = useState<Settings>(defaultSettings)
+  const [ initialized, setInitialized ] = useState(false)
 
   useEffect(() => {
+    const init = async () => {
+      const loaded = await loadSettings()
+      setSettings(loaded)
+      setInitialized(true)
+    }
+    init()
+  }, [])
+
+  useEffect(() => {
+    if (!initialized) return
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
     }
     catch {
       // Ignore storage errors
     }
-  }, [ settings ])
+  }, [ settings, initialized ])
 
   const addLibraryPath = useCallback((path: string) => {
     setSettings(s => {

@@ -2,6 +2,8 @@
 
 This file provides guidance for AI agents working in this repository.
 
+Always read the docs/*.md and CLAUDE.md files at the start of the conversation and follow the instructions in them.
+
 ---
 
 ## 1. Build / Lint / Test Commands

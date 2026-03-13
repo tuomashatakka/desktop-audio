@@ -1,2 +1,15 @@
-// See the Electron documentation for details on how to use preload scripts:
-// https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
+import { contextBridge, ipcRenderer } from 'electron'
+
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  selectDirectory: () =>
+    ipcRenderer.invoke('select-directory'),
+  getMusicLibraryPath: () =>
+    ipcRenderer.invoke('get-music-library-path'),
+  scanDirectory: (path: string) =>
+    ipcRenderer.invoke('scan-directory', path),
+  getAudioMetadata: (path: string) =>
+    ipcRenderer.invoke('get-audio-metadata', path),
+  readFile: (path: string) =>
+    ipcRenderer.invoke('read-file', path),
+})

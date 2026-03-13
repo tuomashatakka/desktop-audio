@@ -1,5 +1,6 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
+import fs from 'node:fs'
 import started from 'electron-squirrel-startup'
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -55,3 +56,51 @@ app.on('activate', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
+
+ipcMain.handle('select-directory', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: [ 'openDirectory' ],
+  })
+  if (result.canceled || result.filePaths.length === 0) {
+    return null
+  }
+  return result.filePaths[0]
+})
+
+ipcMain.handle('get-music-library-path', () =>
+  app.getPath('music'))
+
+ipcMain.handle('scan-directory', async (_event, dirPath: string) => {
+  const files: readonly string[] = []
+
+  function walkDir (dir: string, acc: string[]) {
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true })
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          walkDir(fullPath, acc)
+        }
+        else if (entry.isFile()) {
+          acc.push(fullPath)
+        }
+      }
+    }
+    catch (error) {
+      console.error('Error reading directory:', error)
+    }
+  }
+
+  const acc: readonly string[] = []
+  walkDir(dirPath, acc as string[])
+  return acc as readonly string[]
+})
+
+ipcMain.handle('get-audio-metadata', async (_event, filePath: string) => {
+  return {}
+})
+
+ipcMain.handle('read-file', async (_event, filePath: string) => {
+  const buffer = fs.readFileSync(filePath)
+  return buffer
+})

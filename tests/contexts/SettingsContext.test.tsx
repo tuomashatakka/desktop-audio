@@ -42,6 +42,9 @@ describe('SettingsContext', () => {
     vi.stubGlobal('localStorage', localStorageMock)
     localStorageMock.getItem.mockReturnValue(null)
     localStorageMock.setItem.mockClear()
+    vi.stubGlobal('electronAPI', {
+      getMusicLibraryPath: vi.fn().mockResolvedValue(null),
+    })
   })
 
   afterEach(() => {
@@ -69,6 +72,7 @@ describe('SettingsContext', () => {
     )
 
     await act(async () => {
+      await new Promise(r => setTimeout(r, 10))
       screen.getByText('addPath').click()
     })
 
@@ -83,6 +87,7 @@ describe('SettingsContext', () => {
     )
 
     await act(async () => {
+      await new Promise(r => setTimeout(r, 10))
       screen.getByText('addPath').click()
       screen.getByText('addPath').click()
     })
@@ -98,6 +103,7 @@ describe('SettingsContext', () => {
     )
 
     await act(async () => {
+      await new Promise(r => setTimeout(r, 10))
       screen.getByText('addPath').click()
       screen.getByText('removePath').click()
     })
@@ -113,6 +119,7 @@ describe('SettingsContext', () => {
     )
 
     await act(async () => {
+      await new Promise(r => setTimeout(r, 10))
       screen.getByText('setTheme').click()
     })
 
@@ -127,6 +134,7 @@ describe('SettingsContext', () => {
     )
 
     await act(async () => {
+      await new Promise(r => setTimeout(r, 10))
       screen.getByText('setVolume').click()
     })
 
@@ -141,6 +149,7 @@ describe('SettingsContext', () => {
     )
 
     await act(async () => {
+      await new Promise(r => setTimeout(r, 10))
       screen.getByText('setRepeat').click()
     })
 
