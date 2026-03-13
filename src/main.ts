@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import started from 'electron-squirrel-startup'
+import * as mm from 'music-metadata'
 
 
 if (started) {
@@ -103,7 +104,6 @@ ipcMain.handle('scan-directory', async (_event, dirPath: string) => {
 
 ipcMain.handle('get-audio-metadata', async (_event, filePath: string) => {
   try {
-    const mm = await import('music-metadata')
     const metadata = await mm.parseFile(filePath)
     const picture = metadata.common.picture?.[0]
 
