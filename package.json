@@ -28,20 +28,27 @@
     "@electron-forge/plugin-fuses": "^7.11.1",
     "@electron-forge/plugin-vite": "^7.11.1",
     "@electron/fuses": "^1.8.0",
+    "@types/animejs": "^3.1.13",
     "@types/electron-squirrel-startup": "^1.0.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
+    "@vitejs/plugin-react": "^6.0.0",
     "electron": "41.0.1",
     "eslint": "^10.0.3",
     "eslint-plugin-import": "^2.32.0",
     "typescript": "^5.9.3",
-    "vite": "^5.4.21"
+    "vite": "^8.0.0"
   },
   "dependencies": {
     "@stylistic/eslint-plugin": "^5.10.0",
+    "animejs": "^4.3.6",
     "electron-squirrel-startup": "^1.0.1",
     "eslint-plugin-functional": "^9.0.4",
     "eslint-plugin-unicorn": "^63.0.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "typescript-eslint": "^8.57.0"
   }
 }

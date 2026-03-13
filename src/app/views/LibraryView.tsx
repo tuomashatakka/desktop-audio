@@ -1,0 +1,198 @@
+import { useUI, useLibrary, useAudio, useSettings } from '../contexts'
+import type { Track } from '../contexts'
+import { useMemo, useEffect } from 'react'
+import { useLibraryScanner } from '../hooks'
+import { Input } from '../components/atomic'
+
+
+export function LibraryView () {
+  const { selectedFolderPath, selectFolder, setEditingTrack } = useUI()
+  const { folders, filteredTracks, searchQuery, setSearchQuery, selectTrack, setTracks, setFolders, setLoading, isLoading } = useLibrary()
+  const { play, currentTrack, isPlaying } = useAudio()
+  const { libraryPaths } = useSettings()
+  const { scanLibrary } = useLibraryScanner()
+
+  useEffect(() => {
+    if (libraryPaths.length > 0 && folders.length === 0) {
+      scanLibrary()
+    }
+  }, [ libraryPaths, folders.length, scanLibrary ])
+
+  const handleFolderSelect = (path: string) => {
+    selectFolder(path)
+    setLoading(true)
+    setTimeout(() => {
+      const mockTracks: readonly Track[] = [
+        { id: '1', path: '/music/track1.mp3', title: 'Sample Track 1', artist: 'Artist 1', album: 'Album 1', duration: 180, format: 'mp3' },
+        { id: '2', path: '/music/track2.mp3', title: 'Sample Track 2', artist: 'Artist 2', album: 'Album 2', duration: 240, format: 'mp3' },
+        { id: '3', path: '/music/track3.mp3', title: 'Sample Track 3', artist: 'Artist 3', album: 'Album 3', duration: 200, format: 'mp3' },
+      ]
+      setTracks(mockTracks)
+      setLoading(false)
+    }, 300)
+  }
+
+  const handleTrackPlay = (track: Track, index: number) => {
+    selectTrack(index)
+    play(track)
+  }
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const displayTracks = useMemo(() => {
+    if (!selectedFolderPath)
+      return filteredTracks
+    return filteredTracks
+  }, [ selectedFolderPath, filteredTracks ])
+
+  return (
+    <div style={{ display: 'flex', height: '100%' }}>
+      <div style={{ width: 240, borderRight: '1px solid var(--border)', overflow: 'auto' }}>
+        <div style={{ padding: 'var(--sp-3)' }}>
+          <h5>Folders</h5>
+        </div>
+
+        <FolderTree
+          folders={folders.length > 0
+            ? folders
+            : [
+              { id:       '1',
+                name:     'Music',
+                path:     '/music',
+                children: [
+                  { id: '2', name: 'Rock', path: '/music/rock', children: [], expanded: false },
+                  { id: '3', name: 'Jazz', path: '/music/jazz', children: [], expanded: false },
+                ],
+                expanded: true },
+              { id: '4', name: 'Podcasts', path: '/podcasts', children: [], expanded: false },
+            ]}
+          selectedPath={selectedFolderPath}
+          onSelect={handleFolderSelect}
+        />
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className='view-header'>
+          <h2>Library</h2>
+
+          <div style={{ width: 250 }}>
+            <Input
+              type='search'
+              placeholder='Search tracks...'
+              value={searchQuery}
+              onChange={e =>
+                setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflow: 'auto', padding: 'var(--sp-4)' }}>
+          {isLoading
+            ? <div style={{ textAlign: 'center', padding: 'var(--sp-12)', color: 'var(--text-muted)' }}>
+              <p>Loading...</p>
+            </div>
+            : displayTracks.length === 0
+              ? <div style={{ textAlign: 'center', padding: 'var(--sp-12)', color: 'var(--text-muted)' }}>
+                <p>No tracks found</p>
+                <small>Select a folder or add library paths in Settings</small>
+              </div>
+              : <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ textAlign: 'left', padding: 'var(--sp-2)', color: 'var(--text-muted)', fontWeight: 'var(--font-normal)', fontSize: 'var(--text-sm)' }}>#</th>
+                    <th style={{ textAlign: 'left', padding: 'var(--sp-2)', color: 'var(--text-muted)', fontWeight: 'var(--font-normal)', fontSize: 'var(--text-sm)' }}>Title</th>
+                    <th style={{ textAlign: 'left', padding: 'var(--sp-2)', color: 'var(--text-muted)', fontWeight: 'var(--font-normal)', fontSize: 'var(--text-sm)' }}>Artist</th>
+                    <th style={{ textAlign: 'left', padding: 'var(--sp-2)', color: 'var(--text-muted)', fontWeight: 'var(--font-normal)', fontSize: 'var(--text-sm)' }}>Album</th>
+                    <th style={{ textAlign: 'right', padding: 'var(--sp-2)', color: 'var(--text-muted)', fontWeight: 'var(--font-normal)', fontSize: 'var(--text-sm)' }}>Duration</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {displayTracks.map((track, index) =>
+
+                    <tr
+                      key={track.id}
+                      onClick={() =>
+                        handleTrackPlay(track, index)}
+                      style={{
+                        cursor:     'pointer',
+                        background: currentTrack?.id === track.id ? 'var(--accent-muted)' : 'transparent',
+                      }}
+                      onMouseEnter={e =>
+                        e.currentTarget.style.background = currentTrack?.id === track.id ? 'var(--accent-muted)' : 'var(--bg-hover)'}
+                      onMouseLeave={e =>
+                        e.currentTarget.style.background = currentTrack?.id === track.id ? 'var(--accent-muted)' : 'transparent'}
+                    >
+                      <td style={{ padding: 'var(--sp-2)', color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+                        {currentTrack?.id === track.id && isPlaying ? '▶' : index + 1}
+                      </td>
+
+                      <td style={{ padding: 'var(--sp-2)' }}>{track.title}</td>
+                      <td style={{ padding: 'var(--sp-2)', color: 'var(--text-dim)' }}>{track.artist}</td>
+                      <td style={{ padding: 'var(--sp-2)', color: 'var(--text-dim)' }}>{track.album}</td>
+
+                      <td style={{ textAlign: 'right', padding: 'var(--sp-2)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}>
+                        {formatDuration(track.duration)}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+          }
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface FolderTreeProps {
+  readonly folders:      ReadonlyArray<{ readonly id: string; readonly name: string; readonly path: string; readonly children: FolderTreeProps['folders']; readonly expanded: boolean }>
+  readonly selectedPath: string | null
+  readonly onSelect:     (path: string) => void
+  readonly level?:       number
+}
+
+function FolderTree ({ folders, selectedPath, onSelect, level = 0 }: FolderTreeProps) {
+  return (
+    <div>
+      {folders.map(folder =>
+
+        <div key={folder.id}>
+          <button
+            onClick={() =>
+              onSelect(folder.path)}
+            style={{
+              display:      'flex',
+              alignItems:   'center',
+              gap:          'var(--sp-2)',
+              width:        '100%',
+              padding:      'var(--sp-2) var(--sp-3)',
+              paddingLeft:  `calc(var(--sp-3) + ${level * 16}px)`,
+              textAlign:    'left',
+              background:   selectedPath === folder.path ? 'var(--accent-muted)' : 'transparent',
+              color:        selectedPath === folder.path ? 'var(--accent)' : 'var(--text-dim)',
+              borderRadius: 'var(--radius)',
+              cursor:       'pointer',
+            }}
+          >
+            <span>{folder.children.length > 0 ? folder.expanded ? '📂' : '📁' : '🎵'}</span>
+            <span style={{ fontSize: 'var(--text-sm)' }}>{folder.name}</span>
+          </button>
+
+          {folder.expanded && folder.children.length > 0 &&
+            <FolderTree
+              folders={folder.children}
+              selectedPath={selectedPath}
+              onSelect={onSelect}
+              level={level + 1}
+            />
+          }
+        </div>
+      )}
+    </div>
+  )
+}
