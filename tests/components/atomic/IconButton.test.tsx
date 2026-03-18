@@ -15,15 +15,15 @@ describe('IconButton', () => {
 
   it('renders with different sizes', () => {
     const { rerender } = render(<IconButton label='Small' size='sm'>S</IconButton>)
-    expect(screen.getByRole('button')).toHaveAttribute('data-size', 'sm')
+    expect(screen.getByRole('button')).toHaveClass('sm')
 
     rerender(<IconButton label='Large' size='lg'>L</IconButton>)
-    expect(screen.getByRole('button')).toHaveAttribute('data-size', 'lg')
+    expect(screen.getByRole('button')).toHaveClass('lg')
   })
 
-  it('has data-icon attribute', () => {
+  it('has icon class', () => {
     render(<IconButton label='Icon'>I</IconButton>)
-    expect(screen.getByRole('button')).toHaveAttribute('data-icon')
+    expect(screen.getByRole('button')).toHaveClass('icon')
   })
 
   it('is disabled when disabled prop is passed', () => {

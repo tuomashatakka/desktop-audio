@@ -12,13 +12,19 @@ export function IconButton ({
   size,
   children,
   disabled,
+  className = '',
   ...props
 }: IconButtonProps) {
+  const classes = [
+    'button icon',
+    size,
+    className,
+  ].filter(Boolean).join(' ')
+
   return (
     <button
       aria-label={label}
-      data-icon
-      data-size={size}
+      className={classes}
       disabled={disabled}
       {...props}
     >

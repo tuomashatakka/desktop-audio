@@ -1,14 +1,16 @@
 import { useUI, useLibrary, useAudio, useSettings } from '../contexts'
-import type { Track, FolderNode } from '../contexts'
+import type { Track } from '../contexts'
 import { useMemo, useEffect } from 'react'
 import { useLibraryScanner } from '../hooks'
 import { scanDirectory } from '../services'
 import { Input } from '../components/atomic'
+import { FolderTree } from '../components/composite/FolderTree'
+import './LibraryView.css'
 
 
 export function LibraryView () {
-  const { selectedFolderPath, selectFolder, setEditingTrack } = useUI()
-  const { folders, filteredTracks, searchQuery, setSearchQuery, selectTrack, setTracks, setFolders, setLoading, isLoading, toggleFolder } = useLibrary()
+  const { selectedFolderPath, selectFolder } = useUI()
+  const { folders, filteredTracks, searchQuery, setSearchQuery, selectTrack, setTracks, setLoading, isLoading, toggleFolder } = useLibrary()
   const { play, currentTrack, isPlaying } = useAudio()
   const { libraryPaths } = useSettings()
   const { scanLibrary } = useLibraryScanner()
@@ -44,17 +46,15 @@ export function LibraryView () {
   }
 
   const displayTracks = useMemo(() => {
-    if (!selectedFolderPath)
-      return filteredTracks
     return filteredTracks
-  }, [ selectedFolderPath, filteredTracks ])
+  }, [ filteredTracks ])
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
-      <div style={{ width: 260, borderRight: '1px solid var(--border)', overflow: 'auto', background: 'var(--bg-raised)' }}>
-        <div style={{ padding: 'var(--sp-3)' }}>
+    <div className='library-view'>
+      <aside className='library-sidebar'>
+        <header>
           <h5>Folders</h5>
-        </div>
+        </header>
 
         <FolderTree
           folders={folders}
@@ -62,13 +62,13 @@ export function LibraryView () {
           onSelect={handleFolderSelect}
           onToggle={handleFolderToggle}
         />
-      </div>
+      </aside>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div className='view-header'>
+      <section className='library-main'>
+        <header className='view-header'>
           <h2>Library</h2>
 
-          <div style={{ width: 250 }}>
+          <div className='search-container'>
             <Input
               type='search'
               placeholder='Search tracks...'
@@ -77,54 +77,46 @@ export function LibraryView () {
                 setSearchQuery(e.target.value)}
             />
           </div>
-        </div>
+        </header>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: 'var(--sp-4)' }}>
+        <div className='tracks-container'>
           {isLoading
-            ? <div style={{ textAlign: 'center', padding: 'var(--sp-12)', color: 'var(--text-muted)' }}>
+            ? <div className='status-message'>
               <p>Loading...</p>
             </div>
             : displayTracks.length === 0
-              ? <div style={{ textAlign: 'center', padding: 'var(--sp-12)', color: 'var(--text-muted)' }}>
+              ? <div className='status-message'>
                 <p>No tracks found</p>
                 <small>Select a folder or add library paths in Settings</small>
               </div>
-              : <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              : <table className='tracks-table'>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ textAlign: 'left', padding: 'var(--sp-2)', color: 'var(--text-muted)', fontWeight: 'var(--font-normal)', fontSize: 'var(--text-sm)' }}>#</th>
-                    <th style={{ textAlign: 'left', padding: 'var(--sp-2)', color: 'var(--text-muted)', fontWeight: 'var(--font-normal)', fontSize: 'var(--text-sm)' }}>Title</th>
-                    <th style={{ textAlign: 'left', padding: 'var(--sp-2)', color: 'var(--text-muted)', fontWeight: 'var(--font-normal)', fontSize: 'var(--text-sm)' }}>Artist</th>
-                    <th style={{ textAlign: 'left', padding: 'var(--sp-2)', color: 'var(--text-muted)', fontWeight: 'var(--font-normal)', fontSize: 'var(--text-sm)' }}>Album</th>
-                    <th style={{ textAlign: 'right', padding: 'var(--sp-2)', color: 'var(--text-muted)', fontWeight: 'var(--font-normal)', fontSize: 'var(--text-sm)' }}>Duration</th>
+                  <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Artist</th>
+                    <th>Album</th>
+                    <th className='duration'>Duration</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {displayTracks.map((track, index) =>
-
                     <tr
                       key={track.id}
+                      className={currentTrack?.id === track.id ? 'active' : ''}
                       onClick={() =>
                         handleTrackPlay(track, index)}
-                      style={{
-                        cursor:     'pointer',
-                        background: currentTrack?.id === track.id ? 'var(--accent-muted)' : 'transparent',
-                      }}
-                      onMouseEnter={e =>
-                        e.currentTarget.style.background = currentTrack?.id === track.id ? 'var(--accent-muted)' : 'var(--bg-hover)'}
-                      onMouseLeave={e =>
-                        e.currentTarget.style.background = currentTrack?.id === track.id ? 'var(--accent-muted)' : 'transparent'}
                     >
-                      <td style={{ padding: 'var(--sp-2)', color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+                      <td className='track-number'>
                         {currentTrack?.id === track.id && isPlaying ? '▶' : index + 1}
                       </td>
 
-                      <td style={{ padding: 'var(--sp-2)' }}>{track.title}</td>
-                      <td style={{ padding: 'var(--sp-2)', color: 'var(--text-dim)' }}>{track.artist}</td>
-                      <td style={{ padding: 'var(--sp-2)', color: 'var(--text-dim)' }}>{track.album}</td>
+                      <td className='track-title'>{track.title}</td>
+                      <td className='track-artist'>{track.artist}</td>
+                      <td className='track-album'>{track.album}</td>
 
-                      <td style={{ textAlign: 'right', padding: 'var(--sp-2)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}>
+                      <td className='track-duration'>
                         {formatDuration(track.duration)}
                       </td>
                     </tr>
@@ -133,82 +125,7 @@ export function LibraryView () {
               </table>
           }
         </div>
-      </div>
-    </div>
-  )
-}
-
-interface FolderTreeProps {
-  readonly folders:      ReadonlyArray<FolderNode>
-  readonly selectedPath: string | null
-  readonly onSelect:     (path: string) => void
-  readonly onToggle:     (path: string) => void
-  readonly level?:       number
-}
-
-function FolderTree ({ folders, selectedPath, onSelect, onToggle, level = 0 }: FolderTreeProps) {
-  return (
-    <div className='folder-tree'>
-      {folders.map(folder =>
-
-        <div key={folder.id} className='folder-tree-node'>
-          <button
-            className={`folder-row ${selectedPath === folder.path ? 'active' : ''}`}
-            onClick={() =>
-              onSelect(folder.path)}
-            style={{
-              display:      'flex',
-              alignItems:   'center',
-              gap:          'var(--sp-2)',
-              width:        '100%',
-              padding:      'var(--sp-2) var(--sp-3)',
-              paddingLeft:  `calc(var(--sp-3) + ${level * 16}px)`,
-              textAlign:    'left',
-              background:   selectedPath === folder.path ? 'var(--accent-muted)' : 'transparent',
-              color:        selectedPath === folder.path ? 'var(--accent)' : 'var(--text-dim)',
-              borderRadius: 'var(--radius)',
-              cursor:       'pointer',
-              border:       'none',
-            }}
-          >
-            {folder.children.length > 0 &&
-              <span
-                className='folder-toggle'
-                onClick={e => {
-                  e.stopPropagation()
-                  onToggle(folder.path)
-                }}
-                style={{
-                  width:     16,
-                  textAlign: 'center',
-                  fontSize:  'var(--text-xs)',
-                }}
-              >
-                {folder.expanded ? '▼' : '▶'}
-              </span>
-            }
-
-            <span className='folder-icon'>
-              {folder.children.length > 0
-                ? folder.expanded ? '📂' : '📁'
-                : '🎵'
-              }
-            </span>
-
-            <span style={{ fontSize: 'var(--text-sm)' }}>{folder.name}</span>
-          </button>
-
-          {folder.expanded && folder.children.length > 0 &&
-            <FolderTree
-              folders={folder.children}
-              selectedPath={selectedPath}
-              onSelect={onSelect}
-              onToggle={onToggle}
-              level={level + 1}
-            />
-          }
-        </div>
-      )}
+      </section>
     </div>
   )
 }

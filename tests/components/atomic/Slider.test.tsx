@@ -31,8 +31,8 @@ describe('Slider', () => {
     expect(slider).toHaveAttribute('value', '50')
   })
 
-  it('has data-slider attribute', () => {
+  it('has slider class', () => {
     render(<Slider />)
-    expect(screen.getByRole('slider')).toHaveAttribute('data-slider')
+    expect(screen.getByRole('slider')).toHaveClass('slider')
   })
 })

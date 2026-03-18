@@ -1,0 +1,6 @@
+.waveform {
+  width: 300px;
+  height: 100px;
+  border-radius: var(--radius-lg);
+  background: rgba(18, 18, 18, 0.3);
+}

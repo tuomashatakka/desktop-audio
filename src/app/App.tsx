@@ -1,65 +1,22 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
-import { UIProvider, SettingsProvider, LibraryProvider, AudioProvider, useUI, useAudio, useLibrary } from './contexts'
+import { useEffect, useState } from 'react'
+import { UIProvider, SettingsProvider, LibraryProvider, AudioProvider, useUI, useAudio } from './contexts'
 import { LibraryView } from './views/LibraryView'
 import { PlayerView } from './views/PlayerView'
 import { SettingsView } from './views/SettingsView'
 import { TagEditorView } from './views/TagEditorView'
-import { IconButton } from './components/atomic'
+import { PlayerBar } from './components/composite/PlayerBar'
+import { useKeyboardShortcuts } from './hooks'
 
 
 function AppContent () {
   const { currentView, setView, playerExpanded, togglePlayerExpanded } = useUI()
-  const { isPlaying, currentTrack, currentTime, duration, volume, play, pause, resume, seek, setVolume, playNext, playPrevious } = useAudio()
-  const { filteredTracks } = useLibrary()
+  const { currentTrack } = useAudio()
 
   const [ isAnimating, setIsAnimating ] = useState(false)
   const [ showExpanded, setShowExpanded ] = useState(false)
 
-  // eslint-disable-next-line complexity
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-      return
-    }
-
-    switch (e.code) {
-      case 'Space':
-        e.preventDefault()
-        if (currentTrack) {
-          void (isPlaying ? pause() : resume())
-        }
-        break
-      case 'ArrowRight':
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault()
-          playNext(filteredTracks)
-        }
-        break
-      case 'ArrowLeft':
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault()
-          playPrevious(filteredTracks)
-        }
-        break
-      case 'ArrowUp':
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault()
-          setVolume(Math.min(1, volume + 0.1))
-        }
-        break
-      case 'ArrowDown':
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault()
-          setVolume(Math.max(0, volume - 0.1))
-        }
-        break
-    }
-  }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, filteredTracks, setVolume, volume ])
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown)
-    return () =>
-      window.removeEventListener('keydown', handleKeyDown)
-  }, [ handleKeyDown ])
+  // Register global keyboard shortcuts
+  useKeyboardShortcuts()
 
   useEffect(() => {
     if (playerExpanded && !showExpanded) {
@@ -75,7 +32,7 @@ function AppContent () {
         setIsAnimating(false)
       }, 200)
     }
-  }, [ playerExpanded ])
+  }, [ playerExpanded, showExpanded ])
 
   const renderView = () => {
     switch (currentView) {
@@ -90,19 +47,6 @@ function AppContent () {
       default:
         return <LibraryView />
     }
-  }
-
-  const formatTime = (seconds: number) => {
-    if (!seconds || !Number.isFinite(seconds))
-      return '0:00'
-
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const handlePlayerBarClick = () => {
-    togglePlayerExpanded()
   }
 
   return (
@@ -172,84 +116,7 @@ function AppContent () {
 
         {currentTrack &&
           <>
-            <div
-              className={`player-bar ${playerExpanded ? 'player-bar-hidden' : ''}`}
-              onClick={handlePlayerBarClick}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className='player-bar-track'>
-                <div style={{ width: 40, height: 40, background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }} />
-
-                <div className='player-bar-info'>
-                  <div className='player-bar-title'>{currentTrack.title}</div>
-                  <div className='player-bar-artist'>{currentTrack.artist}</div>
-                </div>
-              </div>
-
-              <div className='player-bar-controls'
-                onClick={e =>
-                  e.stopPropagation()}>
-                <IconButton label='Previous'
-                  onClick={() =>
-                    playPrevious(filteredTracks)}>
-                  ⏮
-                </IconButton>
-
-                <IconButton
-                  label={isPlaying ? 'Pause' : 'Play'}
-                  onClick={isPlaying ? pause : resume}
-                >
-                  {isPlaying ? '⏸' : '▶'}
-                </IconButton>
-
-                <IconButton label='Next'
-                  onClick={() =>
-                    playNext(filteredTracks)}>
-                  ⏭
-                </IconButton>
-              </div>
-
-              <div className='player-bar-progress'
-                onClick={e =>
-                  e.stopPropagation()}>
-                <span className='player-bar-time'>{formatTime(currentTime)}</span>
-
-                <input
-                  type='range'
-                  data-slider
-                  min={0}
-                  max={duration || 100}
-                  value={currentTime}
-                  onChange={e =>
-                    seek(Number(e.target.value))}
-                  style={{ flex: 1 }}
-                />
-
-                <span className='player-bar-time'>{formatTime(duration)}</span>
-              </div>
-
-              <div className='player-bar-volume'
-                onClick={e =>
-                  e.stopPropagation()}>
-                <IconButton label='Volume'
-                  onClick={() =>
-                    setVolume(volume > 0 ? 0 : 0.8)}>
-                  {volume > 0 ? '🔊' : '🔇'}
-                </IconButton>
-
-                <input
-                  type='range'
-                  data-slider
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={volume}
-                  onChange={e =>
-                    setVolume(Number(e.target.value))}
-                  style={{ width: 80 }}
-                />
-              </div>
-            </div>
+            <PlayerBar />
 
             <div
               className={`expanded-player ${showExpanded ? 'expanded-player-visible' : ''} ${isAnimating ? 'animating' : ''}`}

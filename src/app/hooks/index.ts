@@ -1,1 +1,2 @@
-export { useLibraryScanner } from './useLibraryScanner'
+export * from './useLibraryScanner'
+export * from './useKeyboardShortcuts'
