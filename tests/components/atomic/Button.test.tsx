@@ -10,37 +10,37 @@ describe('Button', () => {
 
   it('renders with different variants', () => {
     const { rerender } = render(<Button variant='primary'>Primary</Button>)
-    expect(screen.getByRole('button')).toHaveAttribute('data-variant', 'primary')
+    expect(screen.getByRole('button')).toHaveClass('primary')
 
     rerender(<Button variant='secondary'>Secondary</Button>)
-    expect(screen.getByRole('button')).toHaveAttribute('data-variant', 'secondary')
+    expect(screen.getByRole('button')).toHaveClass('secondary')
 
     rerender(<Button variant='danger'>Danger</Button>)
-    expect(screen.getByRole('button')).toHaveAttribute('data-variant', 'danger')
+    expect(screen.getByRole('button')).toHaveClass('danger')
 
     rerender(<Button variant='ghost'>Ghost</Button>)
-    expect(screen.getByRole('button')).toHaveAttribute('data-variant', 'ghost')
+    expect(screen.getByRole('button')).toHaveClass('ghost')
 
     rerender(<Button variant='outline'>Outline</Button>)
-    expect(screen.getByRole('button')).toHaveAttribute('data-variant', 'outline')
+    expect(screen.getByRole('button')).toHaveClass('outline')
   })
 
   it('renders with different sizes', () => {
     const { rerender } = render(<Button size='sm'>Small</Button>)
-    expect(screen.getByRole('button')).toHaveAttribute('data-size', 'sm')
+    expect(screen.getByRole('button')).toHaveClass('sm')
 
     rerender(<Button size='lg'>Large</Button>)
-    expect(screen.getByRole('button')).toHaveAttribute('data-size', 'lg')
+    expect(screen.getByRole('button')).toHaveClass('lg')
   })
 
   it('renders as icon button when icon prop is true', () => {
     render(<Button icon>Icon</Button>)
-    expect(screen.getByRole('button')).toHaveAttribute('data-icon')
+    expect(screen.getByRole('button')).toHaveClass('icon')
   })
 
   it('shows loading state', () => {
     render(<Button loading>Loading</Button>)
-    expect(screen.getByRole('button')).toHaveAttribute('data-loading')
+    expect(screen.getByRole('button')).toHaveClass('loading')
     expect(screen.getByRole('button')).toBeDisabled()
   })
 

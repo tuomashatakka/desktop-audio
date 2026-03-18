@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useUI, useLibrary } from '../contexts'
-import type { Track } from '../contexts'
 import { Button, Input } from '../components/atomic'
+import './TagEditorView.css'
 
 
 export function TagEditorView () {
@@ -25,41 +25,34 @@ export function TagEditorView () {
 
   if (!track) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <p style={{ color: 'var(--text-muted)' }}>No track selected</p>
+      <div className='tag-editor-view'>
+        <div className='empty-state'>
+          <p>No track selected</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto', padding: 'var(--sp-6)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--sp-6)' }}>
+    <div className='tag-editor-view'>
+      <header className='header'>
         <h2>Edit Tags</h2>
 
-        <Button variant='ghost'
+        <Button
+          variant='ghost'
           onClick={() =>
-            setView('library')}>
+            setView('library')}
+        >
           ← Back
         </Button>
-      </div>
+      </header>
 
-      <div style={{ display: 'flex', gap: 'var(--sp-6)' }}>
-        <div
-          style={{
-            width:          200,
-            height:         200,
-            background:     'var(--bg-raised)',
-            borderRadius:   'var(--radius-lg)',
-            display:        'flex',
-            alignItems:     'center',
-            justifyContent: 'center',
-            fontSize:       48,
-          }}
-        >
+      <div className='editor-layout'>
+        <div className='art-preview'>
           ♫
         </div>
 
-        <div style={{ flex: 1 }} data-stack='sm'>
+        <div className='form-stack stack sm'>
           <Input
             label='Title'
             value={formData.title}
@@ -84,7 +77,7 @@ export function TagEditorView () {
                 ({ ...s, album: e.target.value }))}
           />
 
-          <div style={{ marginTop: 'var(--sp-4)', padding: 'var(--sp-3)', background: 'var(--bg-input)', borderRadius: 'var(--radius)', fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
+          <div className='file-info'>
             <p>
               <strong>File:</strong>
               {' '}
@@ -108,15 +101,17 @@ export function TagEditorView () {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 'var(--sp-2)', justifyContent: 'flex-end', marginTop: 'var(--sp-6)' }}>
-        <Button variant='ghost'
+      <footer className='footer-actions'>
+        <Button
+          variant='ghost'
           onClick={() =>
-            setView('library')}>
+            setView('library')}
+        >
           Cancel
         </Button>
 
         <Button variant='primary' onClick={handleSave}>Save Changes</Button>
-      </div>
+      </footer>
     </div>
   )
 }

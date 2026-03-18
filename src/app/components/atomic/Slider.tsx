@@ -5,13 +5,13 @@ interface SliderProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'
   readonly label?: string
 }
 
-export function Slider ({ label, id, ...props }: SliderProps) {
+export function Slider ({ label, id, className = '', ...props }: SliderProps) {
   const inputId = id || label?.toLowerCase().replace(/\s+/g, '-')
 
   return (
-    <label>
+    <label className='field'>
       {label && <span>{label}</span>}
-      <input type='range' data-slider id={inputId} {...props} />
+      <input type='range' className={`slider ${className}`} id={inputId} {...props} />
     </label>
   )
 }

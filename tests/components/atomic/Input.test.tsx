@@ -18,10 +18,10 @@ describe('Input', () => {
     expect(screen.getByText('This field is required')).toBeInTheDocument()
   })
 
-  it('sets error state on label when error is provided', () => {
+  it('sets error class on label when error is provided', () => {
     render(<Input label='Email' error='Invalid email' />)
     const label = screen.getByText('Email').closest('label')
-    expect(label).toHaveAttribute('data-state', 'error')
+    expect(label).toHaveClass('error')
   })
 
   it('generates id from label if not provided', () => {

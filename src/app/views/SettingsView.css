@@ -1,0 +1,48 @@
+.settings-view {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: var(--sp-6);
+
+  & h2 {
+    margin-bottom: var(--sp-6);
+  }
+
+  & h4 {
+    margin-bottom: var(--sp-4);
+  }
+
+  & .library-section {
+    & .section-description {
+      color: var(--text-dim);
+      font-size: var(--text-sm);
+    }
+
+    & .path-list {
+      & .path-item {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2);
+        padding: var(--sp-2);
+        background: var(--bg-raised);
+        border-radius: var(--radius);
+
+        & span {
+          flex: 1;
+          font-size: var(--text-sm);
+          font-family: var(--font-mono);
+        }
+      }
+    }
+  }
+
+  & .appearance-section {
+    /* Styles for appearance section if needed */
+  }
+
+  & .about-section {
+    & .about-content {
+      color: var(--text-dim);
+      font-size: var(--text-sm);
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import './Waveform.css'
 
 
 interface WaveformProps {
@@ -66,12 +67,7 @@ export function Waveform ({ analyzer, isPlaying }: WaveformProps) {
       ref={canvasRef}
       width={300}
       height={100}
-      style={{
-        width:        300,
-        height:       100,
-        borderRadius: 'var(--radius-lg)',
-        background:   'rgba(18, 18, 18, 0.3)',
-      }}
+      className='waveform'
     />
   )
 }

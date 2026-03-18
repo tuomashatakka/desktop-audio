@@ -16,14 +16,21 @@ export function Button ({
   icon = false,
   children,
   disabled,
+  className = '',
   ...props
 }: ButtonProps) {
+  const classes = [
+    'button',
+    variant,
+    size,
+    icon ? 'icon' : '',
+    loading ? 'loading' : '',
+    className,
+  ].filter(Boolean).join(' ')
+
   return (
     <button
-      data-variant={variant}
-      data-size={size}
-      data-icon={icon || undefined}
-      data-loading={loading || undefined}
+      className={classes}
       disabled={disabled || loading}
       {...props}
     >

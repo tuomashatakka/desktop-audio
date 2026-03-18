@@ -58,8 +58,8 @@ bunx playwright test -g "login flow"
 ## 2. Code Style Guidelines
 
 ### General Philosophy
-- **Semantic HTML first** - Style elements, not classes
-- **Data attributes for variants** - `data-variant`, `data-size`, `data-state`
+- **Semantic HTML first** - Style elements, not just classes
+- **Standard CSS Classes** - Use classes like `.button`, `.stack`, `.field`
 - **Functional programming** - Prefer immutability, avoid mutations where possible
 
 ### File Organization
@@ -115,13 +115,13 @@ import { useAudio } from './contexts'
 
 | Element | Convention | Example |
 |---------|------------|---------|
-| Files | kebab-case | `fileScanner.ts`, `audioEngine.ts` |
+| Files | kebab-case | `file-scanner.ts`, `audio-engine.ts` |
 | Components | PascalCase | `Button.tsx`, `PlayerView.tsx` |
 | Hooks | camelCase with `use` prefix | `useLibraryScanner.ts` |
 | Contexts | PascalCase with `Context` suffix | `AudioContext.tsx`, `useAudio` |
 | Interfaces | PascalCase, descriptive | `AudioState`, `Track`, `FolderNode` |
 | Constants | SCREAMING_SNAKE_CASE | `AUDIO_EXTENSIONS` |
-| CSS classes | kebab-case | `.button-primary`, `.input-error` |
+| CSS classes | kebab-case | `.button`, `.primary`, `.stack` |
 
 ### Import Order (enforced by ESLint)
 
@@ -145,9 +145,9 @@ import '../styles/app.css'
 ### Component Patterns
 
 **Atomic Components:**
-- Use data attributes for props (`data-variant`, `data-size`)
+- Use class names for props (`.primary`, `.sm`, `.loading`)
 - Pass through rest props to underlying element
-- Use `undefined` for optional boolean attributes
+- Use logic to join class names
 
 ```typescript
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -156,12 +156,12 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   readonly loading?: boolean
 }
 
-export function Button({ variant, size, loading, children, ...props }: ButtonProps) {
+export function Button({ variant, size, loading, children, className = '', ...props }: ButtonProps) {
+  const classes = ['button', variant, size, loading && 'loading', className].filter(Boolean).join(' ')
   return (
     <button
-      data-variant={variant}
-      data-size={size}
-      data-loading={loading || undefined}
+      className={classes}
+      disabled={loading}
       {...props}
     >
       {children}
@@ -192,17 +192,17 @@ export function useAudio() {
 
 - Use CSS layers: `@layer tokens, reset, base, states, components, utilities`
 - Use design tokens from `tokens.css`
-- Prefer semantic HTML over custom classes
-- Use data attributes for variants: `[data-variant="primary"]`
+- Prefer semantic HTML + standard classes
+- Use standard CSS nesting
 
 ```css
 @layer components {
-  [data-button] {
+  .button {
     /* base styles */
-  }
-
-  [data-button][data-variant="primary"] {
-    /* primary variant */
+    
+    &.primary {
+      /* primary variant */
+    }
   }
 }
 ```
@@ -241,6 +241,11 @@ describe('Button', () => {
   it('renders button with children', () => {
     render(<Button>Click me</Button>)
     expect(screen.getByRole('button')).toHaveTextContent('Click me')
+  })
+  
+  it('has correct class', () => {
+    render(<Button variant="primary">Click me</Button>)
+    expect(screen.getByRole('button')).toHaveClass('primary')
   })
 })
 ```

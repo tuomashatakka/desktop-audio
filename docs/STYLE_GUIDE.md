@@ -6,8 +6,8 @@ A minimal, dark-first design system. Framework-agnostic, semantic HTML-driven.
 
 ## Core Philosophy
 
-1. **Semantic HTML first** — Style elements, not classes
-2. **Data attributes for variants** — `data-variant`, `data-size`, `data-state`
+1. **Semantic HTML first** — Style elements, not just classes
+2. **Standard CSS Classes** — `.button`, `.stack`, `.field`
 3. **CSS layers for cascade** — Predictable specificity
 4. **Minimal footprint** — No dependencies, no build tools required
 5. **Accessibility built-in** — Focus states, ARIA support, reduced motion
@@ -24,10 +24,10 @@ A minimal, dark-first design system. Framework-agnostic, semantic HTML-driven.
 ```
 
 ```html
-<!-- Just write semantic HTML -->
-<button data-variant="primary">Save</button>
-<input type="email" placeholder="you@example.com">
-<span data-badge data-variant="success">Active</span>
+<!-- Just write semantic HTML with classes -->
+<button class="button primary">Save</button>
+<input class="input" type="email" placeholder="you@example.com">
+<span class="badge success">Active</span>
 ```
 
 ---
@@ -163,44 +163,44 @@ css/
 
 ```html
 <!-- Variants -->
-<button>Default</button>
-<button data-variant="primary">Primary</button>
-<button data-variant="danger">Danger</button>
-<button data-variant="ghost">Ghost</button>
-<button data-variant="outline">Outline</button>
+<button class="button">Default</button>
+<button class="button primary">Primary</button>
+<button class="button danger">Danger</button>
+<button class="button ghost">Ghost</button>
+<button class="button outline">Outline</button>
 
 <!-- Sizes -->
-<button data-size="sm">Small</button>
-<button data-size="lg">Large</button>
+<button class="button sm">Small</button>
+<button class="button lg">Large</button>
 
 <!-- States -->
-<button disabled>Disabled</button>
-<button data-loading>Loading</button>
+<button class="button" disabled>Disabled</button>
+<button class="button loading">Loading</button>
 
 <!-- Icon button -->
-<button data-icon>★</button>
+<button class="button icon">★</button>
 ```
 
 ### Inputs
 
 ```html
 <!-- Text -->
-<label>
+<label class="field">
   <span>Email</span>
-  <input type="email" placeholder="you@example.com">
+  <input class="input" type="email" placeholder="you@example.com">
 </label>
 
 <!-- With validation -->
-<label data-state="error">
+<label class="field error">
   <span>Password</span>
-  <input type="password" aria-invalid="true">
+  <input class="input" type="password" aria-invalid="true">
   <small>Must be 8+ characters</small>
 </label>
 
 <!-- Select -->
-<label>
+<label class="field">
   <span>Country</span>
-  <select>
+  <select class="select">
     <option>Select...</option>
   </select>
 </label>
@@ -210,56 +210,56 @@ css/
 <label><input type="radio" name="plan"> Basic</label>
 
 <!-- Input group -->
-<div data-input-group>
-  <span data-prefix>$</span>
-  <input type="number">
-  <span data-suffix>.00</span>
+<div class="input-group">
+  <span class="prefix">$</span>
+  <input class="input" type="number">
+  <span class="suffix">.00</span>
 </div>
 ```
 
 ### Badges
 
 ```html
-<span data-badge>Default</span>
-<span data-badge data-variant="primary">Primary</span>
-<span data-badge data-variant="success">Success</span>
-<span data-badge data-variant="warning">Warning</span>
-<span data-badge data-variant="danger">Danger</span>
-<span data-badge data-variant="info">Info</span>
+<span class="badge">Default</span>
+<span class="badge primary">Primary</span>
+<span class="badge success">Success</span>
+<span class="badge warning">Warning</span>
+<span class="badge danger">Danger</span>
+<span class="badge info">Info</span>
 
 <!-- With dot -->
-<span data-badge data-dot data-variant="success">Online</span>
+<span class="badge dot success">Online</span>
 
 <!-- Sizes -->
-<span data-badge data-size="sm">Small</span>
-<span data-badge data-size="lg">Large</span>
+<span class="badge sm">Small</span>
+<span class="badge lg">Large</span>
 ```
 
 ### Cards
 
 ```html
 <!-- Basic -->
-<article data-card>
+<article class="card">
   <header>Title</header>
   <p>Content goes here.</p>
 </article>
 
 <!-- Variants -->
-<article data-card data-variant="outlined">...</article>
-<article data-card data-variant="elevated">...</article>
+<article class="card outlined">...</article>
+<article class="card elevated">...</article>
 
 <!-- Interactive -->
-<article data-card data-interactive>
+<article class="card interactive">
   Clickable card
 </article>
 
 <!-- With footer -->
-<article data-card>
+<article class="card">
   <header>Title</header>
   <p>Content</p>
   <footer>
-    <button data-variant="ghost">Cancel</button>
-    <button data-variant="primary">Save</button>
+    <button class="button ghost">Cancel</button>
+    <button class="button primary">Save</button>
   </footer>
 </article>
 ```
@@ -267,22 +267,22 @@ css/
 ### Alerts
 
 ```html
-<aside data-alert>
+<aside class="alert">
   <strong>Info</strong>
   Informational message.
 </aside>
 
-<aside data-alert data-variant="success">
+<aside class="alert success">
   <strong>Success!</strong>
   Operation completed.
 </aside>
 
-<aside data-alert data-variant="warning">
+<aside class="alert warning">
   <strong>Warning</strong>
   Please review.
 </aside>
 
-<aside data-alert data-variant="danger">
+<aside class="alert danger">
   <strong>Error</strong>
   Something went wrong.
 </aside>
@@ -292,58 +292,58 @@ css/
 
 ```html
 <!-- Chip/Tag -->
-<span data-chip>
+<span class="chip">
   Tag <button>×</button>
 </span>
 
 <!-- Avatar -->
-<span data-avatar>JD</span>
-<span data-avatar data-size="sm">A</span>
-<span data-avatar data-size="lg">XL</span>
+<span class="avatar">JD</span>
+<span class="avatar sm">A</span>
+<span class="avatar lg">XL</span>
 
 <!-- Skeleton -->
-<div data-skeleton></div>
+<div class="skeleton"></div>
 
 <!-- Tooltip -->
-<span data-tooltip="Helpful info">Hover me</span>
+<span class="tooltip" data-tooltip="Helpful info">Hover me</span>
 ```
 
 ---
 
 ## State Mixins
 
-Apply states using `data-state` or `data-variant`:
+Apply states using classes:
 
 ```html
 <!-- On containers -->
-<label data-state="error">
+<label class="field error">
   <span>Field</span>
-  <input type="text">
+  <input class="input" type="text">
   <small>Error message</small>
 </label>
 
-<article data-card data-state="success">
+<article class="card success">
   Success state card
 </article>
 
 <!-- On inputs directly -->
-<input data-state="warning">
-<input aria-invalid="true">  <!-- Also triggers error state -->
+<input class="input warning">
+<input class="input" aria-invalid="true">  <!-- Also triggers error state in some implementations -->
 
 <!-- Loading state -->
-<button data-loading>Processing</button>
-<div data-loading>Loading content...</div>
+<button class="button loading">Processing</button>
+<div class="loading">Loading content...</div>
 ```
 
 ### Available States
 
-| Attribute | Effect |
+| Class | Effect |
 |-----------|--------|
-| `data-state="success"` | Green border/background |
-| `data-state="warning"` | Yellow border/background |
-| `data-state="error"` | Red border/background |
-| `data-state="info"` | Blue border/background |
-| `data-loading` | Spinner overlay, disabled |
+| `.success` | Green border/background |
+| `.warning` | Yellow border/background |
+| `.error` | Red border/background |
+| `.info` | Blue border/background |
+| `.loading` | Spinner overlay, disabled |
 | `disabled` | Opacity 0.5, no interaction |
 
 ---
@@ -352,29 +352,29 @@ Apply states using `data-state` or `data-variant`:
 
 ```html
 <!-- Vertical stack -->
-<div data-stack>
+<div class="stack">
   <p>Item 1</p>
   <p>Item 2</p>
 </div>
-<div data-stack="sm">Tight spacing</div>
-<div data-stack="lg">Loose spacing</div>
+<div class="stack sm">Tight spacing</div>
+<div class="stack lg">Loose spacing</div>
 
 <!-- Horizontal cluster -->
-<div data-cluster>
-  <button>A</button>
-  <button>B</button>
+<div class="cluster">
+  <button class="button">A</button>
+  <button class="button">B</button>
 </div>
 
 <!-- Auto grid -->
-<div data-grid>
-  <article data-card>1</article>
-  <article data-card>2</article>
-  <article data-card>3</article>
+<div class="grid">
+  <article class="card">1</article>
+  <article class="card">2</article>
+  <article class="card">3</article>
 </div>
 
 <!-- Visibility -->
 <div hidden>Hidden</div>
-<div data-hidden>Also hidden</div>
+<div class="hidden">Also hidden</div>
 ```
 
 ---
@@ -411,10 +411,10 @@ All heading and text elements are styled by default:
 ### Vanilla JS
 
 ```html
-<button id="submit" data-variant="primary">Submit</button>
+<button id="submit" class="button primary">Submit</button>
 <script>
-  document.getElementById('submit').addEventListener('click', () => {
-    this.setAttribute('data-loading', '')
+  document.getElementById('submit').addEventListener('click', (e) => {
+    e.target.classList.add('loading')
   })
 </script>
 ```
@@ -430,58 +430,17 @@ interface ButtonProps {
 }
 
 function Button({ variant, size, loading, children, ...props }: ButtonProps) {
+  const classes = ['button', variant, size, loading && 'loading'].filter(Boolean).join(' ')
   return (
     <button
-      data-variant={variant}
-      data-size={size}
-      data-loading={loading || undefined}
+      className={classes}
+      disabled={loading}
       {...props}
     >
       {children}
     </button>
   )
 }
-```
-
-### Vue
-
-```vue
-<template>
-  <button
-    :data-variant="variant"
-    :data-size="size"
-    :data-loading="loading || undefined"
-  >
-    <slot />
-  </button>
-</template>
-
-<script setup>
-defineProps({
-  variant: String,
-  size: String,
-  loading: Boolean
-})
-</script>
-```
-
-### Svelte
-
-```svelte
-<script>
-  export let variant = undefined
-  export let size = undefined
-  export let loading = false
-</script>
-
-<button
-  data-variant={variant}
-  data-size={size}
-  data-loading={loading || undefined}
-  {...$$restProps}
->
-  <slot />
-</button>
 ```
 
 ---
@@ -524,4 +483,4 @@ Override tokens in your own CSS:
 
 ---
 
-That's it! Semantic HTML + data attributes = minimal, maintainable styles ♪(´▽｀)
+That's it! Semantic HTML + class names = minimal, maintainable styles ♪(´▽｀)

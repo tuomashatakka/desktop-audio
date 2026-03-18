@@ -2,6 +2,7 @@ import { useSettings } from '../contexts'
 import type { RepeatMode, Theme } from '../contexts'
 import { selectDirectory } from '../services'
 import { Button } from '../components/atomic'
+import './SettingsView.css'
 
 
 export function SettingsView () {
@@ -15,28 +16,29 @@ export function SettingsView () {
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto', padding: 'var(--sp-6)' }}>
-      <h2 style={{ marginBottom: 'var(--sp-6)' }}>Settings</h2>
+    <div className='settings-view'>
+      <h2>Settings</h2>
 
-      <div data-stack='lg'>
-        <section>
-          <h4 style={{ marginBottom: 'var(--sp-4)' }}>Library</h4>
+      <div className='stack lg'>
+        <section className='library-section'>
+          <h4>Library</h4>
 
-          <div data-stack='sm'>
-            <p style={{ color: 'var(--text-dim)', fontSize: 'var(--text-sm)' }}>Library folders to scan for audio files</p>
+          <div className='stack sm'>
+            <p className='section-description'>Library folders to scan for audio files</p>
 
             {libraryPaths.length === 0
-              ? <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>No library paths added</p>
-              : <div data-stack='sm'>
+              ? <p className='status-message'>No library paths added</p>
+              : <div className='path-list stack sm'>
                 {libraryPaths.map(path =>
+                  <div key={path} className='path-item'>
+                    <span>{path}</span>
 
-                  <div key={path} style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', padding: 'var(--sp-2)', background: 'var(--bg-raised)', borderRadius: 'var(--radius)' }}>
-                    <span style={{ flex: 1, fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)' }}>{path}</span>
-
-                    <Button variant='ghost'
+                    <Button
+                      variant='ghost'
                       size='sm'
                       onClick={() =>
-                        removeLibraryPath(path)}>
+                        removeLibraryPath(path)}
+                    >
                       ×
                     </Button>
                   </div>
@@ -48,16 +50,19 @@ export function SettingsView () {
           </div>
         </section>
 
-        <section>
-          <h4 style={{ marginBottom: 'var(--sp-4)' }}>Appearance</h4>
+        <section className='appearance-section'>
+          <h4>Appearance</h4>
 
-          <div data-stack='sm'>
-            <label>
+          <div className='stack sm'>
+            <label className='field'>
               <span>Theme</span>
 
-              <select value={theme}
+              <select
+                className='select'
+                value={theme}
                 onChange={e =>
-                  setTheme(e.target.value as Theme)}>
+                  setTheme(e.target.value as Theme)}
+              >
                 <option value='dark'>Dark</option>
                 <option value='light'>Light</option>
               </select>
@@ -65,39 +70,41 @@ export function SettingsView () {
           </div>
         </section>
 
-        <section>
-          <h4 style={{ marginBottom: 'var(--sp-4)' }}>Playback</h4>
+        <section className='playback-section'>
+          <h4>Playback</h4>
 
-          <div data-stack='sm'>
-            <label>
+          <div className='stack sm'>
+            <label className='field'>
               <span>Default Volume</span>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+              <div className='volume-control cluster'>
                 <input
                   type='range'
-                  data-slider
+                  className='slider'
                   min={0}
                   max={1}
                   step={0.01}
                   value={volume}
                   onChange={e =>
                     setVolume(Number(e.target.value))}
-                  style={{ flex: 1 }}
                 />
 
-                <span style={{ minWidth: 40, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}>
+                <span className='volume-value mono text-sm'>
                   {Math.round(volume * 100)}
                   %
                 </span>
               </div>
             </label>
 
-            <label>
+            <label className='field'>
               <span>Repeat Mode</span>
 
-              <select value={repeatMode}
+              <select
+                className='select'
+                value={repeatMode}
                 onChange={e =>
-                  setRepeatMode(e.target.value as RepeatMode)}>
+                  setRepeatMode(e.target.value as RepeatMode)}
+              >
                 <option value='none'>No Repeat</option>
                 <option value='one'>Repeat One</option>
                 <option value='all'>Repeat All</option>
@@ -106,10 +113,10 @@ export function SettingsView () {
           </div>
         </section>
 
-        <section>
-          <h4 style={{ marginBottom: 'var(--sp-4)' }}>About</h4>
+        <section className='about-section'>
+          <h4>About</h4>
 
-          <div style={{ color: 'var(--text-dim)', fontSize: 'var(--text-sm)' }}>
+          <div className='about-content'>
             <p>Desktop Audio Player v1.0.0</p>
             <p>Built with Electron + React</p>
           </div>

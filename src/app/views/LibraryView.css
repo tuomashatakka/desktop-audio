@@ -1,0 +1,142 @@
+.library-view {
+  display: flex;
+  height: 100%;
+
+  & .library-sidebar {
+    width: 260px;
+    border-right: 1px solid var(--border);
+    overflow: auto;
+    background: var(--bg-raised);
+
+    & header {
+      padding: var(--sp-3);
+    }
+  }
+
+  & .library-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    & .search-container {
+      width: 250px;
+    }
+
+    & .tracks-container {
+      flex: 1;
+      overflow: auto;
+      padding: var(--sp-4);
+
+      & .status-message {
+        text-align: center;
+        padding: var(--sp-12);
+        color: var(--text-muted);
+      }
+    }
+  }
+}
+
+.tracks-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  & thead tr {
+    border-bottom: 1px solid var(--border);
+  }
+
+  & th {
+    text-align: left;
+    padding: var(--sp-2);
+    color: var(--text-muted);
+    font-weight: var(--font-normal);
+    font-size: var(--text-sm);
+
+    &.duration {
+      text-align: right;
+    }
+  }
+
+  & tbody tr {
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease);
+
+    &:hover {
+      background: var(--bg-hover);
+    }
+
+    &.active {
+      background: var(--accent-muted);
+
+      &:hover {
+        background: var(--accent-muted);
+      }
+    }
+  }
+
+  & td {
+    padding: var(--sp-2);
+
+    &.track-number {
+      color: var(--text-muted);
+      font-size: var(--text-sm);
+    }
+
+    &.track-artist,
+    &.track-album {
+      color: var(--text-dim);
+    }
+
+    &.track-duration {
+      text-align: right;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+    }
+  }
+}
+
+/* Folder Tree Styles */
+.folder-tree {
+  & .folder-tree-node {
+    & .folder-row {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      width: 100%;
+      padding: var(--sp-2) var(--sp-3);
+      text-align: left;
+      background: transparent;
+      color: var(--text-dim);
+      border-radius: var(--radius);
+      cursor: pointer;
+      border: none;
+      transition: all var(--duration-fast) var(--ease);
+
+      &:hover {
+        background: var(--bg-hover);
+        color: var(--text);
+      }
+
+      &.active {
+        background: var(--accent-muted);
+        color: var(--accent);
+      }
+    }
+
+    & .folder-toggle {
+      width: 16px;
+      text-align: center;
+      font-size: var(--text-xs);
+      cursor: pointer;
+    }
+
+    & .folder-icon {
+      font-size: var(--text-base);
+    }
+
+    & .folder-name {
+      font-size: var(--text-sm);
+    }
+  }
+}

@@ -6,13 +6,13 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   readonly error?: string
 }
 
-export function Input ({ label, error, id, ...props }: InputProps) {
+export function Input ({ label, error, id, className = '', ...props }: InputProps) {
   const inputId = id || label?.toLowerCase().replace(/\s+/g, '-')
 
   return (
-    <label data-state={error ? 'error' : undefined}>
+    <label className={`field ${error ? 'error' : ''}`}>
       {label && <span>{label}</span>}
-      <input id={inputId} {...props} />
+      <input id={inputId} className={`input ${className}`} {...props} />
       {error && <small>{error}</small>}
     </label>
   )
