@@ -42,8 +42,9 @@ export function PlayerBar () {
         </div>
       </div>
 
-      <div className='player-bar-controls' onClick={e =>
-        e.stopPropagation()}>
+      <div className='player-bar-controls'
+        onClick={e =>
+          e.stopPropagation()}>
         <IconButton
           label='Previous'
           onClick={() =>
@@ -68,8 +69,9 @@ export function PlayerBar () {
         </IconButton>
       </div>
 
-      <div className='player-bar-progress' onClick={e =>
-        e.stopPropagation()}>
+      <div className='player-bar-progress'
+        onClick={e =>
+          e.stopPropagation()}>
         <span className='player-bar-time'>{formatTime(currentTime)}</span>
 
         <input
@@ -85,8 +87,9 @@ export function PlayerBar () {
         <span className='player-bar-time'>{formatTime(duration)}</span>
       </div>
 
-      <div className='player-bar-volume' onClick={e =>
-        e.stopPropagation()}>
+      <div className='player-bar-volume'
+        onClick={e =>
+          e.stopPropagation()}>
         <IconButton
           label='Volume'
           onClick={() =>

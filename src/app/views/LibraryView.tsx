@@ -5,6 +5,7 @@ import { useLibraryScanner } from '../hooks'
 import { scanDirectory } from '../services'
 import { Input } from '../components/atomic'
 import { FolderTree } from '../components/composite/FolderTree'
+import { TrackTable } from '../components/composite/TrackTable'
 import './LibraryView.css'
 
 
@@ -39,15 +40,8 @@ export function LibraryView () {
     play(track)
   }
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const displayTracks = useMemo(() => {
-    return filteredTracks
-  }, [ filteredTracks ])
+  const displayTracks = useMemo(() =>
+    filteredTracks, [ filteredTracks ])
 
   return (
     <div className='library-view'>
@@ -80,49 +74,18 @@ export function LibraryView () {
         </header>
 
         <div className='tracks-container'>
-          {isLoading
+          {displayTracks.length === 0 && !isLoading
             ? <div className='status-message'>
-              <p>Loading...</p>
+              <p>No tracks found</p>
+              <small>Select a folder or add library paths in Settings</small>
             </div>
-            : displayTracks.length === 0
-              ? <div className='status-message'>
-                <p>No tracks found</p>
-                <small>Select a folder or add library paths in Settings</small>
-              </div>
-              : <table className='tracks-table'>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Title</th>
-                    <th>Artist</th>
-                    <th>Album</th>
-                    <th className='duration'>Duration</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {displayTracks.map((track, index) =>
-                    <tr
-                      key={track.id}
-                      className={currentTrack?.id === track.id ? 'active' : ''}
-                      onClick={() =>
-                        handleTrackPlay(track, index)}
-                    >
-                      <td className='track-number'>
-                        {currentTrack?.id === track.id && isPlaying ? '▶' : index + 1}
-                      </td>
-
-                      <td className='track-title'>{track.title}</td>
-                      <td className='track-artist'>{track.artist}</td>
-                      <td className='track-album'>{track.album}</td>
-
-                      <td className='track-duration'>
-                        {formatDuration(track.duration)}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            : <TrackTable
+              tracks={displayTracks}
+              isLoading={isLoading}
+              currentTrack={currentTrack}
+              isPlaying={isPlaying}
+              onPlay={handleTrackPlay}
+            />
           }
         </div>
       </section>

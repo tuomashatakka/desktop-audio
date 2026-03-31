@@ -4,12 +4,17 @@
 
   & .library-sidebar {
     width: 260px;
+    min-width: 180px;
     border-right: 1px solid var(--border);
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
     background: var(--bg-raised);
+    display: flex;
+    flex-direction: column;
 
     & header {
-      padding: var(--sp-3);
+      padding: var(--sp-3) var(--sp-3) var(--sp-2);
+      flex-shrink: 0;
     }
   }
 
@@ -25,8 +30,9 @@
 
     & .tracks-container {
       flex: 1;
-      overflow: auto;
-      padding: var(--sp-4);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
 
       & .status-message {
         text-align: center;
@@ -37,66 +43,156 @@
   }
 }
 
-.tracks-table {
-  width: 100%;
-  border-collapse: collapse;
+/* ─── Track table ─────────────────────────────── */
 
-  & thead tr {
-    border-bottom: 1px solid var(--border);
-  }
+/* Column width map — shared between sticky <thead> and virtualised rows */
+:root {
+  --col-index:    3ch;
+  --col-title:    1fr;
+  --col-artist:   0.55fr;
+  --col-album:    0.55fr;
+  --col-format:   6ch;
+  --col-duration: 6ch;
+  --col-gap:      var(--sp-3);
+}
 
-  & th {
-    text-align: left;
-    padding: var(--sp-2);
-    color: var(--text-muted);
-    font-weight: var(--font-normal);
-    font-size: var(--text-sm);
+.track-table-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 
-    &.duration {
-      text-align: right;
+  /* Sticky header table */
+  & .tracks-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    flex-shrink: 0;
+
+    & thead tr {
+      border-bottom: 1px solid var(--border);
+    }
+
+    & th {
+      padding: var(--sp-2) var(--sp-3);
+      text-align: left;
+      color: var(--text-muted);
+      font-weight: var(--font-normal);
+      font-size: var(--text-sm);
+      user-select: none;
+      white-space: nowrap;
+      overflow: hidden;
+      transition: color var(--duration-fast) var(--ease);
+
+      &[tabindex] {
+        cursor: pointer;
+
+        &:hover { color: var(--text-dim); }
+        &:focus-visible { outline: 1px solid var(--border-focus); }
+      }
+
+      &.sorted { color: var(--accent); }
+
+      & .sort-indicator {
+        font-size: var(--text-xs);
+        opacity: 0.8;
+      }
+
+      /* Column widths — must mirror .track-row grid */
+      &.col-index    { width: 48px; }
+      &.col-title    { width: auto; }
+      &.col-artist   { width: 22%; }
+      &.col-album    { width: 22%; }
+      &.col-format   { width: 52px; }
+      &.col-duration { width: 52px; text-align: right; }
     }
   }
 
-  & tbody tr {
+  /* Virtualised scroll container */
+  & .track-table-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+
+    /* Thin accent scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-hover) transparent;
+
+    &::-webkit-scrollbar       { width: 6px; }
+    &::-webkit-scrollbar-track { background: transparent; }
+    &::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: var(--radius-full); }
+  }
+
+  /* Individual virtualised row */
+  & .track-row {
+    display: grid;
+    grid-template-columns: 48px 1fr 22% 22% 52px 52px;
+    align-items: center;
+    gap: var(--col-gap);
+    padding: 0 var(--sp-3);
+    position: absolute;
+    left: 0;
+    right: 0;
     cursor: pointer;
     transition: background var(--duration-fast) var(--ease);
 
-    &:hover {
-      background: var(--bg-hover);
-    }
+    &:hover        { background: var(--bg-hover); }
+    &:focus-visible { outline: 1px solid var(--border-focus); outline-offset: -1px; }
 
     &.active {
       background: var(--accent-muted);
 
-      &:hover {
-        background: var(--accent-muted);
-      }
+      &:hover { background: var(--accent-muted); }
     }
-  }
 
-  & td {
-    padding: var(--sp-2);
+    &.skeleton-row {
+      display: flex;
+      gap: var(--col-gap);
+      align-items: center;
+      pointer-events: none;
+    }
 
-    &.track-number {
-      color: var(--text-muted);
+    /* Single-row value — no wrapping */
+    & span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       font-size: var(--text-sm);
+      line-height: 1;
     }
 
-    &.track-artist,
-    &.track-album {
+    & .col-index {
+      color: var(--text-muted);
+      font-size: var(--text-xs);
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+    }
+
+    & .col-artist,
+    & .col-album {
       color: var(--text-dim);
     }
 
-    &.track-duration {
-      text-align: right;
+    & .col-format {
       color: var(--text-muted);
+      font-size: var(--text-xs);
       font-family: var(--font-mono);
-      font-size: var(--text-sm);
+      text-transform: uppercase;
+    }
+
+    & .col-duration {
+      text-align: right;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-variant-numeric: tabular-nums;
+      color: var(--text-muted);
     }
   }
 }
 
-/* Folder Tree Styles */
+/* ─── Folder tree ─────────────────────────────── */
+
 .folder-tree {
   & .folder-tree-node {
     & .folder-row {
@@ -122,6 +218,11 @@
         background: var(--accent-muted);
         color: var(--accent);
       }
+
+      &:focus-visible {
+        outline: 1px solid var(--border-focus);
+        outline-offset: -1px;
+      }
     }
 
     & .folder-toggle {
@@ -129,14 +230,37 @@
       text-align: center;
       font-size: var(--text-xs);
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    & .folder-chevron {
+      display: inline-flex;
+      width: 16px;
+      justify-content: center;
+      transition: transform var(--duration-fast) var(--ease);
+      font-size: var(--text-base);
+
+      &.open { transform: rotate(90deg); }
+    }
+
+    & .folder-chevron-spacer {
+      display: inline-block;
+      width: 16px;
     }
 
     & .folder-icon {
-      font-size: var(--text-base);
+      font-size: var(--text-sm);
+      opacity: 0.7;
+      flex-shrink: 0;
     }
 
     & .folder-name {
       font-size: var(--text-sm);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   }
 }

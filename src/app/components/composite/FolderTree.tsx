@@ -26,17 +26,18 @@ export function FolderTree ({ folders, selectedPath, onSelect, onToggle, level =
                 e.stopPropagation()
                 onToggle(folder.path)
               }}
+              aria-hidden='true'
             >
               {folder.children.length > 0
-                ? (folder.expanded ? '⌄' : '›')
-                : <span style={{ width: 16, display: 'inline-block' }} />
+                ? <span className={`folder-chevron ${folder.expanded ? 'open' : ''}`}>›</span>
+                : <span className='folder-chevron-spacer' />
               }
             </span>
 
-            <span className='folder-icon'>
+            <span className='folder-icon' aria-hidden='true'>
               {folder.children.length > 0
-                ? folder.expanded ? '📂' : '📁'
-                : '🎵'
+                ? folder.expanded ? '⊟' : '⊞'
+                : '▸'
               }
             </span>
 
