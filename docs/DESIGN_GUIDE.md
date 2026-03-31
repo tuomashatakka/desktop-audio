@@ -71,14 +71,14 @@ Strict linting enforces consistency and catches errors early:
 Use design tokens for all visual properties:
 
 ```css
-/* ✅ Good - Using design tokens */
+/* ☑︎ Good - Using design tokens */
 .button {
   padding: var(--spacing-sm) var(--spacing-md);
   background-color: var(--color-primary-500);
   border-radius: var(--border-radius-base);
 }
 
-/* ❌ Bad - Magic numbers */
+/* ☒ Bad - Magic numbers */
 .button {
   padding: 8px 16px;
   background-color: #0ea5e9;
@@ -96,12 +96,12 @@ Minimize complexity at every level:
 - **Styles**: Leverage cascading and inheritance
 
 ```tsx
-// ✅ Good - Simple component
+// ☑︎ Good - Simple component
 export function Badge({ variant = 'neutral', children }: BadgeProps) {
   return <span className={`badge ${variant}`}>{children}</span>
 }
 
-// ❌ Bad - Over-engineered
+// ☒ Bad - Over-engineered
 export function Badge({
   variant = 'neutral',
   size = 'md',
@@ -136,7 +136,7 @@ Design with accessibility in mind from the start:
 - Screen reader support
 
 ```tsx
-// ✅ Good - Accessible button
+// ☑︎ Good - Accessible button
 export function IconButton({ label, icon, onClick }: IconButtonProps) {
   return (
     <button aria-label={label} onClick={onClick}>
@@ -145,7 +145,7 @@ export function IconButton({ label, icon, onClick }: IconButtonProps) {
   )
 }
 
-// ❌ Bad - No accessibility
+// ☒ Bad - No accessibility
 export function IconButton({ icon, onClick }: IconButtonProps) {
   return <div className="button" onClick={onClick}>{icon}</div>
 }
@@ -162,13 +162,13 @@ Optimize for performance without premature optimization:
 - Minimize re-renders
 
 ```tsx
-// ✅ Good - Memoized calculation
+// ☑︎ Good - Memoized calculation
 const sortedItems = useMemo(
   () => items.sort((a, b) => a.name.localeCompare(b.name)),
   [items]
 )
 
-// ❌ Bad - Recalculates on every render
+// ☒ Bad - Recalculates on every render
 const sortedItems = items.sort((a, b) => a.name.localeCompare(b.name))
 ```
 
@@ -198,7 +198,7 @@ view/        → Layout (Main, Sidebar, Header)
 Build complex UIs by composing simple components:
 
 ```tsx
-// ✅ Good - Composition
+// ☑︎ Good - Composition
 <Card>
   <Card.Header>
     <h3>Title</h3>
@@ -211,7 +211,7 @@ Build complex UIs by composing simple components:
   </Card.Footer>
 </Card>
 
-// ❌ Bad - Configuration
+// ☒ Bad - Configuration
 <Card
   title="Title"
   content="Content goes here"
@@ -258,13 +258,13 @@ export const ButtonGhost = (props) => <Button variant="ghost" {...props} />
 Prefer `useMemo` over `useEffect` for derived state:
 
 ```tsx
-// ✅ Good - Derived state
+// ☑︎ Good - Derived state
 const activeItems = useMemo(
   () => items.filter(item => item.active),
   [items]
 )
 
-// ❌ Bad - useEffect
+// ☒ Bad - useEffect
 const [activeItems, setActiveItems] = useState([])
 useEffect(() => {
   setActiveItems(items.filter(item => item.active))
@@ -304,7 +304,7 @@ Use PostCSS nesting for organization:
 Simple class names with nesting instead of BEM:
 
 ```css
-/* ✅ Good - Simple classes with nesting */
+/* ☑︎ Good - Simple classes with nesting */
 .button {
   &.primary { }
   &.secondary { }
@@ -312,7 +312,7 @@ Simple class names with nesting instead of BEM:
   &.lg { }
 }
 
-/* ❌ Bad - BEM */
+/* ☒ Bad - BEM */
 .button--primary { }
 .button--secondary { }
 .button--sm { }
@@ -372,14 +372,14 @@ import { api } from './api'
 Never use `any`. Use specific types or `unknown`:
 
 ```typescript
-// ✅ Good
+// ☑︎ Good
 function handleError(error: unknown) {
   if (error instanceof Error) {
     console.error(error.message)
   }
 }
 
-// ❌ Bad
+// ☒ Bad
 function handleError(error: any) {
   console.error(error.message)
 }
@@ -435,8 +435,8 @@ function greet(user: User) {
   return `Hello, ${user.name}`
 }
 
-greet({ id: 1, name: 'Alice' }) // ✅
-greet({ id: 1 }) // ❌ Type error
+greet({ id: 1, name: 'Alice' }) // ☑︎
+greet({ id: 1 }) // ☒ Type error
 ```
 
 ### Manual Testing
