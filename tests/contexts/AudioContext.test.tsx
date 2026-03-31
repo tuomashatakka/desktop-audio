@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { AudioProvider, useAudio } from '../../src/app/contexts/AudioContext'
 import type { Track } from '../../src/app/services/types'
@@ -109,9 +108,9 @@ describe('AudioContext', () => {
 
   it('throws error when useAudio is used outside provider', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-    
+
     expect(() => render(<TestConsumer />)).toThrow('useAudio must be used within AudioProvider')
-    
+
     consoleError.mockRestore()
   })
 })

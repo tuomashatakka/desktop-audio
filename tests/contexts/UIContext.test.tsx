@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { UIProvider, useUI, type ViewType } from '../../src/app/contexts/UIContext'
 
@@ -124,9 +123,9 @@ describe('UIContext', () => {
 
   it('throws error when useUI is used outside provider', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-    
+
     expect(() => render(<TestConsumer />)).toThrow('useUI must be used within UIProvider')
-    
+
     consoleError.mockRestore()
   })
 })
