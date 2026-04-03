@@ -8,6 +8,7 @@ interface UIState {
   readonly currentView:        ViewType
   readonly sidebarOpen:        boolean
   readonly selectedFolderPath: string | null
+  readonly selectedPlaylistId: string | null
   readonly editingTrackId:     string | null
   readonly playerExpanded:     boolean
 }
@@ -16,6 +17,7 @@ interface UIContextValue extends UIState {
   readonly setView:              (view: ViewType) => void
   readonly toggleSidebar:        () => void
   readonly selectFolder:         (path: string | null) => void
+  readonly selectPlaylist:       (id: string | null) => void
   readonly setEditingTrack:      (id: string | null) => void
   readonly togglePlayerExpanded: () => void
 }
@@ -27,6 +29,7 @@ export function UIProvider ({ children }: { readonly children: ReactNode }) {
     currentView:        'library',
     sidebarOpen:        true,
     selectedFolderPath: null,
+    selectedPlaylistId: null,
     editingTrackId:     null,
     playerExpanded:     false,
   })
@@ -43,7 +46,12 @@ export function UIProvider ({ children }: { readonly children: ReactNode }) {
 
   const selectFolder = useCallback((path: string | null) => {
     setState(s =>
-      ({ ...s, selectedFolderPath: path }))
+      ({ ...s, selectedFolderPath: path, selectedPlaylistId: null }))
+  }, [])
+
+  const selectPlaylist = useCallback((id: string | null) => {
+    setState(s =>
+      ({ ...s, selectedPlaylistId: id, selectedFolderPath: null }))
   }, [])
 
   const setEditingTrack = useCallback((id: string | null) => {
@@ -67,6 +75,7 @@ export function UIProvider ({ children }: { readonly children: ReactNode }) {
         setView,
         toggleSidebar,
         selectFolder,
+        selectPlaylist,
         setEditingTrack,
         togglePlayerExpanded,
       }}

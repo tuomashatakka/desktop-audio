@@ -4,6 +4,19 @@ import {
 } from '../../src/app/services/fileScanner'
 import { mockElectronAPI, setupMockElectronAPI } from '../mocks/electron'
 
+const makeMockTrack = (filePath: string, overrides = {}) => ({
+  id:         filePath,
+  path:       filePath,
+  title:      filePath.split('/').pop()?.replace(/\.[^.]+$/, '') ?? '',
+  artist:     'Unknown Artist',
+  album:      'Unknown Album',
+  duration:   0,
+  format:     filePath.split('.').pop()?.toUpperCase() ?? '',
+  size:       0,
+  coverColor: 'hsl(300, 65%, 38%)',
+  ...overrides,
+})
+
 describe('fileScanner utilities', () => {
   beforeEach(() => {
     setupMockElectronAPI()
@@ -11,17 +24,20 @@ describe('fileScanner utilities', () => {
 
   describe('scanDirectory', () => {
     it('returns empty arrays when no electron API', async () => {
-      Object.defineProperty(window, 'electronAPI', { value: undefined })
+      Object.defineProperty(window, 'electronAPI', { value: undefined, writable: true })
       const result = await scanDirectory('/music')
       expect(result.folders).toHaveLength(0)
       expect(result.tracks).toHaveLength(0)
     })
 
-    it('scans directory and creates tracks from audio files', async () => {
+    it('scans directory and returns enriched tracks from scanLibrary', async () => {
+      mockElectronAPI.scanLibrary.mockResolvedValue([
+        makeMockTrack('/music/track1.mp3', { title: 'track1', format: 'MP3' }),
+        makeMockTrack('/music/track2.flac', { title: 'track2', format: 'FLAC' }),
+      ])
       mockElectronAPI.scanDirectory.mockResolvedValue([
         '/music/track1.mp3',
         '/music/track2.flac',
-        '/music/readme.txt',
       ])
 
       const result = await scanDirectory('/music')
@@ -33,10 +49,11 @@ describe('fileScanner utilities', () => {
       expect(result.tracks[1]?.format).toBe('FLAC')
     })
 
-    it('sets default values for track metadata', async () => {
-      mockElectronAPI.scanDirectory.mockResolvedValue([
-        '/music/song.mp3',
+    it('sets default values for track metadata when tags are absent', async () => {
+      mockElectronAPI.scanLibrary.mockResolvedValue([
+        makeMockTrack('/music/song.mp3'),
       ])
+      mockElectronAPI.scanDirectory.mockResolvedValue([ '/music/song.mp3' ])
 
       const result = await scanDirectory('/music')
 
@@ -48,7 +65,7 @@ describe('fileScanner utilities', () => {
     })
 
     it('handles errors gracefully', async () => {
-      mockElectronAPI.scanDirectory.mockRejectedValue(new Error('Scan failed'))
+      mockElectronAPI.scanLibrary.mockRejectedValue(new Error('Scan failed'))
 
       const result = await scanDirectory('/music')
 
@@ -59,7 +76,7 @@ describe('fileScanner utilities', () => {
 
   describe('selectDirectory', () => {
     it('returns null when no electron API', async () => {
-      Object.defineProperty(window, 'electronAPI', { value: undefined })
+      Object.defineProperty(window, 'electronAPI', { value: undefined, writable: true })
       const result = await selectDirectory()
       expect(result).toBeNull()
     })

@@ -17,6 +17,7 @@ interface Column {
 }
 
 const COLUMNS: readonly Column[] = [
+  { key: 'album-art', label: '', className: 'col-art', sortable: false },
   { key: '#', label: '#', className: 'col-index', sortable: false },
   { key: 'title', label: 'Title', className: 'col-title', sortable: true },
   { key: 'artist', label: 'Artist', className: 'col-artist', sortable: true },
@@ -107,11 +108,12 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
                 }}
                 aria-hidden='true'
               >
+                <Skeleton width='24px' height='24px' />
                 <Skeleton width='2ch' />
-                <Skeleton width='38%' />
-                <Skeleton width='22%' />
+                <Skeleton width='36%' />
                 <Skeleton width='20%' />
-                <Skeleton width='8%' />
+                <Skeleton width='18%' />
+                <Skeleton width='7%' />
                 <Skeleton width='5ch' />
               </div>
             )
@@ -124,7 +126,7 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
               const active = currentTrack?.id === track.id
               return (
                 <div
-                  key={track.id}
+                  key={track.path}
                   role='row'
                   className={[ 'track-row', active ? 'active' : '' ].join(' ').trim()}
                   style={{
@@ -138,6 +140,13 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
                     e.key === 'Enter' && onPlay(track, vrow.index)}
                   aria-selected={active}
                 >
+                  <span className='col-art' aria-hidden='true'>
+                    {track.albumArt
+                      ? <img src={track.albumArt} alt='' />
+                      : <span className='art-swatch' style={{ background: track.coverColor }} />
+                    }
+                  </span>
+
                   <span className='col-index'>
                     {active && isPlaying ? '▶' : vrow.index + 1}
                   </span>

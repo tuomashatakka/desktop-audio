@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
+import { readdir, stat } from 'node:fs/promises'
 import started from 'electron-squirrel-startup'
 import * as mm from 'music-metadata'
 
@@ -130,6 +131,187 @@ ipcMain.handle('get-audio-metadata', async (_event, filePath: string) => {
     return {}
   }
 })
+
+// ─── scan-library helpers ────────────────────────────────────────────────────
+
+const AUDIO_EXTENSIONS_SET = new Set([
+  '.mp3', '.m4a', '.flac', '.wav', '.ogg',
+  '.aac', '.opus', '.webm', '.wma', '.aiff', '.aif',
+])
+
+// Option B: narrow hue range 280–360 (violet → hot pink), cohesive with accent hsl(337,100%,50%)
+// djb2 hash via reduce — no mutation needed
+const generateCoverColor = (title: string): string => {
+  const hash = Array.from(title).reduce((h, ch) =>
+    Math.imul(h, 31) + ch.charCodeAt(0) | 0, 0)
+  const hue = 280 + Math.abs(hash) % 80
+  return `hsl(${hue}, 65%, 38%)`
+}
+
+const extractYear = (noExt: string): number | undefined => {
+  const m = noExt.match(/\b(19\d{2}|20\d{2})\b/) ?? noExt.match(/[\[(](19\d{2}|20\d{2})[\])]/)
+  if (!m) {
+    return undefined
+  }
+
+  const y = Number.parseInt(m[1] ?? m[0], 10)
+  return Number.isNaN(y) ? undefined : y
+}
+
+const extractTrackNumber = (noExt: string): number | undefined => {
+  const m = noExt.match(/^(\d{1,3})[.\s-]/)
+  if (!m) {
+    return undefined
+  }
+
+  const n = Number.parseInt(m[1] ?? '', 10)
+  return Number.isNaN(n) ? undefined : n
+}
+
+const parseTitleArtist = (noExt: string): { title: string; artist: string } => {
+  const dashIdx = noExt.indexOf(' - ')
+  if (dashIdx <= 0) {
+    return {
+      title:  noExt.replace(/^\d+\.?\s+/, '') || noExt,
+      artist: 'Unknown Artist',
+    }
+  }
+  return {
+    artist: noExt.slice(0, dashIdx).trim(),
+    title:  noExt.slice(dashIdx + 3).trim()
+      .replace(/^\d+\.?\s+/, '') || noExt.slice(dashIdx + 3).trim(),
+  }
+}
+
+const encodeAlbumArt = (picture: { format: string; data: Uint8Array } | undefined): string | undefined => {
+  if (!picture) {
+    return undefined
+  }
+  return `data:${picture.format};base64,${Buffer.from(picture.data).toString('base64')}`
+}
+
+interface ScannedTrack {
+  id:           string
+  path:         string
+  title:        string
+  artist:       string
+  album:        string
+  duration:     number
+  format:       string
+  size:         number
+  coverColor:   string
+  albumArt?:    string
+  year?:        number
+  genre?:       string
+  trackNumber?: number
+}
+
+type OptionalFields = Pick<ScannedTrack, 'albumArt' | 'year' | 'genre' | 'trackNumber'>
+
+const extractOptionalFields = (
+  meta: mm.IAudioMetadata,
+  yearFallback:        number | undefined,
+  trackNumberFallback: number | undefined
+): Partial<OptionalFields> => {
+  const albumArt     = encodeAlbumArt(meta.common.picture?.[0])
+  const resolvedYear = meta.common.year ?? yearFallback
+  const resolvedTn   = meta.common.track?.no ?? trackNumberFallback
+  const genre        = meta.common.genre?.[0]
+  return {
+    ...albumArt === undefined ? {} : { albumArt },
+    ...resolvedYear === undefined ? {} : { year: resolvedYear },
+    ...genre === undefined ? {} : { genre },
+    ...resolvedTn === undefined ? {} : { trackNumber: resolvedTn },
+  }
+}
+
+const processAudioFile = async (fullPath: string, fileSize: number): Promise<ScannedTrack> => {
+  const ext = path.extname(fullPath).toLowerCase()
+  const noExt = path.basename(fullPath, ext)
+  const parentDir = path.basename(path.dirname(fullPath))
+  const fallback = parseTitleArtist(noExt)
+  const album = parentDir !== '.' && parentDir !== '/' ? parentDir : 'Unknown Album'
+  const year = extractYear(noExt)
+  const trackNumber = extractTrackNumber(noExt)
+  const format = ext.replace('.', '').toUpperCase()
+
+  try {
+    const meta = await mm.parseFile(fullPath, { duration: true })
+    const resolvedTitle = meta.common.title || fallback.title
+    return {
+      id:         fullPath,
+      path:       fullPath,
+      title:      resolvedTitle,
+      artist:     meta.common.artist || fallback.artist,
+      album:      meta.common.album || album,
+      duration:   Math.round(meta.format.duration ?? 0),
+      format,
+      size:       fileSize,
+      coverColor: generateCoverColor(resolvedTitle),
+      ...extractOptionalFields(meta, year, trackNumber),
+    }
+  }
+  catch {
+    return {
+      id:         fullPath,
+      path:       fullPath,
+      title:      fallback.title,
+      artist:     fallback.artist,
+      album,
+      duration:   0,
+      format,
+      size:       fileSize,
+      coverColor: generateCoverColor(fallback.title),
+      ...year === undefined ? {} : { year },
+      ...trackNumber === undefined ? {} : { trackNumber },
+    }
+  }
+}
+
+ipcMain.handle('scan-library', async (_event, dirPath: string) => {
+  const tracks: ScannedTrack[] = []
+  const seen = new Set<string>()
+
+  const walk = async (dir: string): Promise<void> => {
+    try {
+      const entries = await readdir(dir, { withFileTypes: true })
+      await Promise.all(
+        entries.map(async entry => {
+          const fullPath = path.join(dir, entry.name)
+          if (entry.isDirectory()) {
+            await walk(fullPath)
+            return
+          }
+          if (
+            entry.isFile() &&
+            AUDIO_EXTENSIONS_SET.has(path.extname(entry.name).toLowerCase()) &&
+            !seen.has(fullPath)
+          ) {
+            seen.add(fullPath)
+            try {
+              const stats = await stat(fullPath)
+              const track = await processAudioFile(fullPath, stats.size)
+              tracks.push(track)
+            }
+            catch {
+              // skip unreadable files
+            }
+          }
+        })
+      )
+    }
+    catch {
+      // skip inaccessible directories
+    }
+  }
+
+  await walk(dirPath)
+  tracks.sort((a, b) =>
+    a.title.localeCompare(b.title))
+  return tracks
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 ipcMain.handle('read-file', async (_event, filePath: string) => {
   const buffer = fs.readFileSync(filePath)

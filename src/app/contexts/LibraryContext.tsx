@@ -1,17 +1,9 @@
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useMemo } from 'react'
+import type { Track, Playlist } from '../services/types'
 
 
-export interface Track {
-  readonly id:        string
-  readonly path:      string
-  readonly title:     string
-  readonly artist:    string
-  readonly album:     string
-  readonly duration:  number
-  readonly format:    string
-  readonly albumArt?: string;
-}
+export type { Track, Playlist } from '../services/types'
 
 export interface FolderNode {
   readonly id:       string
@@ -24,19 +16,23 @@ export interface FolderNode {
 interface LibraryState {
   readonly folders:            readonly FolderNode[]
   readonly tracks:             readonly Track[]
+  readonly playlists:          readonly Playlist[]
   readonly searchQuery:        string
   readonly selectedTrackIndex: number | null
   readonly isLoading:          boolean
 }
 
 interface LibraryContextValue extends LibraryState {
-  readonly setFolders:     (folders: readonly FolderNode[]) => void
-  readonly setTracks:      (tracks: readonly Track[]) => void
-  readonly setSearchQuery: (query: string) => void
-  readonly selectTrack:    (index: number | null) => void
-  readonly toggleFolder:   (path: string) => void
-  readonly setLoading:     (loading: boolean) => void
-  readonly filteredTracks: readonly Track[]
+  readonly setFolders:              (folders: readonly FolderNode[]) => void
+  readonly setTracks:               (tracks: readonly Track[]) => void
+  readonly setSearchQuery:          (query: string) => void
+  readonly selectTrack:             (index: number | null) => void
+  readonly toggleFolder:            (path: string) => void
+  readonly setLoading:              (loading: boolean) => void
+  readonly filteredTracks:          readonly Track[]
+  readonly addPlaylist:             (name: string) => void
+  readonly removePlaylist:          (id: string) => void
+  readonly addTracksToPlaylist:     (playlistId: string, tracks: readonly Track[]) => void
 }
 
 const LibraryContext = createContext<LibraryContextValue | null>(null)
@@ -45,6 +41,7 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
   const [ state, setState ] = useState<LibraryState>({
     folders:            [],
     tracks:             [],
+    playlists:          [],
     searchQuery:        '',
     selectedTrackIndex: null,
     isLoading:          false,
@@ -83,6 +80,31 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
       ({ ...s, isLoading: loading }))
   }, [])
 
+  const addPlaylist = useCallback((name: string) => {
+    const id = Math.random().toString(36).slice(2, 11)
+    setState(s =>
+      ({ ...s, playlists: [ ...s.playlists, { id, name, tracks: [] }] }))
+  }, [])
+
+  const removePlaylist = useCallback((id: string) => {
+    setState(s =>
+      ({ ...s, playlists: s.playlists.filter(p =>
+        p.id !== id) }))
+  }, [])
+
+  const addTracksToPlaylist = useCallback((playlistId: string, tracks: readonly Track[]) => {
+    setState(s =>
+      ({
+        ...s,
+        playlists: s.playlists.map(p =>
+          p.id === playlistId
+            ? { ...p, tracks: [ ...p.tracks, ...tracks.filter(t =>
+              !p.tracks.some(pt =>
+                pt.path === t.path)) ] }
+            : p),
+      }))
+  }, [])
+
   const filteredTracks = useMemo(() => {
     if (!state.searchQuery.trim()) {
       return state.tracks
@@ -108,6 +130,9 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
         toggleFolder,
         setLoading,
         filteredTracks,
+        addPlaylist,
+        removePlaylist,
+        addTracksToPlaylist,
       }}
     >
       {children}

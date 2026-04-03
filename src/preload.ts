@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('get-music-library-path'),
   scanDirectory: (path: string) =>
     ipcRenderer.invoke('scan-directory', path),
+  scanLibrary: (path: string) =>
+    ipcRenderer.invoke('scan-library', path),
   getAudioMetadata: (path: string) =>
     ipcRenderer.invoke('get-audio-metadata', path),
   readFile: (path: string) =>
