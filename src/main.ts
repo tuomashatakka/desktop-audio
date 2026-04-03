@@ -310,6 +310,60 @@ ipcMain.handle('scan-library', async (_event, dirPath: string) => {
   return tracks
 })
 
+// Streaming variant — pushes batches to the renderer as files are found
+// so the UI can populate incrementally without waiting for the full scan.
+const STREAM_BATCH_SIZE = 20
+
+ipcMain.on('scan-library-stream', async (event, dirPath: string) => {
+  const seen = new Set<string>()
+  const pending: ScannedTrack[] = []
+
+  const flush = () => {
+    if (pending.length > 0) {
+      event.sender.send('scan-library-batch', [ ...pending ])
+      pending.length = 0
+    }
+  }
+
+  const walk = async (dir: string): Promise<void> => {
+    try {
+      const entries = await readdir(dir, { withFileTypes: true })
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          await walk(fullPath)
+          continue
+        }
+        if (
+          entry.isFile() &&
+          AUDIO_EXTENSIONS_SET.has(path.extname(entry.name).toLowerCase()) &&
+          !seen.has(fullPath)
+        ) {
+          seen.add(fullPath)
+          try {
+            const stats = await stat(fullPath)
+            const track = await processAudioFile(fullPath, stats.size)
+            pending.push(track)
+            if (pending.length >= STREAM_BATCH_SIZE) {
+              flush()
+            }
+          }
+          catch {
+            // skip unreadable files
+          }
+        }
+      }
+    }
+    catch {
+      // skip inaccessible directories
+    }
+  }
+
+  await walk(dirPath)
+  flush()
+  event.sender.send('scan-library-done')
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 ipcMain.handle('read-file', async (_event, filePath: string) => {

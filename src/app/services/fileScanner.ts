@@ -6,6 +6,7 @@ declare global {
     readonly electronAPI?: {
       readonly scanDirectory:       (path: string) => Promise<readonly string[]>
       readonly scanLibrary:         (path: string) => Promise<readonly Track[]>
+      readonly scanLibraryStream:   (path: string, onBatch: (tracks: Track[]) => void, onDone: () => void) => void
       readonly getAudioMetadata:    (path: string) => Promise<AudioMetadata>
       readonly selectDirectory:     () => Promise<string | null>
       readonly getMusicLibraryPath: () => Promise<string>

@@ -10,6 +10,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('scan-directory', path),
   scanLibrary: (path: string) =>
     ipcRenderer.invoke('scan-library', path),
+  scanLibraryStream: (
+    dirPath: string,
+    onBatch: (tracks: unknown[]) => void,
+    onDone: () => void
+  ) => {
+    ipcRenderer.send('scan-library-stream', dirPath)
+
+    const batchHandler = (_: unknown, batch: unknown[]) =>
+      onBatch(batch)
+    const doneHandler = () => {
+      ipcRenderer.removeListener('scan-library-batch', batchHandler)
+      ipcRenderer.removeListener('scan-library-done', doneHandler)
+      onDone()
+    }
+    ipcRenderer.on('scan-library-batch', batchHandler)
+    ipcRenderer.once('scan-library-done', doneHandler)
+  },
   getAudioMetadata: (path: string) =>
     ipcRenderer.invoke('get-audio-metadata', path),
   readFile: (path: string) =>

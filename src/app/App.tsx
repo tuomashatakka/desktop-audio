@@ -17,36 +17,37 @@ function AppContent () {
   const { currentTrack } = useAudio()
   const { theme } = useSettings()
   const { width } = useWindowSize()
+  const [ isAnimating, setIsAnimating ] = useState(false)
+  const [ showExpanded, setShowExpanded ] = useState(false)
+
+  // All hooks must be called unconditionally before any early return
+  useKeyboardShortcuts()
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [ theme ])
 
+  useEffect(() => {
+    if (width >= MINI_THRESHOLD) {
+      if (playerExpanded && !showExpanded) {
+        setIsAnimating(true)
+        setShowExpanded(true)
+        setTimeout(() =>
+          setIsAnimating(false), 300)
+      }
+      else if (!playerExpanded && showExpanded) {
+        setIsAnimating(true)
+        setTimeout(() => {
+          setShowExpanded(false)
+          setIsAnimating(false)
+        }, 200)
+      }
+    }
+  }, [ playerExpanded, showExpanded, width ])
+
   if (width < MINI_THRESHOLD) {
     return <MiniPlayer />
   }
-
-  const [ isAnimating, setIsAnimating ] = useState(false)
-  const [ showExpanded, setShowExpanded ] = useState(false)
-
-  // Register global keyboard shortcuts
-  useKeyboardShortcuts()
-
-  useEffect(() => {
-    if (playerExpanded && !showExpanded) {
-      setIsAnimating(true)
-      setShowExpanded(true)
-      setTimeout(() =>
-        setIsAnimating(false), 300)
-    }
-    else if (!playerExpanded && showExpanded) {
-      setIsAnimating(true)
-      setTimeout(() => {
-        setShowExpanded(false)
-        setIsAnimating(false)
-      }, 200)
-    }
-  }, [ playerExpanded, showExpanded ])
 
   const renderView = () => {
     switch (currentView) {

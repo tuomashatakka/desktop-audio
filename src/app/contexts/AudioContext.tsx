@@ -40,6 +40,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   const analyzerRef = useRef<AnalyserNode | null>(null)
   const audioContextRef = useRef<globalThis.AudioContext | null>(null)
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null)
+  const [ analyzer, setAnalyzer ] = useState<AnalyserNode | null>(null)
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -117,6 +118,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
       analyzerRef.current = ctx.createAnalyser()
       analyzerRef.current.fftSize = 256
       analyzerRef.current.connect(ctx.destination)
+      setAnalyzer(analyzerRef.current)
     }
 
     if (!sourceRef.current && audioRef.current) {
@@ -269,7 +271,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
         setVolume,
         playNext,
         playPrevious,
-        analyzer: analyzerRef.current,
+        analyzer,
       }}
     >
       {children}
