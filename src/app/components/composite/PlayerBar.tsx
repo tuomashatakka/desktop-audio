@@ -1,5 +1,6 @@
 import { useUI, useAudio, useLibrary } from '../../contexts'
 import { IconButton } from '../atomic'
+import { WaveformProgress } from '../atomic/WaveformProgress'
 
 
 export function PlayerBar () {
@@ -74,14 +75,12 @@ export function PlayerBar () {
           e.stopPropagation()}>
         <span className='player-bar-time'>{formatTime(currentTime)}</span>
 
-        <input
-          type='range'
-          className='slider'
-          min={0}
-          max={duration || 100}
-          value={currentTime}
-          onChange={e =>
-            seek(Number(e.target.value))}
+        <WaveformProgress
+          currentTime={currentTime}
+          duration={duration}
+          onSeek={seek}
+          barCount={80}
+          compact
         />
 
         <span className='player-bar-time'>{formatTime(duration)}</span>

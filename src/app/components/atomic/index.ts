@@ -9,3 +9,5 @@ export { Skeleton } from './Skeleton'
 export { Slider } from './Slider'
 
 export { Waveform } from './Waveform'
+
+export { WaveformProgress } from './WaveformProgress'

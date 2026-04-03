@@ -2,24 +2,21 @@ import { useState } from 'react'
 import { useAudio, useLibrary } from '../contexts'
 import { IconButton, Button } from '../components/atomic'
 import { Waveform } from '../components/atomic/Waveform'
+import { WaveformProgress } from '../components/atomic/WaveformProgress'
 import './PlayerView.css'
 
+function formatTime (seconds: number): string {
+  if (!seconds || !Number.isFinite(seconds))
+    return '0:00'
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
 
 export function PlayerView () {
-  const { currentTrack, isPlaying, currentTime, duration, volume, pause, resume, seek, setVolume, playNext, playPrevious, analyzer } = useAudio()
+  const { currentTrack, isPlaying, currentTime, duration, pause, resume, seek, playNext, playPrevious, analyzer } = useAudio()
   const { filteredTracks } = useLibrary()
-  const [ showWaveform, setShowWaveform ] = useState(false)
-
-  const formatTime = (seconds: number) => {
-    if (!seconds || !Number.isFinite(seconds))
-      return '0:00'
-
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const progress = duration > 0 ? currentTime / duration * 100 : 0
+  const [ tab, setTab ] = useState<'player' | 'visualizer'>('player')
 
   if (!currentTrack) {
     return (
@@ -35,116 +32,96 @@ export function PlayerView () {
 
   return (
     <div className='player-view'>
+
+      {/* ─── Tab bar ──────────────────────────────── */}
+      <div className='player-tab-bar'>
+        <button
+          className={`player-tab ${tab === 'player' ? 'active' : ''}`}
+          onClick={() =>
+            setTab('player')}
+        >
+          <span className='tab-icon'>♪</span>
+          Player
+        </button>
+
+        <button
+          className={`player-tab ${tab === 'visualizer' ? 'active' : ''}`}
+          onClick={() =>
+            setTab('visualizer')}
+        >
+          <span className='tab-icon'>∿</span>
+          Visualizer
+        </button>
+      </div>
+
+      {/* ─── Main content ─────────────────────────── */}
       <div className='player-content'>
-        <div className='view-toggle'>
-          <Button
-            onClick={() =>
-              setShowWaveform(false)}
-            variant={showWaveform ? 'secondary' : 'primary'}
-            size='sm'
-          >
-            Album Art
-          </Button>
 
-          <Button
-            onClick={() =>
-              setShowWaveform(true)}
-            variant={showWaveform ? 'primary' : 'secondary'}
-            size='sm'
-          >
-            Waveform
-          </Button>
-        </div>
-
-        {showWaveform
+        {tab === 'visualizer'
           ? <Waveform analyzer={analyzer} isPlaying={isPlaying} />
-          : <div className='album-art-container'>
-            {currentTrack.albumArt
-              ? <img
-                src={currentTrack.albumArt}
-                alt='Album art'
-              />
-              : '♫'
-            }
-          </div>
-        }
-
-        <div className='player-info'>
-          <h2>{currentTrack.title}</h2>
-          <p className='track-artist'>{currentTrack.artist}</p>
-          <p className='track-album'>{currentTrack.album}</p>
-        </div>
-
-        <div className='progress-section'>
-          <div className='progress-bar-container'>
-            <span className='time-label'>{formatTime(currentTime)}</span>
-
-            <div className='progress-track'>
-              <div
-                className='progress-fill'
-                style={{ width: `${progress}%` }}
-              />
-
-              <input
-                type='range'
-                min={0}
-                max={duration || 100}
-                value={currentTime}
-                onChange={e =>
-                  seek(Number(e.target.value))}
-              />
+          : <>
+            {/* Album art split card */}
+            <div className='album-art-card'>
+              {currentTrack.albumArt
+                ? <img src={currentTrack.albumArt} alt='Album art' />
+                : <div className='art-fallback'>
+                  <span>♫</span>
+                </div>
+              }
             </div>
 
-            <span className='time-label total'>{formatTime(duration)}</span>
-          </div>
-        </div>
+            {/* Track info */}
+            <div className='player-info'>
+              <h2 className='track-title'>{currentTrack.title}</h2>
+              <p className='track-artist'>{currentTrack.artist}</p>
+              <p className='track-album'>{currentTrack.album}</p>
+            </div>
 
-        <div className='playback-controls'>
-          <IconButton
-            label='Previous'
-            onClick={() =>
-              playPrevious(filteredTracks)}
-          >
-            ⏮
-          </IconButton>
+            {/* Waveform progress */}
+            <div className='progress-section'>
+              <WaveformProgress
+                currentTime={currentTime}
+                duration={duration}
+                onSeek={seek}
+                barCount={75}
+              />
 
-          <Button
-            variant='primary'
-            className='play-pause-btn'
-            icon
-            onClick={isPlaying ? pause : resume}
-          >
-            {isPlaying ? '⏸' : '▶'}
-          </Button>
+              <div className='time-row'>
+                <span className='time-label'>{formatTime(currentTime)}</span>
+                <span className='time-label'>{formatTime(duration)}</span>
+              </div>
+            </div>
 
-          <IconButton
-            label='Next'
-            onClick={() =>
-              playNext(filteredTracks)}
-          >
-            ⏭
-          </IconButton>
-        </div>
+            {/* Playback controls */}
+            <div className='playback-controls'>
+              <IconButton
+                label='Previous'
+                onClick={() =>
+                  playPrevious(filteredTracks)}
+              >
+                ⏮
+              </IconButton>
 
-        <div className='volume-controls'>
-          <span className='volume-icon'>🔊</span>
+              <Button
+                variant='primary'
+                className='play-pause-btn'
+                icon
+                onClick={isPlaying ? pause : resume}
+              >
+                {isPlaying ? '⏸' : '▶'}
+              </Button>
 
-          <input
-            type='range'
-            className='slider volume-slider'
-            min={0}
-            max={1}
-            step={0.01}
-            value={volume}
-            onChange={e =>
-              setVolume(Number(e.target.value))}
-          />
+              <IconButton
+                label='Next'
+                onClick={() =>
+                  playNext(filteredTracks)}
+              >
+                ⏭
+              </IconButton>
+            </div>
+          </>
+        }
 
-          <span className='volume-value'>
-            {Math.round(volume * 100)}
-            %
-          </span>
-        </div>
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { UIProvider, SettingsProvider, LibraryProvider, AudioProvider, useUI, useAudio } from './contexts'
+import { UIProvider, SettingsProvider, LibraryProvider, AudioProvider, useUI, useAudio, useSettings } from './contexts'
 import { LibraryView } from './views/LibraryView'
 import { PlayerView } from './views/PlayerView'
 import { SettingsView } from './views/SettingsView'
@@ -11,6 +11,11 @@ import { useKeyboardShortcuts } from './hooks'
 function AppContent () {
   const { currentView, setView, playerExpanded, togglePlayerExpanded } = useUI()
   const { currentTrack } = useAudio()
+  const { theme } = useSettings()
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [ theme ])
 
   const [ isAnimating, setIsAnimating ] = useState(false)
   const [ showExpanded, setShowExpanded ] = useState(false)
@@ -129,7 +134,7 @@ function AppContent () {
                   onClick={togglePlayerExpanded}
                   aria-label='Close player'
                 >
-                  ↓
+                  ✕
                 </button>
 
                 <PlayerView />

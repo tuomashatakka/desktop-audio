@@ -1,0 +1,36 @@
+.waveform-progress {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  height: 52px;
+  cursor: pointer;
+  padding: 6px 0;
+
+  &:focus-visible {
+    outline: none;
+    border-radius: var(--radius);
+    box-shadow: 0 0 0 2px var(--border-focus);
+  }
+
+  &.compact {
+    height: 28px;
+    padding: 4px 0;
+    gap: 1.5px;
+  }
+}
+
+.wf-bar {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 1px;
+  background: var(--wf-unplayed);
+  transform-origin: center;
+  transform: scaleY(var(--amp));
+  height: 100%;
+  transition: background var(--duration-fast) var(--ease);
+
+  &.played {
+    background: var(--wf-played);
+  }
+}

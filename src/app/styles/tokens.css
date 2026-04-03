@@ -4,6 +4,7 @@
     --bg-raised: #1a1a1a;
     --bg-input: #2a2a2a;
     --bg-hover: #333333;
+    --bg-window: rgba(18, 18, 18, 0.85);
 
     --accent: hsl(337, 100%, 50%);
     --accent-hover: hsl(337, 100%, 60%);
@@ -50,15 +51,44 @@
     --radius-sm: 2px;
     --radius: 4px;
     --radius-lg: 8px;
+    --radius-xl: 20px;
     --radius-full: 9999px;
 
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
     --shadow: 0 2px 4px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.3);
     --shadow-lg: 0 8px 16px rgba(0,0,0,0.2), 0 4px 8px rgba(0,0,0,0.3);
+    --shadow-card: 0 12px 40px rgba(0,0,0,0.25);
 
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
     --duration-fast: 100ms;
     --duration: 200ms;
     --duration-slow: 300ms;
+
+    /* waveform bar colours */
+    --wf-unplayed: rgba(255, 255, 255, 0.15);
+    --wf-played:   rgba(255, 255, 255, 0.55);
+  }
+
+  [data-theme="light"] {
+    --bg: #f0f0f0;
+    --bg-raised: #ffffff;
+    --bg-input: #e8e8e8;
+    --bg-hover: #dedede;
+    --bg-window: rgba(240, 240, 240, 0.9);
+
+    --text: #111111;
+    --text-dim: #444444;
+    --text-muted: #888888;
+
+    --border: rgba(0, 0, 0, 0.08);
+    --border-hover: rgba(0, 0, 0, 0.18);
+
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+    --shadow: 0 2px 4px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06);
+    --shadow-card: 0 12px 40px rgba(0,0,0,0.12);
+
+    --wf-unplayed: rgba(0, 0, 0, 0.13);
+    --wf-played:   rgba(0, 0, 0, 0.45);
   }
 }
