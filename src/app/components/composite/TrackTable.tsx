@@ -101,6 +101,9 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
                 key={vrow.key}
                 className='track-row skeleton-row'
                 style={{
+                  position:  'absolute',
+                  top:       0,
+                  width:     '100%',
                   transform: `translateY(${vrow.start}px)`,
                   height:    ROW_HEIGHT,
                 }}
@@ -124,10 +127,13 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
               const active = currentTrack?.id === track.id
               return (
                 <div
-                  key={track.path}
+                  key={track.id}
                   role='row'
                   className={[ 'track-row', active ? 'active' : '' ].join(' ').trim()}
                   style={{
+                    position:  'absolute',
+                    top:       0,
+                    width:     '100%',
                     transform: `translateY(${vrow.start}px)`,
                     height:    ROW_HEIGHT,
                   }}
