@@ -25,9 +25,7 @@
       font-size: 48px;
     }
 
-    & .form-stack {
-      flex: 1;
-    }
+    & .form-stack { flex: 1; }
 
     & .file-info {
       margin-top: var(--sp-4);
@@ -37,13 +35,8 @@
       font-size: var(--text-sm);
       color: var(--text-muted);
 
-      & p {
-        margin-bottom: var(--sp-1);
-      }
-
-      & strong {
-        color: var(--text-dim);
-      }
+      & p      { margin-bottom: var(--sp-1); }
+      & strong { color: var(--text-dim); }
     }
   }
 

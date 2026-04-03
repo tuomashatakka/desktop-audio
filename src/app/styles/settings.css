@@ -3,13 +3,8 @@
   margin: 0 auto;
   padding: var(--sp-6);
 
-  & h2 {
-    margin-bottom: var(--sp-6);
-  }
-
-  & h4 {
-    margin-bottom: var(--sp-4);
-  }
+  & h2 { margin-bottom: var(--sp-6); }
+  & h4 { margin-bottom: var(--sp-4); }
 
   & .library-section {
     & .section-description {
@@ -33,10 +28,6 @@
         }
       }
     }
-  }
-
-  & .appearance-section {
-    /* Styles for appearance section if needed */
   }
 
   & .about-section {

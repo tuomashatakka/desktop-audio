@@ -64,6 +64,7 @@ function buildFolderTree (rootPath: string, files: readonly string[]): FolderNod
       if (!childrenMap.has(parentPath)) {
         childrenMap.set(parentPath, [])
       }
+
       const siblings = childrenMap.get(parentPath)!
       if (!siblings.includes(currentPath)) {
         siblings.push(currentPath)

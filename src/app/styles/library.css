@@ -11,10 +11,13 @@
     background: var(--bg-raised);
     display: flex;
     flex-direction: column;
+    transition: width var(--duration) var(--ease), min-width var(--duration) var(--ease);
 
-    & header {
-      padding: var(--sp-3) var(--sp-3) var(--sp-2);
-      flex-shrink: 0;
+    &.sidebar-collapsed {
+      width: 0;
+      min-width: 0;
+      overflow: hidden;
+      border-right: none;
     }
   }
 
@@ -24,8 +27,9 @@
     flex-direction: column;
     overflow: hidden;
 
-    & .search-container {
+    & .view-header .search-input {
       width: 250px;
+      flex-shrink: 0;
     }
 
     & .tracks-container {
@@ -45,7 +49,7 @@
 
 /* ─── Track table ─────────────────────────────── */
 
-/* Column width map — shared between sticky <thead> and virtualised rows */
+/* Column width tokens — shared between header and virtualised rows */
 :root {
   --col-index:    3ch;
   --col-title:    1fr;
@@ -62,50 +66,38 @@
   height: 100%;
   overflow: hidden;
 
-  /* Sticky header table */
-  & .tracks-table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
+  /* Sticky div header row */
+  & .track-header {
+    display: grid;
+    grid-template-columns: 36px 40px 1fr 22% 22% 52px 52px;
+    align-items: center;
+    gap: var(--col-gap);
+    padding: 0 var(--sp-2);
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-raised);
 
-    & thead tr {
-      border-bottom: 1px solid var(--border);
-    }
-
-    & th {
+    & [role="columnheader"] {
       padding: var(--sp-2) var(--sp-3);
-      text-align: left;
       color: var(--text-muted);
-      font-weight: var(--font-normal);
       font-size: var(--text-sm);
+      font-weight: var(--font-normal);
       user-select: none;
       white-space: nowrap;
       overflow: hidden;
       transition: color var(--duration-fast) var(--ease);
 
-      &[tabindex] {
-        cursor: pointer;
+      &[tabindex]       { cursor: pointer; }
+      &[tabindex]:hover { color: var(--text-dim); }
+      &.sorted          { color: var(--accent); }
+      &.col-duration    { text-align: right; }
+      &.col-art         { padding: 0 var(--sp-2); }
+      &:focus-visible   { outline: 1px solid var(--border-focus); }
 
-        &:hover { color: var(--text-dim); }
-        &:focus-visible { outline: 1px solid var(--border-focus); }
-      }
-
-      &.sorted { color: var(--accent); }
-
-      & .sort-indicator {
-        font-size: var(--text-xs);
-        opacity: 0.8;
-      }
-
-      /* Column widths — must mirror .track-row grid */
-      &.col-art      { width: 36px; padding: 0 var(--sp-2); }
-      &.col-index    { width: 40px; }
-      &.col-title    { width: auto; }
-      &.col-artist   { width: 22%; }
-      &.col-album    { width: 22%; }
-      &.col-format   { width: 52px; }
-      &.col-duration { width: 52px; text-align: right; }
+      & .sort-indicator { font-size: var(--text-xs); opacity: 0.8; }
     }
   }
 
@@ -116,7 +108,6 @@
     overflow-x: hidden;
     position: relative;
 
-    /* Thin accent scrollbar */
     scrollbar-width: thin;
     scrollbar-color: var(--bg-hover) transparent;
 
@@ -138,12 +129,11 @@
     cursor: pointer;
     transition: background var(--duration-fast) var(--ease);
 
-    &:hover        { background: var(--bg-hover); }
+    &:hover         { background: var(--bg-hover); }
     &:focus-visible { outline: 1px solid var(--border-focus); outline-offset: -1px; }
 
     &.active {
       background: var(--accent-muted);
-
       &:hover { background: var(--accent-muted); }
     }
 
@@ -154,7 +144,6 @@
       pointer-events: none;
     }
 
-    /* Single-row value — no wrapping */
     & span {
       white-space: nowrap;
       overflow: hidden;
@@ -196,9 +185,7 @@
     }
 
     & .col-artist,
-    & .col-album {
-      color: var(--text-dim);
-    }
+    & .col-album { color: var(--text-dim); }
 
     & .col-format {
       color: var(--text-muted);
@@ -256,6 +243,31 @@
   }
 }
 
+/* ─── Sidebar collapse toggle ─────────────────── */
+
+.sidebar-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: var(--sp-1);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color var(--duration-fast) var(--ease);
+
+  &:hover { color: var(--text); }
+
+  & .sidebar-toggle-chevron {
+    display: inline-block;
+    font-size: var(--text-lg);
+    line-height: 1;
+    transition: transform var(--duration-fast) var(--ease);
+
+    &.open { transform: rotate(180deg); }
+  }
+}
+
 /* ─── Playlists ────────────────────────────────── */
 
 .playlist-new-btn {
@@ -294,34 +306,12 @@
   border-radius: var(--radius);
   transition: all var(--duration-fast) var(--ease);
 
-  &:hover {
-    background: var(--bg-hover);
-    color: var(--text);
-  }
+  &:hover  { background: var(--bg-hover); color: var(--text); }
+  &.active { background: var(--accent-muted); color: var(--accent); }
 
-  &.active {
-    background: var(--accent-muted);
-    color: var(--accent);
-  }
-
-  & .playlist-icon {
-    opacity: 0.5;
-    flex-shrink: 0;
-  }
-
-  & .playlist-name {
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  & .playlist-count {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
-  }
+  & .playlist-icon  { opacity: 0.5; flex-shrink: 0; }
+  & .playlist-name  { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  & .playlist-count { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 }
 
 .playlist-empty {
@@ -349,20 +339,9 @@
       border: none;
       transition: all var(--duration-fast) var(--ease);
 
-      &:hover {
-        background: var(--bg-hover);
-        color: var(--text);
-      }
-
-      &.active {
-        background: var(--accent-muted);
-        color: var(--accent);
-      }
-
-      &:focus-visible {
-        outline: 1px solid var(--border-focus);
-        outline-offset: -1px;
-      }
+      &:hover         { background: var(--bg-hover); color: var(--text); }
+      &.active        { background: var(--accent-muted); color: var(--accent); }
+      &:focus-visible { outline: 1px solid var(--border-focus); outline-offset: -1px; }
     }
 
     & .folder-toggle {
@@ -385,10 +364,7 @@
       &.open { transform: rotate(90deg); }
     }
 
-    & .folder-chevron-spacer {
-      display: inline-block;
-      width: 16px;
-    }
+    & .folder-chevron-spacer { display: inline-block; width: 16px; }
 
     & .folder-icon {
       font-size: var(--text-sm);

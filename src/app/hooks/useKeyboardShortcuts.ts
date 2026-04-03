@@ -6,6 +6,7 @@ export function useKeyboardShortcuts () {
   const { isPlaying, currentTrack, volume, pause, resume, setVolume, playNext, playPrevious } = useAudio()
   const { filteredTracks } = useLibrary()
 
+  // eslint-disable-next-line complexity
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       return

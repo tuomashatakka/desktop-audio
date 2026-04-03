@@ -6,8 +6,12 @@ export { IconButton } from './IconButton'
 
 export { Skeleton } from './Skeleton'
 
-export { Slider } from './Slider'
-
 export { Waveform } from './Waveform'
 
 export { WaveformProgress } from './WaveformProgress'
+
+export { Dialog } from './Dialog'
+
+export { PromptDialog } from './PromptDialog'
+
+export { Popover } from './Popover'

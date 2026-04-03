@@ -2,8 +2,18 @@
 @import "./app/styles/reset.css";
 @import "./app/styles/base.css";
 @import "./app/styles/components.css";
-
 @import "./app/styles/app.css";
+
+@import "./app/styles/library.css";
+@import "./app/styles/player.css";
+@import "./app/styles/settings.css";
+@import "./app/styles/tag-editor.css";
+
+@import "./app/styles/waveform.css";
+@import "./app/styles/waveform-progress.css";
+
+@import "./app/styles/dialog.css";
+@import "./app/styles/popover.css";
 
 @layer base {
   html, body, #app {

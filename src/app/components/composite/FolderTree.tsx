@@ -10,8 +10,10 @@ interface FolderTreeProps {
 }
 
 export function FolderTree ({ folders, selectedPath, onSelect, onToggle, level = 0 }: FolderTreeProps) {
+  const Wrapper = level === 0 ? 'nav' : 'div'
+
   return (
-    <nav className='folder-tree'>
+    <Wrapper className='folder-tree'>
       {folders.map(folder =>
         <div key={folder.id} className='folder-tree-node'>
           <button
@@ -55,6 +57,6 @@ export function FolderTree ({ folders, selectedPath, onSelect, onToggle, level =
           }
         </div>
       )}
-    </nav>
+    </Wrapper>
   )
 }

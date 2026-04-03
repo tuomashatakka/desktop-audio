@@ -3,11 +3,12 @@ import { useAudio, useLibrary } from '../contexts'
 import { IconButton, Button } from '../components/atomic'
 import { Waveform } from '../components/atomic/Waveform'
 import { WaveformProgress } from '../components/atomic/WaveformProgress'
-import './PlayerView.css'
+
 
 function formatTime (seconds: number): string {
   if (!seconds || !Number.isFinite(seconds))
     return '0:00'
+
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
@@ -34,7 +35,7 @@ export function PlayerView () {
     <div className='player-view'>
 
       {/* ─── Tab bar ──────────────────────────────── */}
-      <div className='player-tab-bar'>
+      <nav className='player-tab-bar'>
         <button
           className={`player-tab ${tab === 'player' ? 'active' : ''}`}
           onClick={() =>
@@ -52,7 +53,7 @@ export function PlayerView () {
           <span className='tab-icon'>∿</span>
           Visualizer
         </button>
-      </div>
+      </nav>
 
       {/* ─── Main content ─────────────────────────── */}
       <div className='player-content'>
@@ -61,14 +62,12 @@ export function PlayerView () {
           ? <Waveform analyzer={analyzer} isPlaying={isPlaying} />
           : <>
             {/* Album art split card */}
-            <div className='album-art-card'>
+            <figure className='album-art-card'>
               {currentTrack.albumArt
                 ? <img src={currentTrack.albumArt} alt='Album art' />
-                : <div className='art-fallback'>
-                  <span>♫</span>
-                </div>
+                : <span className='art-fallback'>♫</span>
               }
-            </div>
+            </figure>
 
             {/* Track info */}
             <div className='player-info'>
@@ -78,7 +77,7 @@ export function PlayerView () {
             </div>
 
             {/* Waveform progress */}
-            <div className='progress-section'>
+            <section className='progress-section'>
               <WaveformProgress
                 currentTime={currentTime}
                 duration={duration}
@@ -90,7 +89,7 @@ export function PlayerView () {
                 <span className='time-label'>{formatTime(currentTime)}</span>
                 <span className='time-label'>{formatTime(duration)}</span>
               </div>
-            </div>
+            </section>
 
             {/* Playback controls */}
             <div className='playback-controls'>

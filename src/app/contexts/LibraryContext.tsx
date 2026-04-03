@@ -23,16 +23,16 @@ interface LibraryState {
 }
 
 interface LibraryContextValue extends LibraryState {
-  readonly setFolders:              (folders: readonly FolderNode[]) => void
-  readonly setTracks:               (tracks: readonly Track[]) => void
-  readonly setSearchQuery:          (query: string) => void
-  readonly selectTrack:             (index: number | null) => void
-  readonly toggleFolder:            (path: string) => void
-  readonly setLoading:              (loading: boolean) => void
-  readonly filteredTracks:          readonly Track[]
-  readonly addPlaylist:             (name: string) => void
-  readonly removePlaylist:          (id: string) => void
-  readonly addTracksToPlaylist:     (playlistId: string, tracks: readonly Track[]) => void
+  readonly setFolders:          (folders: readonly FolderNode[]) => void
+  readonly setTracks:           (tracks: readonly Track[]) => void
+  readonly setSearchQuery:      (query: string) => void
+  readonly selectTrack:         (index: number | null) => void
+  readonly toggleFolder:        (path: string) => void
+  readonly setLoading:          (loading: boolean) => void
+  readonly filteredTracks:      readonly Track[]
+  readonly addPlaylist:         (name: string) => void
+  readonly removePlaylist:      (id: string) => void
+  readonly addTracksToPlaylist: (playlistId: string, tracks: readonly Track[]) => void
 }
 
 const LibraryContext = createContext<LibraryContextValue | null>(null)
@@ -81,15 +81,17 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
   }, [])
 
   const addPlaylist = useCallback((name: string) => {
-    const id = Math.random().toString(36).slice(2, 11)
+    const id = Math.random().toString(36)
+      .slice(2, 11)
     setState(s =>
-      ({ ...s, playlists: [ ...s.playlists, { id, name, tracks: [] }] }))
+      ({ ...s, playlists: [ ...s.playlists, { id, name, tracks: []}]}))
   }, [])
 
   const removePlaylist = useCallback((id: string) => {
     setState(s =>
-      ({ ...s, playlists: s.playlists.filter(p =>
-        p.id !== id) }))
+      ({ ...s,
+        playlists: s.playlists.filter(p =>
+          p.id !== id) }))
   }, [])
 
   const addTracksToPlaylist = useCallback((playlistId: string, tracks: readonly Track[]) => {
@@ -98,9 +100,10 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
         ...s,
         playlists: s.playlists.map(p =>
           p.id === playlistId
-            ? { ...p, tracks: [ ...p.tracks, ...tracks.filter(t =>
-              !p.tracks.some(pt =>
-                pt.path === t.path)) ] }
+            ? { ...p,
+              tracks: [ ...p.tracks, ...tracks.filter(t =>
+                !p.tracks.some(pt =>
+                  pt.path === t.path)) ]}
             : p),
       }))
   }, [])

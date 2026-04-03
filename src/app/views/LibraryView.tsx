@@ -3,14 +3,16 @@ import type { Track } from '../contexts'
 import { useMemo, useEffect, useState } from 'react'
 import { useLibraryScanner } from '../hooks'
 import { scanDirectory } from '../services'
-import { Input } from '../components/atomic'
+import { Input, PromptDialog } from '../components/atomic'
 import { FolderTree } from '../components/composite/FolderTree'
 import { TrackTable } from '../components/composite/TrackTable'
-import './LibraryView.css'
+import { ContextMenu } from '../components/composite/ContextMenu'
+import type { ContextMenuItem } from '../components/composite/ContextMenu'
 
 
+// eslint-disable-next-line complexity
 export function LibraryView () {
-  const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist } = useUI()
+  const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist, sidebarOpen, toggleSidebar, setEditingTrack } = useUI()
   const { folders, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, setTracks, setLoading, isLoading, toggleFolder } = useLibrary()
   const { play, currentTrack, isPlaying } = useAudio()
   const { libraryPaths } = useSettings()
@@ -18,6 +20,9 @@ export function LibraryView () {
 
   const [ foldersCollapsed, setFoldersCollapsed ] = useState(false)
   const [ playlistsCollapsed, setPlaylistsCollapsed ] = useState(false)
+  const [ promptOpen, setPromptOpen ] = useState(false)
+  const [ contextRect, setContextRect ] = useState<DOMRect | null>(null)
+  const [ contextTrack, setContextTrack ] = useState<Track | null>(null)
 
   useEffect(() => {
     if (libraryPaths.length > 0 && folders.length === 0) {
@@ -43,12 +48,31 @@ export function LibraryView () {
     play(track)
   }
 
-  const handleNewPlaylist = () => {
-    const name = window.prompt('Playlist name:')
-    if (name?.trim()) {
-      addPlaylist(name.trim())
-    }
+  const handleNewPlaylist = () =>
+    setPromptOpen(true)
+
+  const handleContextMenu = (track: Track, rect: DOMRect) => {
+    setContextTrack(track)
+    setContextRect(rect)
   }
+
+  const contextMenuItems: readonly ContextMenuItem[] = contextTrack
+    ? [
+      { label:  'Play',
+        icon:   '▶',
+        action: () =>
+          handleTrackPlay(contextTrack, 0) },
+      { label:  'Add to Playlist',
+        icon:   '♩',
+        action: () =>
+          setPromptOpen(true) },
+      { separator: true },
+      { label:  'Edit Tags',
+        icon:   '✎',
+        action: () =>
+          setEditingTrack(contextTrack.id) },
+    ]
+    : []
 
   const displayTracks = useMemo(() => {
     if (selectedPlaylistId) {
@@ -60,7 +84,7 @@ export function LibraryView () {
 
   return (
     <div className='library-view'>
-      <aside className='library-sidebar'>
+      <aside className={`library-sidebar ${sidebarOpen ? '' : 'sidebar-collapsed'}`}>
 
         {/* ─── Folders section ───────────────────── */}
         <div className='sidebar-section'>
@@ -96,6 +120,7 @@ export function LibraryView () {
           >
             <span className={`section-chevron ${playlistsCollapsed ? '' : 'open'}`}>›</span>
             <span>Playlists</span>
+
             <button
               className='playlist-new-btn'
               onClick={e => {
@@ -134,29 +159,38 @@ export function LibraryView () {
 
       <section className='library-main'>
         <header className='view-header'>
+          <button
+            className='sidebar-toggle-btn'
+            onClick={toggleSidebar}
+            aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            aria-expanded={sidebarOpen}
+          >
+            <span className={`sidebar-toggle-chevron ${sidebarOpen ? 'open' : ''}`}>‹</span>
+          </button>
+
           <h2>
             {selectedPlaylistId
-              ? (playlists.find(p =>
-                p.id === selectedPlaylistId)?.name ?? 'Playlist')
+              ? playlists.find(p =>
+                p.id === selectedPlaylistId)?.name ?? 'Playlist'
               : 'Library'
             }
           </h2>
 
-          <div className='search-container'>
-            <Input
-              type='search'
-              placeholder='Search tracks...'
-              value={searchQuery}
-              onChange={e =>
-                setSearchQuery(e.target.value)}
-            />
-          </div>
+          <Input
+            wrapperClass='search-input'
+            type='search'
+            placeholder='Search tracks...'
+            value={searchQuery}
+            onChange={e =>
+              setSearchQuery(e.target.value)}
+          />
         </header>
 
         <div className='tracks-container'>
           {displayTracks.length === 0 && !isLoading
             ? <div className='status-message'>
               <p>No tracks found</p>
+
               <small>
                 {selectedPlaylistId
                   ? 'This playlist is empty'
@@ -170,10 +204,29 @@ export function LibraryView () {
               currentTrack={currentTrack}
               isPlaying={isPlaying}
               onPlay={handleTrackPlay}
+              onContextMenu={handleContextMenu}
             />
           }
         </div>
       </section>
+
+      <ContextMenu
+        items={contextMenuItems}
+        anchorRect={contextRect}
+        onClose={() => {
+          setContextRect(null); setContextTrack(null)
+        }}
+      />
+
+      <PromptDialog
+        open={promptOpen}
+        title='New Playlist'
+        placeholder='Playlist name...'
+        onConfirm={name =>
+          addPlaylist(name)}
+        onClose={() =>
+          setPromptOpen(false)}
+      />
     </div>
   )
 }

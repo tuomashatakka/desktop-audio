@@ -10,7 +10,7 @@ const ROW_HEIGHT = 36
 const SKELETON_ROW_COUNT = 20
 
 interface Column {
-  readonly key:       SortKey | '#'
+  readonly key:       SortKey | '#' | 'album-art'
   readonly label:     string
   readonly className: string
   readonly sortable:  boolean
@@ -18,7 +18,7 @@ interface Column {
 
 const COLUMNS: readonly Column[] = [
   { key: 'album-art', label: '', className: 'col-art', sortable: false },
-  { key: '#', label: '#', className: 'col-index', sortable: false },
+  { key: '#', label: '', className: 'col-index', sortable: false },
   { key: 'title', label: 'Title', className: 'col-title', sortable: true },
   { key: 'artist', label: 'Artist', className: 'col-artist', sortable: true },
   { key: 'album', label: 'Album', className: 'col-album', sortable: true },
@@ -27,11 +27,12 @@ const COLUMNS: readonly Column[] = [
 ]
 
 interface TrackTableProps {
-  readonly tracks:       readonly Track[]
-  readonly isLoading:    boolean
-  readonly currentTrack: Track | null
-  readonly isPlaying:    boolean
-  readonly onPlay:       (track: Track, index: number) => void
+  readonly tracks:         readonly Track[]
+  readonly isLoading:      boolean
+  readonly currentTrack:   Track | null
+  readonly isPlaying:      boolean
+  readonly onPlay:         (track: Track, index: number) => void
+  readonly onContextMenu?: (track: Track, rect: DOMRect) => void
 }
 
 function formatDuration (seconds: number): string {
@@ -40,7 +41,7 @@ function formatDuration (seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay }: TrackTableProps) {
+export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay, onContextMenu }: TrackTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const { sorted, sortKey, sortDir, toggleSort } = useSortableTable(tracks)
 
@@ -58,36 +59,33 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
   return (
     <div className='track-table-wrap'>
 
-      {/* Sticky header — real <table> for semantic column labels */}
-      <table className='tracks-table' role='presentation'>
-        <thead>
-          <tr>
-            {COLUMNS.map(col => {
-              const isSorted = col.sortable && col.key === sortKey
-              return (
-                <th
-                  key={col.key}
-                  className={[ col.className, isSorted ? `sorted ${sortDir}` : '' ].join(' ').trim()}
-                  onClick={() =>
-                    col.sortable && toggleSort(col.key as SortKey)}
-                  aria-sort={isSorted ? sortDir === 'asc' ? 'ascending' : 'descending' : undefined}
-                  tabIndex={col.sortable ? 0 : undefined}
-                  onKeyDown={e =>
-                    col.sortable && e.key === 'Enter' && toggleSort(col.key as SortKey)}
-                >
-                  {col.label}
+      {/* Sticky header row — same grid as virtualised rows */}
+      <div className='track-header' role='row'>
+        {COLUMNS.map(col => {
+          const isSorted = col.sortable && col.key === sortKey
+          return (
+            <div
+              key={col.key}
+              role='columnheader'
+              className={[ col.className, isSorted ? `sorted ${sortDir}` : '' ].join(' ').trim()}
+              onClick={() =>
+                col.sortable && toggleSort(col.key as SortKey)}
+              aria-sort={isSorted ? sortDir === 'asc' ? 'ascending' : 'descending' : undefined}
+              tabIndex={col.sortable ? 0 : undefined}
+              onKeyDown={e =>
+                col.sortable && e.key === 'Enter' && toggleSort(col.key as SortKey)}
+            >
+              {col.label}
 
-                  {isSorted &&
-                    <span className='sort-indicator' aria-hidden='true'>
-                      {sortDir === 'asc' ? ' ▲' : ' ▼'}
-                    </span>
-                  }
-                </th>
-              )
-            })}
-          </tr>
-        </thead>
-      </table>
+              {isSorted &&
+                <span className='sort-indicator' aria-hidden='true'>
+                  {sortDir === 'asc' ? ' ▲' : ' ▼'}
+                </span>
+              }
+            </div>
+          )
+        })}
+      </div>
 
       {/* Virtualised scroll body */}
       <div ref={scrollRef} className='track-table-scroll'>
@@ -135,6 +133,10 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
                   }}
                   onClick={() =>
                     onPlay(track, vrow.index)}
+                  onContextMenu={e => {
+                    e.preventDefault()
+                    onContextMenu?.(track, e.currentTarget.getBoundingClientRect())
+                  }}
                   tabIndex={0}
                   onKeyDown={e =>
                     e.key === 'Enter' && onPlay(track, vrow.index)}

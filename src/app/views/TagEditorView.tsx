@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useUI, useLibrary } from '../contexts'
 import { Button, Input } from '../components/atomic'
-import './TagEditorView.css'
 
 
 export function TagEditorView () {

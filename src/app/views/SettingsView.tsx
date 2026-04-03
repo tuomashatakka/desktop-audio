@@ -2,7 +2,6 @@ import { useSettings } from '../contexts'
 import type { RepeatMode, Theme } from '../contexts'
 import { selectDirectory } from '../services'
 import { Button } from '../components/atomic'
-import './SettingsView.css'
 
 
 export function SettingsView () {

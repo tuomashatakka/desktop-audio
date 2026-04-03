@@ -38,8 +38,8 @@ export function PlayerBar () {
         </div>
 
         <div className='player-bar-info'>
-          <div className='player-bar-title'>{currentTrack.title}</div>
-          <div className='player-bar-artist'>{currentTrack.artist}</div>
+          <strong className='player-bar-title'>{currentTrack.title}</strong>
+          <span className='player-bar-artist'>{currentTrack.artist}</span>
         </div>
       </div>
 

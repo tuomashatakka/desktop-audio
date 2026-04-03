@@ -1,5 +1,4 @@
 import { useRef, useMemo, useCallback } from 'react'
-import './WaveformProgress.css'
 
 
 interface WaveformProgressProps {
@@ -38,6 +37,7 @@ export function WaveformProgress ({
   const seekFromEvent = useCallback((clientX: number) => {
     if (!containerRef.current || !duration)
       return
+
     const rect = containerRef.current.getBoundingClientRect()
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
     onSeek(ratio * duration)
@@ -50,6 +50,7 @@ export function WaveformProgress ({
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!duration)
       return
+
     const step = duration * 0.02
     if (e.key === 'ArrowRight')
       onSeek(Math.min(duration, currentTime + step))
