@@ -5,17 +5,26 @@ import { PlayerView } from './views/PlayerView'
 import { SettingsView } from './views/SettingsView'
 import { TagEditorView } from './views/TagEditorView'
 import { PlayerBar } from './components/composite/PlayerBar'
-import { useKeyboardShortcuts } from './hooks'
+import { MiniPlayer } from './components/composite/MiniPlayer'
+import { useKeyboardShortcuts, useWindowSize } from './hooks'
+
+
+const MINI_THRESHOLD = 400
 
 
 function AppContent () {
   const { currentView, setView, playerExpanded, togglePlayerExpanded } = useUI()
   const { currentTrack } = useAudio()
   const { theme } = useSettings()
+  const { width } = useWindowSize()
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [ theme ])
+
+  if (width < MINI_THRESHOLD) {
+    return <MiniPlayer />
+  }
 
   const [ isAnimating, setIsAnimating ] = useState(false)
   const [ showExpanded, setShowExpanded ] = useState(false)
