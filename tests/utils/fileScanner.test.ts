@@ -1,10 +1,7 @@
-import {
-  scanDirectory,
-  selectDirectory,
-} from '../../src/app/services/fileScanner'
 import { mockElectronAPI, setupMockElectronAPI } from '../mocks/electron'
+import type { Track } from '../../src/app/services/types'
 
-const makeMockTrack = (filePath: string, overrides = {}) => ({
+const makeMockTrack = (filePath: string, overrides: Partial<Track> = {}): Track => ({
   id:         filePath,
   path:       filePath,
   title:      filePath.split('/').pop()?.replace(/\.[^.]+$/, '') ?? '',
@@ -17,84 +14,82 @@ const makeMockTrack = (filePath: string, overrides = {}) => ({
   ...overrides,
 })
 
-describe('fileScanner utilities', () => {
+describe('electronAPI bridge', () => {
   beforeEach(() => {
     setupMockElectronAPI()
   })
 
-  describe('scanDirectory', () => {
-    it('returns empty arrays when no electron API', async () => {
+  describe('loadLibrary', () => {
+    it('returns empty array when no electron API', async () => {
       Object.defineProperty(window, 'electronAPI', { value: undefined, writable: true })
-      const result = await scanDirectory('/music')
-      expect(result.folders).toHaveLength(0)
-      expect(result.tracks).toHaveLength(0)
+      const result = await (window.electronAPI as typeof mockElectronAPI | undefined)?.loadLibrary() ?? []
+      expect(result).toHaveLength(0)
     })
 
-    it('scans directory and returns enriched tracks from scanLibrary', async () => {
-      mockElectronAPI.scanLibrary.mockResolvedValue([
+    it('returns tracks from DB', async () => {
+      mockElectronAPI.loadLibrary.mockResolvedValue([
         makeMockTrack('/music/track1.mp3', { title: 'track1', format: 'MP3' }),
         makeMockTrack('/music/track2.flac', { title: 'track2', format: 'FLAC' }),
       ])
-      mockElectronAPI.scanDirectory.mockResolvedValue([
-        '/music/track1.mp3',
-        '/music/track2.flac',
-      ])
 
-      const result = await scanDirectory('/music')
+      const tracks = await window.electronAPI!.loadLibrary()
 
-      expect(result.tracks).toHaveLength(2)
-      expect(result.tracks[0]?.title).toBe('track1')
-      expect(result.tracks[0]?.format).toBe('MP3')
-      expect(result.tracks[1]?.title).toBe('track2')
-      expect(result.tracks[1]?.format).toBe('FLAC')
+      expect(tracks).toHaveLength(2)
+      expect((tracks as Track[])[0]?.title).toBe('track1')
+      expect((tracks as Track[])[1]?.format).toBe('FLAC')
     })
 
-    it('sets default values for track metadata when tags are absent', async () => {
-      mockElectronAPI.scanLibrary.mockResolvedValue([
+    it('returns default metadata values when tags are absent', async () => {
+      mockElectronAPI.loadLibrary.mockResolvedValue([
         makeMockTrack('/music/song.mp3'),
       ])
-      mockElectronAPI.scanDirectory.mockResolvedValue([ '/music/song.mp3' ])
 
-      const result = await scanDirectory('/music')
+      const tracks = await window.electronAPI!.loadLibrary() as Track[]
 
-      expect(result.tracks[0]?.artist).toBe('Unknown Artist')
-      expect(result.tracks[0]?.album).toBe('Unknown Album')
-      expect(result.tracks[0]?.duration).toBe(0)
-      expect(result.tracks[0]?.id).toBeDefined()
-      expect(result.tracks[0]?.path).toBe('/music/song.mp3')
+      expect(tracks[0]?.artist).toBe('Unknown Artist')
+      expect(tracks[0]?.album).toBe('Unknown Album')
+      expect(tracks[0]?.duration).toBe(0)
+      expect(tracks[0]?.path).toBe('/music/song.mp3')
     })
 
     it('handles errors gracefully', async () => {
-      mockElectronAPI.scanLibrary.mockRejectedValue(new Error('Scan failed'))
+      mockElectronAPI.loadLibrary.mockRejectedValue(new Error('DB load failed'))
 
-      const result = await scanDirectory('/music')
-
-      expect(result.folders).toHaveLength(0)
-      expect(result.tracks).toHaveLength(0)
+      await expect(window.electronAPI!.loadLibrary()).rejects.toThrow('DB load failed')
     })
   })
 
   describe('selectDirectory', () => {
     it('returns null when no electron API', async () => {
       Object.defineProperty(window, 'electronAPI', { value: undefined, writable: true })
-      const result = await selectDirectory()
+      const result = await (window.electronAPI as typeof mockElectronAPI | undefined)?.selectDirectory() ?? null
       expect(result).toBeNull()
     })
 
     it('returns selected directory path', async () => {
       mockElectronAPI.selectDirectory.mockResolvedValue('/selected/path')
 
-      const result = await selectDirectory()
+      const result = await window.electronAPI!.selectDirectory()
 
       expect(result).toBe('/selected/path')
     })
 
-    it('handles errors gracefully', async () => {
+    it('handles rejection gracefully', async () => {
       mockElectronAPI.selectDirectory.mockRejectedValue(new Error('Select failed'))
 
-      const result = await selectDirectory()
+      await expect(window.electronAPI!.selectDirectory()).rejects.toThrow('Select failed')
+    })
+  })
 
-      expect(result).toBeNull()
+  describe('onLibraryBatch / onLibraryDone', () => {
+    it('onLibraryBatch returns an unsubscribe function', () => {
+      const unsub = window.electronAPI!.onLibraryBatch(() => {})
+      expect(typeof unsub).toBe('function')
+    })
+
+    it('onLibraryDone returns an unsubscribe function', () => {
+      const unsub = window.electronAPI!.onLibraryDone(() => {})
+      expect(typeof unsub).toBe('function')
     })
   })
 })
