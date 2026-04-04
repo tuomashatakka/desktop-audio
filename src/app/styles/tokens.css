@@ -8,7 +8,7 @@
 
     --accent: hsl(337, 100%, 50%);
     --accent-hover: hsl(337, 100%, 60%);
-    --accent-muted: hsl(337, 55%, 60%);
+    --accent-muted: hsl(337, 80%, 30%);
     --accent-alt: #ff8cf2;
 
     --success: #38b000;

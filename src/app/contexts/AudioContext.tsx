@@ -10,6 +10,7 @@ interface AudioState {
   readonly currentTrack: Track | null
   readonly volume:       number
   readonly isLoading:    boolean
+  readonly waveformBars: Float32Array | null
 }
 
 interface AudioContextValue extends AudioState {
@@ -34,6 +35,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     currentTrack: null,
     volume:       0.8,
     isLoading:    false,
+    waveformBars: null,
   })
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -134,21 +136,20 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     if (!audio)
       return
 
+    // Reset waveform bars for new track immediately
+    setState(s => ({ ...s, waveformBars: null, currentTrack: track, isPlaying: true, currentTime: 0 }))
+
     try {
-      // Setup analyzer for waveform
       setupAnalyzer()
 
-      // Read file via Electron API and create a Blob URL
       const buffer = await window.electronAPI?.readFile(track.path)
       if (!buffer) {
         throw new Error('Failed to read file')
       }
 
-      // Create a Blob from the ArrayBuffer and generate a URL
       const blob = new Blob([ buffer ])
       const audioUrl = URL.createObjectURL(blob)
 
-      // Store URL for cleanup
       const oldUrl = audio.src
       if (oldUrl && oldUrl.startsWith('blob:')) {
         URL.revokeObjectURL(oldUrl)
@@ -156,18 +157,19 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
 
       audio.src = audioUrl
       await audio.play()
+
+      // Decode waveform from blob (non-blocking, after playback starts)
+      const ctx = audioContextRef.current
+      if (ctx) {
+        blob.arrayBuffer()
+          .then(ab => decodeWaveformBars(ab, 80, ctx))
+          .then(bars => setState(s => ({ ...s, waveformBars: bars })))
+          .catch(() => {}) // non-critical — mock bars will remain
+      }
     }
     catch (error) {
       console.error('Error playing audio:', error)
     }
-
-    setState(s =>
-      ({
-        ...s,
-        currentTrack: track,
-        isPlaying:    true,
-        currentTime:  0,
-      }))
   }, [ setupAnalyzer ])
 
   const pause = useCallback(() => {

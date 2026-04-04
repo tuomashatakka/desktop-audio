@@ -57,7 +57,7 @@
   --col-album:    0.55fr;
   --col-format:   6ch;
   --col-duration: 6ch;
-  --col-gap:      var(--sp-3);
+  --col-gap:      var(--sp-1);
 }
 
 .track-table-wrap {
@@ -72,13 +72,13 @@
     grid-template-columns: 36px 40px 1fr 22% 22% 52px 52px;
     align-items: center;
     gap: var(--col-gap);
-    padding: 0 var(--sp-2);
+    padding: 0;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     position: sticky;
     top: 0;
     z-index: 1;
-    background: var(--bg-raised);
+    /* background: var(--bg-raised); */
 
     & [role="columnheader"] {
       padding: var(--sp-2) var(--sp-3);
@@ -122,7 +122,7 @@
     grid-template-columns: 36px 40px 1fr 22% 22% 52px 52px;
     align-items: center;
     gap: var(--col-gap);
-    padding: 0 var(--sp-2);
+    padding: 0;
     position: absolute;
     left: 0;
     right: 0;

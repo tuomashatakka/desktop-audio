@@ -1,12 +1,9 @@
 import { useEffect, useRef } from 'react'
+import { useAudio } from '../../contexts'
 
 
-interface WaveformProps {
-  readonly analyzer:  AnalyserNode | null
-  readonly isPlaying: boolean
-}
-
-export function Waveform ({ analyzer, isPlaying }: WaveformProps) {
+export function Waveform () {
+  const { isPlaying, analyzer } = useAudio()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animationRef = useRef<number | null>(null)
 
@@ -27,6 +24,10 @@ export function Waveform ({ analyzer, isPlaying }: WaveformProps) {
         animationRef.current = null
         return
       }
+
+      const { width, height } = canvas.parentElement?.getBoundingClientRect() || { width: 300, height: 100 }
+      canvas.height = height - 48
+      canvas.width = width - 48
 
       animationRef.current = requestAnimationFrame(draw)
       analyzer.getByteFrequencyData(dataArray)

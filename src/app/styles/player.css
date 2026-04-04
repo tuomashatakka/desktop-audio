@@ -55,7 +55,6 @@
 .player-content {
   flex: 1;
   width: 100%;
-  max-width: 440px;
   display: flex;
   flex-direction: column;
   align-items: center;

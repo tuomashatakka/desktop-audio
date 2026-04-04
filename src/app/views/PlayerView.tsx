@@ -59,7 +59,7 @@ export function PlayerView () {
       <div className='player-content'>
 
         {tab === 'visualizer'
-          ? <Waveform analyzer={analyzer} isPlaying={isPlaying} />
+          ? <Waveform />
           : <>
             {/* Album art split card */}
             <figure className='album-art-card'>

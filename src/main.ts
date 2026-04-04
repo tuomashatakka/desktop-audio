@@ -12,6 +12,7 @@ if (started) {
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
+    icon:            path.join(__dirname, '..', 'assets', 'icon.png'),
     width:           1200,
     height:          800,
     minWidth:        60,
