@@ -25,6 +25,7 @@
   }
 }
 
+
 /* Invisible full-size drag region behind everything */
 .mini-drag-region {
   position: absolute;
@@ -89,6 +90,20 @@
   align-items: center;
   gap: var(--sp-1);
   padding-right: var(--sp-3);
+  margin: 0 auto;
+  justify-self: center;
+}
+
+.mini-info {
+  flex-basis: 120px;
+}
+
+.mini-full {
+  flex-flow: row wrap;
+  justify-content: center;
+  align-items: center;
+  padding: 30vh 0;
+  gap: 0;
 }
 
 .mini-btn {

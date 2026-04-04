@@ -2,7 +2,6 @@ import { useUI, useLibrary, useAudio, useSettings } from '../contexts'
 import type { Track } from '../contexts'
 import { useMemo, useEffect, useState } from 'react'
 import { useLibraryScanner } from '../hooks'
-import { scanDirectory } from '../services'
 import { Input, PromptDialog } from '../components/atomic'
 import { FolderTree } from '../components/composite/FolderTree'
 import { TrackTable } from '../components/composite/TrackTable'
@@ -13,7 +12,7 @@ import type { ContextMenuItem } from '../components/composite/ContextMenu'
 // eslint-disable-next-line complexity
 export function LibraryView () {
   const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist, sidebarOpen, toggleSidebar, setEditingTrack } = useUI()
-  const { folders, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, setTracks, setLoading, isLoading, toggleFolder } = useLibrary()
+  const { folders, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, isLoading, toggleFolder } = useLibrary()
   const { play, currentTrack, isPlaying } = useAudio()
   const { libraryPaths } = useSettings()
   const { scanLibrary } = useLibraryScanner()
@@ -30,13 +29,8 @@ export function LibraryView () {
     }
   }, [ libraryPaths, folders.length, scanLibrary ])
 
-  const handleFolderSelect = async (path: string) => {
+  const handleFolderSelect = (path: string) => {
     selectFolder(path)
-    setLoading(true)
-
-    const { tracks } = await scanDirectory(path)
-    setTracks(tracks)
-    setLoading(false)
   }
 
   const handleFolderToggle = (path: string) => {
@@ -79,8 +73,12 @@ export function LibraryView () {
       return playlists.find(p =>
         p.id === selectedPlaylistId)?.tracks ?? []
     }
+    if (selectedFolderPath) {
+      return filteredTracks.filter(t =>
+        t.path.startsWith(selectedFolderPath))
+    }
     return filteredTracks
-  }, [ selectedPlaylistId, playlists, filteredTracks ])
+  }, [ selectedPlaylistId, selectedFolderPath, playlists, filteredTracks ])
 
   return (
     <div className='library-view'>

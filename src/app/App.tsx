@@ -7,6 +7,7 @@ import { TagEditorView } from './views/TagEditorView'
 import { PlayerBar } from './components/composite/PlayerBar'
 import { MiniPlayer } from './components/composite/MiniPlayer'
 import { useKeyboardShortcuts, useWindowSize } from './hooks'
+import bridge from './services/contextBridge'
 
 
 const MINI_THRESHOLD = 400
@@ -98,7 +99,7 @@ function AppContent () {
           <button
             className='titlebar-btn'
             onClick={() =>
-              window.electronAPI?.minimizeWindow()}
+              bridge?.minimizeWindow()}
             aria-label='Minimize'
           >
             ─
@@ -107,7 +108,7 @@ function AppContent () {
           <button
             className='titlebar-btn'
             onClick={() =>
-              window.electronAPI?.maximizeWindow()}
+              bridge?.maximizeWindow()}
             aria-label='Maximize'
           >
             □
@@ -116,7 +117,7 @@ function AppContent () {
           <button
             className='titlebar-btn titlebar-btn-close'
             onClick={() =>
-              window.electronAPI?.closeWindow()}
+              bridge?.closeWindow()}
             aria-label='Close'
           >
             ✕

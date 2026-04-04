@@ -15,7 +15,7 @@ function formatTime (seconds: number): string {
 }
 
 export function PlayerView () {
-  const { currentTrack, isPlaying, currentTime, duration, pause, resume, seek, playNext, playPrevious, analyzer } = useAudio()
+  const { currentTrack, isPlaying, currentTime, duration, waveformBars, pause, resume, seek, playNext, playPrevious, analyzer } = useAudio()
   const { filteredTracks } = useLibrary()
   const [ tab, setTab ] = useState<'player' | 'visualizer'>('player')
 
@@ -82,6 +82,7 @@ export function PlayerView () {
                 currentTime={currentTime}
                 duration={duration}
                 onSeek={seek}
+                bars={waveformBars}
                 barCount={75}
               />
 

@@ -5,7 +5,7 @@ import { WaveformProgress } from '../atomic/WaveformProgress'
 
 export function PlayerBar () {
   const { playerExpanded, togglePlayerExpanded } = useUI()
-  const { isPlaying, currentTrack, currentTime, duration, volume, pause, resume, seek, setVolume, playNext, playPrevious } = useAudio()
+  const { isPlaying, currentTrack, currentTime, duration, volume, waveformBars, pause, resume, seek, setVolume, playNext, playPrevious } = useAudio()
   const { filteredTracks } = useLibrary()
 
   if (!currentTrack)
@@ -79,6 +79,7 @@ export function PlayerBar () {
           currentTime={currentTime}
           duration={duration}
           onSeek={seek}
+          bars={waveformBars}
           barCount={80}
           compact
         />
