@@ -1,4 +1,4 @@
-import { useRef, useMemo, useCallback } from 'react'
+import { useRef, useMemo, useCallback, useEffect, useState } from 'react'
 
 
 interface WaveformProgressProps {
@@ -28,13 +28,34 @@ export function WaveformProgress ({
   duration,
   onSeek,
   bars: externalBars = null,
-  barCount = 70,
+  barCount: barCountProp,
   compact = false,
 }: WaveformProgressProps) {
+  const [ derivedBarCount, setDerivedBarCount ] = useState(barCountProp ?? 70)
+  const barCount = barCountProp ?? derivedBarCount
+
   const fallbackBars = useMemo(() =>
     generateFallbackBars(barCount), [ barCount ])
   const bars = externalBars ?? fallbackBars
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (barCountProp !== undefined)
+      return // external override — skip ResizeObserver
+
+    const el = containerRef.current
+    if (!el)
+      return
+
+    const ro = new ResizeObserver(([ entry ]) => {
+      const w = entry.contentRect.width
+      setDerivedBarCount(Math.max(1, Math.floor(w / 6)))
+    })
+    ro.observe(el)
+    return () =>
+      ro.disconnect()
+  }, [ barCountProp ])
+
   const progress = duration > 0 ? currentTime / duration : 0
 
   const seekFromEvent = useCallback((clientX: number) => {

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, globalShortcut } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { Worker } from 'node:worker_threads'
@@ -10,8 +10,11 @@ if (started) {
   app.quit()
 }
 
+// eslint-disable-next-line functional/no-let
+let mainWindow: BrowserWindow | null = null
+
 const createWindow = () => {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     icon:            path.join(__dirname, '..', 'assets', 'icon.png'),
     width:           1200,
     height:          800,
@@ -37,9 +40,23 @@ const createWindow = () => {
   }
 
   mainWindow.webContents.openDevTools()
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
 }
 
-app.on('ready', createWindow)
+app.on('ready', () => {
+  createWindow()
+  globalShortcut.register('MediaPlayPause', () =>
+    mainWindow?.webContents.send('media:play-pause'))
+  globalShortcut.register('MediaNextTrack', () =>
+    mainWindow?.webContents.send('media:next'))
+  globalShortcut.register('MediaPreviousTrack', () =>
+    mainWindow?.webContents.send('media:prev'))
+})
+
+app.on('will-quit', () =>
+  globalShortcut.unregisterAll())
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

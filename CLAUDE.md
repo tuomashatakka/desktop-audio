@@ -10,7 +10,6 @@ bun run typecheck    # tsc --noEmit
 bun run lint         # eslint ./src
 bun test             # vitest run
 bun run test:watch   # vitest --watch
-bun run rebuild      # rebuild better-sqlite3 native module after dep changes
 bun run make         # production build
 ```
 
@@ -35,10 +34,3 @@ src/
 
 All IPC channels use `namespace:action` format: `library:scan`, `file:read`, `window:minimize`.
 Bridge methods `onLibraryBatch` / `onLibraryDone` return unsubscribe functions — use in `useEffect` cleanup.
-
-## Gotchas
-
-- `better-sqlite3` is a native module — run `bun run rebuild` after any `bun install` that touches native deps
-- ESLint rule `functional/no-let` flags all `let` — prefix with `// eslint-disable-next-line functional/no-let`
-- Scanner worker runs in a separate thread with its own DB connection; main process only relays IPC messages
-- Settings persisted to `localStorage`; library tracks persisted to `~/.appData/library.db` (SQLite)

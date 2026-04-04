@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useSortableTable } from '../../hooks/useSortableTable'
 import { Skeleton } from '../atomic/Skeleton'
@@ -33,6 +33,7 @@ interface TrackTableProps {
   readonly isPlaying:      boolean
   readonly onPlay:         (track: Track, index: number) => void
   readonly onContextMenu?: (track: Track, rect: DOMRect) => void
+  readonly onScroll?:      (e: Event) => void
 }
 
 function formatDuration (seconds: number): string {
@@ -41,8 +42,18 @@ function formatDuration (seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay, onContextMenu }: TrackTableProps) {
+export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay, onContextMenu, onScroll }: TrackTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || !onScroll)
+      return
+    el.addEventListener('scroll', onScroll)
+    return () =>
+      el.removeEventListener('scroll', onScroll)
+  }, [ onScroll ])
+
   const { sorted, sortKey, sortDir, toggleSort } = useSortableTable(tracks)
 
   const rowCount = isLoading ? SKELETON_ROW_COUNT : sorted.length

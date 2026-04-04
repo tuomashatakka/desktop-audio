@@ -1,10 +1,12 @@
 import { useEffect, useCallback } from 'react'
-import { useAudio, useLibrary } from '../contexts'
+import { useAudio, useLibrary, useUI } from '../contexts'
+import bridge from '../services/contextBridge'
 
 
 export function useKeyboardShortcuts () {
   const { isPlaying, currentTrack, volume, pause, resume, setVolume, playNext, playPrevious } = useAudio()
   const { filteredTracks } = useLibrary()
+  const { currentView, setView, playerExpanded, togglePlayerExpanded } = useUI()
 
   // eslint-disable-next-line complexity
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -43,12 +45,43 @@ export function useKeyboardShortcuts () {
           setVolume(Math.max(0, volume - 0.1))
         }
         break
+      case 'Escape':
+        if (playerExpanded)
+          togglePlayerExpanded()
+        else if (currentView === 'player')
+          setView('library')
+        e.preventDefault()
+        break
+      case 'AltLeft':
+      case 'AltRight':
+        // Focus first title-bar button — do NOT preventDefault (breaks OS Alt combos)
+        document.querySelector<HTMLElement>('.titlebar-controls button')?.focus()
+        break
     }
-  }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, filteredTracks, setVolume, volume ])
+  }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, filteredTracks, setVolume, volume, playerExpanded, togglePlayerExpanded, currentView, setView ])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
     return () =>
       window.removeEventListener('keydown', handleKeyDown)
   }, [ handleKeyDown ])
+
+  // ─── Media key IPC subscriptions ──────────────────────────────────────────
+
+  useEffect(() => {
+    if (!bridge)
+      return
+
+    const unsub1 = bridge.onMediaPlayPause(() => {
+      if (currentTrack)
+        void (isPlaying ? pause() : resume())
+    })
+    const unsub2 = bridge.onMediaNext(() =>
+      playNext(filteredTracks))
+    const unsub3 = bridge.onMediaPrev(() =>
+      playPrevious(filteredTracks))
+    return () => {
+      unsub1(); unsub2(); unsub3()
+    }
+  }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, filteredTracks ])
 }

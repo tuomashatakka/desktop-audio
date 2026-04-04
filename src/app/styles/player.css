@@ -1,8 +1,12 @@
 .player-view {
+  container-type: size;
   display: flex;
   flex-direction: column;
   height: 100%;
   align-items: center;
+  justify-content: center;
+  gap: var(--sp-6);
+  padding: var(--sp-6) var(--sp-8) var(--sp-8);
   background: var(--bg);
 
   & .empty-player {
@@ -18,61 +22,16 @@
   }
 }
 
-/* ─── Tab bar ──────────────────────────────────── */
-
-.player-tab-bar {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  background: var(--bg-hover);
-  border-radius: var(--radius-full);
-  margin-top: var(--sp-6);
-  flex-shrink: 0;
-}
-
-.player-tab {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-4);
-  border-radius: var(--radius-full);
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease);
-
-  &:hover  { color: var(--text-dim); }
-  &.active { background: var(--bg-raised); color: var(--text); box-shadow: var(--shadow-sm); }
-
-  & .tab-icon { font-size: var(--text-base); line-height: 1; }
-}
-
-/* ─── Main content ─────────────────────────────── */
-
-.player-content {
-  flex: 1;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-6);
-  padding: var(--sp-6) var(--sp-8) var(--sp-8);
-}
-
 /* ─── Album art card ───────────────────────────── */
 
 .album-art-card {
-  width: 340px;
-  height: 340px;
+  width: clamp(80px, 40cqh, 320px);
+  aspect-ratio: 1;
   background: var(--bg-raised);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
   overflow: hidden;
-  flex-shrink: 0;
+  flex-shrink: 1;
   margin: 0;
 
   & img {
@@ -92,6 +51,44 @@
     background: var(--bg-hover);
     font-size: 64px;
     opacity: 0.35;
+  }
+}
+
+/* ─── Container query: narrow → row layout ─────── */
+
+@container (max-width: 300px) {
+  .player-view {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+  }
+
+  .album-art-card {
+    width: clamp(40px, 20cqw, 100px);
+  }
+
+  .player-info {
+    flex: 1;
+    text-align: left;
+    min-width: 0;
+  }
+
+  .progress-section { width: 100%; }
+}
+
+/* ─── Container query: nano tier (≤ 80px) ─────── */
+
+@container (max-width: 80px), (max-height: 80px) {
+  .player-info,
+  .progress-section,
+  .playback-controls :not(.play-pause-btn) {
+    display: none;
+  }
+
+  .album-art-card {
+    width: clamp(32px, 10cqw, 56px);
   }
 }
 
