@@ -80,7 +80,7 @@
 
 /* ─── Container query: nano tier (≤ 80px) ─────── */
 
-@container (max-width: 80px, max-height: 80px) {
+@container (max-height: 80px) {
   .player-info,
   .progress-section,
   .playback-controls :not(.play-pause-btn) {
