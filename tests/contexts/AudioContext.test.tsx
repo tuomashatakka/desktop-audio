@@ -1,6 +1,6 @@
-import { render, screen, act } from '@testing-library/react'
 import { AudioProvider, useAudio } from '../../src/app/contexts/AudioContext'
 import type { Track } from '../../src/app/services/types'
+import { render, act, screen } from '@testing-library/react'
 
 const mockTrack: Track = {
   id: 'track-1',
@@ -10,6 +10,8 @@ const mockTrack: Track = {
   album: 'Test Album',
   duration: 180,
   format: 'MP3',
+  size: 69,
+  coverColor: 'hsl(300, 65%, 38%)',
 }
 
 function TestConsumer () {

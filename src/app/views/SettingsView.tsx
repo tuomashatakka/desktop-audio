@@ -1,6 +1,6 @@
 import { useSettings } from '../contexts'
 import type { RepeatMode, Theme } from '../contexts'
-import { selectDirectory } from '../services'
+import bridge from '../services/contextBridge'
 import { Button } from '../components/atomic'
 
 
@@ -8,7 +8,7 @@ export function SettingsView () {
   const { libraryPaths, theme, volume, repeatMode, addLibraryPath, removeLibraryPath, setTheme, setVolume, setRepeatMode } = useSettings()
 
   const handleAddPath = async () => {
-    const path = await selectDirectory()
+    const path = await bridge.selectDirectory()
     if (path) {
       addLibraryPath(path)
     }

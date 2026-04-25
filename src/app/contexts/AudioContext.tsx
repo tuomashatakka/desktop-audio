@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import type { Track } from './LibraryContext'
+import bridge from '../services/contextBridge'
 
 
 interface AudioState {
@@ -23,6 +24,37 @@ interface AudioContextValue extends AudioState {
   readonly playNext:     (tracks: readonly Track[]) => void
   readonly playPrevious: (tracks: readonly Track[]) => void
   readonly analyzer:     AnalyserNode | null
+}
+
+/** Decode an audio file and compute per-bar RMS amplitudes for the waveform. */
+async function decodeWaveformBars (
+  buffer: ArrayBuffer,
+  barCount: number,
+  audioCtx: globalThis.AudioContext
+): Promise<Float32Array> {
+  const decoded = await audioCtx.decodeAudioData(buffer)
+  const channel = decoded.getChannelData(0)
+  const samplesPerBar = Math.floor(channel.length / barCount)
+  const bars = new Float32Array(barCount)
+
+  for (let i = 0; i < barCount; i++) {
+    const start = i * samplesPerBar
+    // eslint-disable-next-line functional/no-let
+    let sum = 0
+    for (let j = start; j < start + samplesPerBar; j++) {
+      sum += channel[j] * channel[j]
+    }
+    bars[i] = Math.sqrt(sum / samplesPerBar)
+  }
+
+  // Normalise to [0.07, 1.0]
+  const max = bars.reduce((a, b) =>
+    Math.max(a, b), 0.001)
+  for (let i = 0; i < barCount; i++) {
+    bars[i] = Math.max(0.07, bars[i] / max)
+  }
+
+  return bars
 }
 
 const AudioContext = createContext<AudioContextValue | null>(null)
@@ -137,12 +169,13 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
       return
 
     // Reset waveform bars for new track immediately
-    setState(s => ({ ...s, waveformBars: null, currentTrack: track, isPlaying: true, currentTime: 0 }))
+    setState(s =>
+      ({ ...s, waveformBars: null, currentTrack: track, isPlaying: true, currentTime: 0 }))
 
     try {
       setupAnalyzer()
 
-      const buffer = await window.electronAPI?.readFile(track.path)
+      const buffer = await bridge?.readFile(track.path)
       if (!buffer) {
         throw new Error('Failed to read file')
       }
@@ -162,8 +195,11 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
       const ctx = audioContextRef.current
       if (ctx) {
         blob.arrayBuffer()
-          .then(ab => decodeWaveformBars(ab, 80, ctx))
-          .then(bars => setState(s => ({ ...s, waveformBars: bars })))
+          .then(ab =>
+            decodeWaveformBars(ab, 80, ctx))
+          .then(bars =>
+            setState(s =>
+              ({ ...s, waveformBars: bars })))
           .catch(() => {}) // non-critical — mock bars will remain
       }
     }

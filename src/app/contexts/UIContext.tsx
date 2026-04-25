@@ -27,7 +27,7 @@ const UIContext = createContext<UIContextValue | null>(null)
 export function UIProvider ({ children }: { readonly children: ReactNode }) {
   const [ state, setState ] = useState<UIState>({
     currentView:        'library',
-    sidebarOpen:        true,
+    sidebarOpen:        false,
     selectedFolderPath: null,
     selectedPlaylistId: null,
     editingTrackId:     null,

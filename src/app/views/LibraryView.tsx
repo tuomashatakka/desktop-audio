@@ -1,8 +1,7 @@
 import { useUI, useLibrary, useAudio, useSettings } from '../contexts'
 import type { Track } from '../contexts'
-import { useMemo, useEffect, useState } from 'react'
+import { useMemo, useEffect, useState, useCallback, useRef } from 'react'
 import { useLibraryScanner } from '../hooks'
-import { scanDirectory } from '../services'
 import { Input, PromptDialog } from '../components/atomic'
 import { FolderTree } from '../components/composite/FolderTree'
 import { TrackTable } from '../components/composite/TrackTable'
@@ -13,7 +12,7 @@ import type { ContextMenuItem } from '../components/composite/ContextMenu'
 // eslint-disable-next-line complexity
 export function LibraryView () {
   const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist, sidebarOpen, toggleSidebar, setEditingTrack } = useUI()
-  const { folders, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, setTracks, setLoading, isLoading, toggleFolder } = useLibrary()
+  const { folders, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, isLoading, toggleFolder } = useLibrary()
   const { play, currentTrack, isPlaying } = useAudio()
   const { libraryPaths } = useSettings()
   const { scanLibrary } = useLibraryScanner()
@@ -23,6 +22,26 @@ export function LibraryView () {
   const [ promptOpen, setPromptOpen ] = useState(false)
   const [ contextRect, setContextRect ] = useState<DOMRect | null>(null)
   const [ contextTrack, setContextTrack ] = useState<Track | null>(null)
+  const [ headerVisible, setHeaderVisible ] = useState(true)
+  const lastScrollY = useRef(0)
+
+  const handleScroll = useCallback((e: Event) => {
+    const el = e.target as HTMLElement
+    const dir = el.scrollTop > lastScrollY.current ? 'down' : 'up'
+    lastScrollY.current = el.scrollTop
+    if (dir === 'down' && el.scrollTop > 40)
+      setHeaderVisible(false)
+    else
+      setHeaderVisible(true)
+  }, [])
+
+  const headerTitle = selectedPlaylistId
+    ? playlists.find(p =>
+      p.id === selectedPlaylistId)?.name ?? 'Library'
+    : selectedFolderPath
+      ? selectedFolderPath.split('/').filter(Boolean)
+        .at(-1) ?? 'Library'
+      : 'Library'
 
   useEffect(() => {
     if (libraryPaths.length > 0 && folders.length === 0) {
@@ -30,13 +49,8 @@ export function LibraryView () {
     }
   }, [ libraryPaths, folders.length, scanLibrary ])
 
-  const handleFolderSelect = async (path: string) => {
+  const handleFolderSelect = (path: string) => {
     selectFolder(path)
-    setLoading(true)
-
-    const { tracks } = await scanDirectory(path)
-    setTracks(tracks)
-    setLoading(false)
   }
 
   const handleFolderToggle = (path: string) => {
@@ -79,8 +93,12 @@ export function LibraryView () {
       return playlists.find(p =>
         p.id === selectedPlaylistId)?.tracks ?? []
     }
+    if (selectedFolderPath) {
+      return filteredTracks.filter(t =>
+        t.path.startsWith(selectedFolderPath))
+    }
     return filteredTracks
-  }, [ selectedPlaylistId, playlists, filteredTracks ])
+  }, [ selectedPlaylistId, selectedFolderPath, playlists, filteredTracks ])
 
   return (
     <div className='library-view'>
@@ -158,7 +176,7 @@ export function LibraryView () {
       </aside>
 
       <section className='library-main'>
-        <header className='view-header'>
+        <header className={`view-header ${headerVisible ? '' : 'header-hidden'}`}>
           <button
             className='sidebar-toggle-btn'
             onClick={toggleSidebar}
@@ -168,13 +186,7 @@ export function LibraryView () {
             <span className={`sidebar-toggle-chevron ${sidebarOpen ? 'open' : ''}`}>‹</span>
           </button>
 
-          <h2>
-            {selectedPlaylistId
-              ? playlists.find(p =>
-                p.id === selectedPlaylistId)?.name ?? 'Playlist'
-              : 'Library'
-            }
-          </h2>
+          <h2>{headerTitle}</h2>
 
           <Input
             wrapperClass='search-input'
@@ -205,6 +217,7 @@ export function LibraryView () {
               isPlaying={isPlaying}
               onPlay={handleTrackPlay}
               onContextMenu={handleContextMenu}
+              onScroll={handleScroll}
             />
           }
         </div>

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import bridge from '../services/contextBridge'
 
 
 export type RepeatMode = 'none' | 'one' | 'all'
@@ -31,9 +32,9 @@ const defaultSettings: Settings = {
 const STORAGE_KEY = 'desktop-audio-settings'
 
 async function getDefaultLibraryPath (): Promise<string | null> {
-  if (window.electronAPI?.getMusicLibraryPath) {
+  if (bridge?.getMusicDir) {
     try {
-      return await window.electronAPI.getMusicLibraryPath()
+      return await bridge.getMusicDir()
     }
     catch {
       // Ignore errors

@@ -5,18 +5,14 @@ import { PlayerView } from './views/PlayerView'
 import { SettingsView } from './views/SettingsView'
 import { TagEditorView } from './views/TagEditorView'
 import { PlayerBar } from './components/composite/PlayerBar'
-import { MiniPlayer } from './components/composite/MiniPlayer'
-import { useKeyboardShortcuts, useWindowSize } from './hooks'
-
-
-const MINI_THRESHOLD = 400
+import { useKeyboardShortcuts } from './hooks'
+import bridge from './services/contextBridge'
 
 
 function AppContent () {
   const { currentView, setView, playerExpanded, togglePlayerExpanded } = useUI()
   const { currentTrack } = useAudio()
   const { theme } = useSettings()
-  const { width } = useWindowSize()
   const [ isAnimating, setIsAnimating ] = useState(false)
   const [ showExpanded, setShowExpanded ] = useState(false)
 
@@ -28,26 +24,20 @@ function AppContent () {
   }, [ theme ])
 
   useEffect(() => {
-    if (width >= MINI_THRESHOLD) {
-      if (playerExpanded && !showExpanded) {
-        setIsAnimating(true)
-        setShowExpanded(true)
-        setTimeout(() =>
-          setIsAnimating(false), 300)
-      }
-      else if (!playerExpanded && showExpanded) {
-        setIsAnimating(true)
-        setTimeout(() => {
-          setShowExpanded(false)
-          setIsAnimating(false)
-        }, 200)
-      }
+    if (playerExpanded && !showExpanded) {
+      setIsAnimating(true)
+      setShowExpanded(true)
+      setTimeout(() =>
+        setIsAnimating(false), 300)
     }
-  }, [ playerExpanded, showExpanded, width ])
-
-  if (width < MINI_THRESHOLD) {
-    return <MiniPlayer />
-  }
+    else if (!playerExpanded && showExpanded) {
+      setIsAnimating(true)
+      setTimeout(() => {
+        setShowExpanded(false)
+        setIsAnimating(false)
+      }, 200)
+    }
+  }, [ playerExpanded, showExpanded ])
 
   const renderView = () => {
     switch (currentView) {
@@ -98,7 +88,7 @@ function AppContent () {
           <button
             className='titlebar-btn'
             onClick={() =>
-              window.electronAPI?.minimizeWindow()}
+              bridge?.minimizeWindow()}
             aria-label='Minimize'
           >
             ─
@@ -107,7 +97,7 @@ function AppContent () {
           <button
             className='titlebar-btn'
             onClick={() =>
-              window.electronAPI?.maximizeWindow()}
+              bridge?.maximizeWindow()}
             aria-label='Maximize'
           >
             □
@@ -116,7 +106,7 @@ function AppContent () {
           <button
             className='titlebar-btn titlebar-btn-close'
             onClick={() =>
-              window.electronAPI?.closeWindow()}
+              bridge?.closeWindow()}
             aria-label='Close'
           >
             ✕

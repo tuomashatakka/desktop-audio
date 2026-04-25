@@ -1,16 +1,17 @@
-import { useRef, useMemo, useCallback } from 'react'
+import { useRef, useMemo, useCallback, useEffect, useState } from 'react'
 
 
 interface WaveformProgressProps {
   readonly currentTime: number
   readonly duration:    number
   readonly onSeek:      (time: number) => void
+  readonly bars?:       Float32Array | null
   readonly barCount?:   number
   readonly compact?:    boolean
 }
 
-/** Deterministic natural-looking amplitude shape via stacked sines */
-function generateBars (count: number): number[] {
+/** Fallback: deterministic natural-looking amplitude shape via stacked sines */
+function generateFallbackBars (count: number): number[] {
   return Array.from({ length: count }, (_, i) => {
     const t = i / count
     const v =
@@ -26,12 +27,35 @@ export function WaveformProgress ({
   currentTime,
   duration,
   onSeek,
-  barCount = 70,
+  bars: externalBars = null,
+  barCount: barCountProp,
   compact = false,
 }: WaveformProgressProps) {
-  const bars = useMemo(() =>
-    generateBars(barCount), [ barCount ])
+  const [ derivedBarCount, setDerivedBarCount ] = useState(barCountProp ?? 70)
+  const barCount = barCountProp ?? derivedBarCount
+
+  const fallbackBars = useMemo(() =>
+    generateFallbackBars(barCount), [ barCount ])
+  const bars = externalBars ?? fallbackBars
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (barCountProp !== undefined)
+      return // external override — skip ResizeObserver
+
+    const el = containerRef.current
+    if (!el)
+      return
+
+    const ro = new ResizeObserver(([ entry ]) => {
+      const w = entry.contentRect.width
+      setDerivedBarCount(Math.max(1, Math.floor(w / 6)))
+    })
+    ro.observe(el)
+    return () =>
+      ro.disconnect()
+  }, [ barCountProp ])
+
   const progress = duration > 0 ? currentTime / duration : 0
 
   const seekFromEvent = useCallback((clientX: number) => {
@@ -71,8 +95,8 @@ export function WaveformProgress ({
       aria-valuenow={Math.round(currentTime)}
       tabIndex={0}
     >
-      {bars.map((amp, i) => {
-        const played = i / barCount < progress
+      {Array.from(bars).map((amp, i) => {
+        const played = i / bars.length < progress
         return (
           <span
             key={i}

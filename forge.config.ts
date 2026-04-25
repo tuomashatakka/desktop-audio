@@ -12,7 +12,10 @@ const config: ForgeConfig = {
     asar: true,
     icon: './assets/icon',
   },
-  rebuildConfig: {},
+  rebuildConfig: {
+    force: true,
+    onlyModules: ['better-sqlite3'],
+  },
   makers: [
     new MakerSquirrel({}),
     new MakerZIP({}, ['darwin']),
@@ -34,6 +37,11 @@ const config: ForgeConfig = {
           entry: 'src/preload.ts',
           config: 'vite.preload.config.ts',
           target: 'preload',
+        },
+        {
+          entry: 'src/scanner-worker.ts',
+          config: 'vite.worker.config.ts',
+          target: 'main',
         },
       ],
       renderer: [
