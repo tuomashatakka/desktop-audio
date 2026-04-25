@@ -40,7 +40,7 @@ describe('UIContext', () => {
     )
 
     expect(screen.getByTestId('view')).toHaveTextContent('library')
-    expect(screen.getByTestId('sidebar')).toHaveTextContent('true')
+    expect(screen.getByTestId('sidebar')).toHaveTextContent('false')
     expect(screen.getByTestId('folder')).toHaveTextContent('null')
     expect(screen.getByTestId('editing')).toHaveTextContent('null')
     expect(screen.getByTestId('expanded')).toHaveTextContent('false')
@@ -67,13 +67,13 @@ describe('UIContext', () => {
       </UIProvider>
     )
 
-    expect(screen.getByTestId('sidebar')).toHaveTextContent('true')
+    expect(screen.getByTestId('sidebar')).toHaveTextContent('false')
 
     await act(async () => {
       screen.getByText('toggleSidebar').click()
     })
 
-    expect(screen.getByTestId('sidebar')).toHaveTextContent('false')
+    expect(screen.getByTestId('sidebar')).toHaveTextContent('true')
   })
 
   it('selectFolder updates selected folder path', async () => {

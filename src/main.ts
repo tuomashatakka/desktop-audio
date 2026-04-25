@@ -1,7 +1,7 @@
-import { app, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, globalShortcut } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
-import { readdir, stat } from 'node:fs/promises'
+import { Worker } from 'node:worker_threads'
 import started from 'electron-squirrel-startup'
 import * as mm from 'music-metadata'
 
@@ -10,8 +10,11 @@ if (started) {
   app.quit()
 }
 
+// eslint-disable-next-line functional/no-let
+let mainWindow: BrowserWindow | null = null
+
 const createWindow = () => {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     icon:            path.join(__dirname, '..', 'assets', 'icon.png'),
     width:           1200,
     height:          800,
@@ -37,16 +40,24 @@ const createWindow = () => {
   }
 
   mainWindow.webContents.openDevTools()
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', createWindow)
+app.on('ready', () => {
+  createWindow()
+  globalShortcut.register('MediaPlayPause', () =>
+    mainWindow?.webContents.send('media:play-pause'))
+  globalShortcut.register('MediaNextTrack', () =>
+    mainWindow?.webContents.send('media:next'))
+  globalShortcut.register('MediaPreviousTrack', () =>
+    mainWindow?.webContents.send('media:prev'))
+})
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+app.on('will-quit', () =>
+  globalShortcut.unregisterAll())
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
@@ -54,17 +65,25 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
   }
 })
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-ipcMain.handle('select-directory', async () => {
+function mapTrack ({ mtime_ms: _mtime, cover_color, album_art, track_number, ...rest }: Record<string, unknown>) {
+  return {
+    ...rest,
+    coverColor:  cover_color,
+    albumArt:    album_art ?? undefined,
+    trackNumber: track_number ?? undefined,
+  }
+}
+
+// ─── File handlers ────────────────────────────────────────────────────────────
+
+ipcMain.handle('file:select', async () => {
   const result = await dialog.showOpenDialog({
     properties: [ 'openDirectory' ],
   })
@@ -74,36 +93,10 @@ ipcMain.handle('select-directory', async () => {
   return result.filePaths[0]
 })
 
-ipcMain.handle('get-music-library-path', () =>
+ipcMain.handle('file:music-dir', () =>
   app.getPath('music'))
 
-ipcMain.handle('scan-directory', async (_event, dirPath: string) => {
-  const files: string[] = []
-
-  function walkDir (dir: string, acc: string[]) {
-    try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true })
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name)
-        if (entry.isDirectory()) {
-          walkDir(fullPath, acc)
-        }
-        else if (entry.isFile()) {
-          acc.push(fullPath)
-        }
-      }
-    }
-    catch (error) {
-      console.error('Error reading directory:', error)
-    }
-  }
-
-  const acc: string[] = []
-  walkDir(dirPath, acc)
-  return acc as readonly string[]
-})
-
-ipcMain.handle('get-audio-metadata', async (_event, filePath: string) => {
+ipcMain.handle('file:metadata', async (_event, filePath: string) => {
   try {
     const metadata = await mm.parseFile(filePath)
     const picture = metadata.common.picture?.[0]
@@ -132,251 +125,117 @@ ipcMain.handle('get-audio-metadata', async (_event, filePath: string) => {
   }
 })
 
-// ─── scan-library helpers ────────────────────────────────────────────────────
-
-const AUDIO_EXTENSIONS_SET = new Set([
-  '.mp3', '.m4a', '.flac', '.wav', '.ogg',
-  '.aac', '.opus', '.webm', '.wma', '.aiff', '.aif',
-])
-
-// Option B: narrow hue range 280–360 (violet → hot pink), cohesive with accent hsl(337,100%,50%)
-// djb2 hash via reduce — no mutation needed
-const generateCoverColor = (title: string): string => {
-  const hash = Array.from(title).reduce((h, ch) =>
-    Math.imul(h, 31) + ch.charCodeAt(0) | 0, 0)
-  const hue = 280 + Math.abs(hash) % 80
-  return `hsl(${hue}, 65%, 38%)`
-}
-
-const extractYear = (noExt: string): number | undefined => {
-  const m = noExt.match(/\b(19\d{2}|20\d{2})\b/) ?? noExt.match(/[\[(](19\d{2}|20\d{2})[\])]/)
-  if (!m) {
-    return undefined
-  }
-
-  const y = Number.parseInt(m[1] ?? m[0], 10)
-  return Number.isNaN(y) ? undefined : y
-}
-
-const extractTrackNumber = (noExt: string): number | undefined => {
-  const m = noExt.match(/^(\d{1,3})[.\s-]/)
-  if (!m) {
-    return undefined
-  }
-
-  const n = Number.parseInt(m[1] ?? '', 10)
-  return Number.isNaN(n) ? undefined : n
-}
-
-const parseTitleArtist = (noExt: string): { title: string; artist: string } => {
-  const dashIdx = noExt.indexOf(' - ')
-  if (dashIdx <= 0) {
-    return {
-      title:  noExt.replace(/^\d+\.?\s+/, '') || noExt,
-      artist: 'Unknown Artist',
-    }
-  }
-  return {
-    artist: noExt.slice(0, dashIdx).trim(),
-    title:  noExt.slice(dashIdx + 3).trim()
-      .replace(/^\d+\.?\s+/, '') || noExt.slice(dashIdx + 3).trim(),
-  }
-}
-
-const encodeAlbumArt = (picture: { format: string; data: Uint8Array } | undefined): string | undefined => {
-  if (!picture) {
-    return undefined
-  }
-  return `data:${picture.format};base64,${Buffer.from(picture.data).toString('base64')}`
-}
-
-interface ScannedTrack {
-  id:           string
-  path:         string
-  title:        string
-  artist:       string
-  album:        string
-  duration:     number
-  format:       string
-  size:         number
-  coverColor:   string
-  albumArt?:    string
-  year?:        number
-  genre?:       string
-  trackNumber?: number
-}
-
-type OptionalFields = Pick<ScannedTrack, 'albumArt' | 'year' | 'genre' | 'trackNumber'>
-
-const extractOptionalFields = (
-  meta: mm.IAudioMetadata,
-  yearFallback:        number | undefined,
-  trackNumberFallback: number | undefined
-): Partial<OptionalFields> => {
-  const albumArt     = encodeAlbumArt(meta.common.picture?.[0])
-  const resolvedYear = meta.common.year ?? yearFallback
-  const resolvedTn   = meta.common.track?.no ?? trackNumberFallback
-  const genre        = meta.common.genre?.[0]
-  return {
-    ...albumArt === undefined ? {} : { albumArt },
-    ...resolvedYear === undefined ? {} : { year: resolvedYear },
-    ...genre === undefined ? {} : { genre },
-    ...resolvedTn === undefined ? {} : { trackNumber: resolvedTn },
-  }
-}
-
-const processAudioFile = async (fullPath: string, fileSize: number): Promise<ScannedTrack> => {
-  const ext = path.extname(fullPath).toLowerCase()
-  const noExt = path.basename(fullPath, ext)
-  const parentDir = path.basename(path.dirname(fullPath))
-  const fallback = parseTitleArtist(noExt)
-  const album = parentDir !== '.' && parentDir !== '/' ? parentDir : 'Unknown Album'
-  const year = extractYear(noExt)
-  const trackNumber = extractTrackNumber(noExt)
-  const format = ext.replace('.', '').toUpperCase()
-
-  try {
-    const meta = await mm.parseFile(fullPath, { duration: true })
-    const resolvedTitle = meta.common.title || fallback.title
-    return {
-      id:         fullPath,
-      path:       fullPath,
-      title:      resolvedTitle,
-      artist:     meta.common.artist || fallback.artist,
-      album:      meta.common.album || album,
-      duration:   Math.round(meta.format.duration ?? 0),
-      format,
-      size:       fileSize,
-      coverColor: generateCoverColor(resolvedTitle),
-      ...extractOptionalFields(meta, year, trackNumber),
-    }
-  }
-  catch {
-    return {
-      id:         fullPath,
-      path:       fullPath,
-      title:      fallback.title,
-      artist:     fallback.artist,
-      album,
-      duration:   0,
-      format,
-      size:       fileSize,
-      coverColor: generateCoverColor(fallback.title),
-      ...year === undefined ? {} : { year },
-      ...trackNumber === undefined ? {} : { trackNumber },
-    }
-  }
-}
-
-ipcMain.handle('scan-library', async (_event, dirPath: string) => {
-  const tracks: ScannedTrack[] = []
-  const seen = new Set<string>()
-
-  const walk = async (dir: string): Promise<void> => {
-    try {
-      const entries = await readdir(dir, { withFileTypes: true })
-      await Promise.all(
-        entries.map(async entry => {
-          const fullPath = path.join(dir, entry.name)
-          if (entry.isDirectory()) {
-            await walk(fullPath)
-            return
-          }
-          if (
-            entry.isFile() &&
-            AUDIO_EXTENSIONS_SET.has(path.extname(entry.name).toLowerCase()) &&
-            !seen.has(fullPath)
-          ) {
-            seen.add(fullPath)
-            try {
-              const stats = await stat(fullPath)
-              const track = await processAudioFile(fullPath, stats.size)
-              tracks.push(track)
-            }
-            catch {
-              // skip unreadable files
-            }
-          }
-        })
-      )
-    }
-    catch {
-      // skip inaccessible directories
-    }
-  }
-
-  await walk(dirPath)
-  tracks.sort((a, b) =>
-    a.title.localeCompare(b.title))
-  return tracks
-})
-
-// Streaming variant — pushes batches to the renderer as files are found
-// so the UI can populate incrementally without waiting for the full scan.
-const STREAM_BATCH_SIZE = 20
-
-ipcMain.on('scan-library-stream', async (event, dirPath: string) => {
-  const seen = new Set<string>()
-  const pending: ScannedTrack[] = []
-
-  const flush = () => {
-    if (pending.length > 0) {
-      event.sender.send('scan-library-batch', [ ...pending ])
-      pending.length = 0
-    }
-  }
-
-  const walk = async (dir: string): Promise<void> => {
-    try {
-      const entries = await readdir(dir, { withFileTypes: true })
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name)
-        if (entry.isDirectory()) {
-          await walk(fullPath)
-          continue
-        }
-        if (
-          entry.isFile() &&
-          AUDIO_EXTENSIONS_SET.has(path.extname(entry.name).toLowerCase()) &&
-          !seen.has(fullPath)
-        ) {
-          seen.add(fullPath)
-          try {
-            const stats = await stat(fullPath)
-            const track = await processAudioFile(fullPath, stats.size)
-            pending.push(track)
-            if (pending.length >= STREAM_BATCH_SIZE) {
-              flush()
-            }
-          }
-          catch {
-            // skip unreadable files
-          }
-        }
-      }
-    }
-    catch {
-      // skip inaccessible directories
-    }
-  }
-
-  await walk(dirPath)
-  flush()
-  event.sender.send('scan-library-done')
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-ipcMain.handle('read-file', async (_event, filePath: string) => {
+ipcMain.handle('file:read', async (_event, filePath: string) => {
   const buffer = fs.readFileSync(filePath)
   return buffer
 })
 
-ipcMain.on('window-minimize', () => {
+// ─── Logging ──────────────────────────────────────────────────────────────────
+
+const log = {
+  info: (msg: string) =>
+    console.log(`ⓘ [main] ${msg}`),
+  debug: (msg: string) =>
+    console.log(`⌗ [main] ${msg}`),
+  warn: (msg: string) =>
+    console.warn(`◬ [main] ${msg}`),
+}
+
+// ─── Library handlers ─────────────────────────────────────────────────────────
+
+// Fast startup: return all persisted tracks from SQLite without scanning
+ipcMain.handle('library:load', () => {
+  const dbPath = path.join(app.getPath('appData'), 'library.db')
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Database = require('better-sqlite3')
+    const db = new Database(dbPath, { readonly: true, fileMustExist: true })
+    const rows = db.prepare('SELECT * FROM tracks ORDER BY title ASC').all() as Record<string, unknown>[]
+    db.close()
+    log.info(`▤ library:load → ${rows.length} tracks from DB`)
+    return rows.map(mapTrack)
+  }
+  catch {
+    log.info('▤ library:load → DB not yet created (first run)')
+    return [] // DB not yet created (first run)
+  }
+})
+
+// ─── Scanner worker ───────────────────────────────────────────────────────────
+
+type WorkerMessage =
+  { type: 'batch'; tracks: unknown[] } |
+  { type: 'done'; totalCount: number } |
+  { type: 'error'; message: string }
+
+// eslint-disable-next-line functional/no-let
+let scanWorker: Worker | null = null
+
+function getScanWorker (): Worker {
+  if (scanWorker)
+    return scanWorker
+
+  const dbPath = path.join(app.getPath('appData'), 'library.db')
+  scanWorker = new Worker(
+    path.join(__dirname, 'scanner-worker.js'),
+    { workerData: { dbPath }}
+  )
+  scanWorker.on('error', err =>
+    console.error('[scanner-worker]', err))
+  scanWorker.on('exit', code => {
+    if (code !== 0)
+      console.error('[scanner-worker] exited with code', code)
+    scanWorker = null
+  })
+  return scanWorker
+}
+
+app.on('before-quit', () =>
+  scanWorker?.terminate())
+
+// Streaming scan — delegates all work to the scanner worker
+ipcMain.on('library:scan', (event, dirPaths: string[]) => {
+  const t0     = Date.now()
+  const worker = getScanWorker()
+
+  log.info(`⟲ library:scan — ${dirPaths.length} path(s): ${dirPaths.join(', ')}`)
+
+  // eslint-disable-next-line functional/no-let
+  let batchCount = 0
+  // eslint-disable-next-line functional/no-let
+  let totalSent  = 0
+
+  const handle = (msg: WorkerMessage) => {
+    if (msg.type === 'batch') {
+      const tracks = (msg.tracks as Record<string, unknown>[]).map(mapTrack)
+      batchCount++
+      totalSent += tracks.length
+      log.debug(`⇗ batch #${batchCount} → renderer (${tracks.length} tracks, ${totalSent} total)`)
+      event.sender.send('library:batch', tracks)
+    }
+    else if (msg.type === 'done' || msg.type === 'error') {
+      worker.off('message', handle)
+      if (msg.type === 'error') {
+        log.warn(`⨂ scan error from worker: ${msg.message}`)
+      }
+      else {
+        log.info(`✓ library:scan done — ${totalSent} tracks in ${batchCount} batches · ◴ ${Date.now() - t0}ms`)
+      }
+      event.sender.send('library:done')
+    }
+  }
+
+  worker.on('message', handle)
+  worker.postMessage({ type: 'scan', dirPaths })
+})
+
+// ─── Window handlers ──────────────────────────────────────────────────────────
+
+ipcMain.on('window:minimize', () => {
   BrowserWindow.getFocusedWindow()?.minimize()
 })
 
-ipcMain.on('window-maximize', () => {
+ipcMain.on('window:maximize', () => {
   const win = BrowserWindow.getFocusedWindow()
   if (win?.isMaximized()) {
     win.unmaximize()
@@ -386,9 +245,9 @@ ipcMain.on('window-maximize', () => {
   }
 })
 
-ipcMain.on('window-close', () => {
+ipcMain.on('window:close', () => {
   BrowserWindow.getFocusedWindow()?.close()
 })
 
-ipcMain.handle('window-is-maximized', () =>
+ipcMain.handle('window:is-maximized', () =>
   BrowserWindow.getFocusedWindow()?.isMaximized() ?? false)

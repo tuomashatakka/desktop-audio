@@ -116,16 +116,33 @@
 }
 
 .view-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   padding: var(--sp-4) var(--sp-6);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
+  background: var(--bg);
+  transition: transform var(--duration) var(--ease),
+              opacity var(--duration) var(--ease);
 
   & h2 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.7;
     margin: 0;
   }
+}
+
+.view-header.header-hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .view-content {

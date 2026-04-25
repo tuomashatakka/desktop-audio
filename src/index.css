@@ -14,7 +14,6 @@
 
 @import "./app/styles/dialog.css";
 @import "./app/styles/popover.css";
-@import "./app/styles/mini-player.css";
 
 @layer base {
   html, body, #app {

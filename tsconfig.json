@@ -16,6 +16,6 @@
     "strict": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"]
   },
-  "include": ["src/**/*", "forge.env.d.ts"],
+  "include": ["src/**/*", "global.d.ts", "forge.env.d.ts"],
   "exclude": ["node_modules"]
 }
