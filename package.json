@@ -60,6 +60,7 @@
   "dependencies": {
     "@stylistic/eslint-plugin": "5.10.0",
     "@tanstack/react-virtual": "3.13.23",
+    "@tuomashatakka/eslint-config": "^3.1.0",
     "better-sqlite3": "^12.8.0",
     "electron-squirrel-startup": "1.0.1",
     "eslint-plugin-functional": "9.0.4",

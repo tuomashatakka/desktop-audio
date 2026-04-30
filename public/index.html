@@ -10,8 +10,9 @@
   <meta property="og:type" content="website">
   <title>Desktop Audio</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♫</text></svg>">
+  <link rel="stylesheet" href="tokens.css">
   <style>
-    @layer reset, base, layout, components, animations;
+    @layer reset, base, layout, components, animations, lightbox;
 
     /* ── Reset ───────────────────────────────────── */
     @layer reset {
@@ -22,17 +23,18 @@
       button { font: inherit; cursor: pointer; border: none; background: none; }
     }
 
-    /* ── Design Tokens ───────────────────────────── */
+    /* ── Design Tokens — alias to app tokens (tokens.css) ── */
     @layer base {
       :root {
-        --clr-bg:       #0a0a0f;
-        --clr-surface:   #12121a;
-        --clr-surface-2: #1a1a26;
-        --clr-text:      #e8e8ef;
-        --clr-text-dim:  #7a7a8e;
-        --clr-accent:    #ff5500;
-        --clr-accent-2:  #ff7733;
-        --clr-glow:      rgba(255, 85, 0, 0.35);
+        /* Color aliases mapped onto the app's design tokens. */
+        --clr-bg:        var(--bg);
+        --clr-surface:   var(--bg-raised);
+        --clr-surface-2: var(--bg-input);
+        --clr-text:      var(--text);
+        --clr-text-dim:  var(--text-dim);
+        --clr-accent:    var(--accent);
+        --clr-accent-2:  var(--accent-hover);
+        --clr-glow:      hsl(337 100% 50% / 0.35);
 
         --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
         --ease-in-out:    cubic-bezier(0.45, 0, 0.55, 1);
@@ -473,6 +475,220 @@
       50%      { height: var(--h, 60%); }
     }
 
+    /* ── Screenshot grid: allow internal scroll when many cards ── */
+    .screenshot-grid {
+      max-height: 60dvh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 0.25rem;
+      scrollbar-width: thin;
+      scrollbar-color: var(--clr-accent) transparent;
+      mask-image: linear-gradient(to bottom, transparent 0, black 4%, black 96%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 4%, black 96%, transparent 100%);
+    }
+    .screenshot-card {
+      cursor: zoom-in;
+      transition: transform 0.5s var(--ease-out-expo), box-shadow 0.5s var(--ease-out-expo);
+    }
+    .screenshot-card:hover,
+    .screenshot-card:focus-visible {
+      transform: translateY(-4px);
+      box-shadow: 0 18px 44px -12px var(--clr-glow);
+      outline: none;
+    }
+
+    /* ── Pointer light canvas (decorative, screen blend) ── */
+    #pointer-light {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      mix-blend-mode: screen;
+      z-index: 50;
+    }
+
+    /* ── Lightbox dialog ── */
+    @layer lightbox {
+      dialog#lightbox {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        max-width: 100vw;
+        max-height: 100vh;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--clr-text);
+        overflow: hidden;
+      }
+
+      dialog#lightbox::backdrop {
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(40px) saturate(140%);
+        -webkit-backdrop-filter: blur(40px) saturate(140%);
+        animation: backdrop-in 0.5s var(--ease-out-expo) forwards;
+      }
+      dialog#lightbox.closing::backdrop {
+        animation: backdrop-out 0.35s var(--ease-in-out) forwards;
+      }
+
+      @keyframes backdrop-in {
+        from { background: rgba(0,0,0,0); backdrop-filter: blur(0) saturate(100%); -webkit-backdrop-filter: blur(0) saturate(100%); }
+        to   { background: rgba(0,0,0,0.6); backdrop-filter: blur(40px) saturate(140%); -webkit-backdrop-filter: blur(40px) saturate(140%); }
+      }
+      @keyframes backdrop-out {
+        to { background: rgba(0,0,0,0); backdrop-filter: blur(0) saturate(100%); -webkit-backdrop-filter: blur(0) saturate(100%); }
+      }
+
+      /* Vignette over the entire page while modal is open */
+      dialog#lightbox::before,
+      dialog#lightbox::after {
+        content: "";
+        position: fixed;
+        inset: -10vmax;
+        pointer-events: none;
+        z-index: -1;
+      }
+      dialog#lightbox::before {
+        background: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.85) 100%);
+        mix-blend-mode: multiply;
+      }
+      dialog#lightbox::after {
+        background: radial-gradient(ellipse at center, hsl(337 60% 30% / 0.18) 0%, transparent 65%);
+        mix-blend-mode: overlay;
+      }
+
+      .lightbox-stage {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: clamp(1rem, 4vw, 4rem);
+      }
+
+      .lightbox-img {
+        display: block;
+        max-width: min(92vw, 1600px);
+        max-height: 86vh;
+        object-fit: contain;
+        border-radius: 14px;
+        box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7);
+        transition:
+          transform 480ms var(--ease-out-expo),
+          opacity 320ms ease,
+          filter 320ms ease;
+        will-change: transform, opacity, filter;
+      }
+
+      /* Open scale-in (one-shot via .opening class so it doesn't clobber later swap transitions) */
+      dialog#lightbox .lightbox-img.opening {
+        animation: img-open 0.6s var(--ease-out-expo) both;
+      }
+      @keyframes img-open {
+        from { opacity: 0; transform: scale(0.94); filter: blur(12px); }
+        to   { opacity: 1; transform: scale(1); filter: blur(0); }
+      }
+      dialog#lightbox.closing .lightbox-img {
+        animation: img-close 0.32s var(--ease-in-out) forwards;
+      }
+      @keyframes img-close {
+        to { opacity: 0; transform: scale(0.96); filter: blur(8px); }
+      }
+
+      /* Slide swap for prev/next — animations only (no transition class) */
+      .lightbox-img.swap-out-left  { animation: swap-out-to-left  0.28s var(--ease-in-out) forwards; }
+      .lightbox-img.swap-out-right { animation: swap-out-to-right 0.28s var(--ease-in-out) forwards; }
+      .lightbox-img.swap-in-left   { animation: swap-in-from-right 0.42s var(--ease-out-expo) both; }
+      .lightbox-img.swap-in-right  { animation: swap-in-from-left  0.42s var(--ease-out-expo) both; }
+      @keyframes swap-out-to-left  {
+        to { opacity: 0; transform: translateX(-6%) scale(0.97); filter: blur(8px); }
+      }
+      @keyframes swap-out-to-right {
+        to { opacity: 0; transform: translateX( 6%) scale(0.97); filter: blur(8px); }
+      }
+      @keyframes swap-in-from-right {
+        from { opacity: 0; transform: translateX( 6%) scale(0.97); filter: blur(8px); }
+        to   { opacity: 1; transform: translateX(0)   scale(1);   filter: blur(0); }
+      }
+      @keyframes swap-in-from-left {
+        from { opacity: 0; transform: translateX(-6%) scale(0.97); filter: blur(8px); }
+        to   { opacity: 1; transform: translateX(0)   scale(1);   filter: blur(0); }
+      }
+
+      .lightbox-caption {
+        position: absolute;
+        left: 50%;
+        bottom: clamp(1rem, 3vh, 2rem);
+        transform: translateX(-50%);
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        color: var(--clr-text-dim);
+        background: rgba(0,0,0,0.4);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 999px;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        white-space: nowrap;
+        max-width: 80vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .lightbox-counter {
+        position: absolute;
+        top: clamp(1rem, 3vh, 1.5rem);
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.75rem;
+        font-family: var(--font-mono);
+        color: var(--clr-text-dim);
+        letter-spacing: 0.1em;
+      }
+
+      .lightbox-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 56px;
+        height: 56px;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.12);
+        color: var(--clr-text);
+        font-size: 1.5rem;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        transition: background 0.25s var(--ease-out-expo), transform 0.25s var(--ease-out-expo);
+      }
+      .lightbox-btn:hover { background: rgba(255,255,255,0.14); transform: translateY(-50%) scale(1.06); }
+      .lightbox-btn.prev  { left: clamp(0.5rem, 2vw, 2rem); }
+      .lightbox-btn.next  { right: clamp(0.5rem, 2vw, 2rem); }
+
+      .lightbox-close {
+        position: absolute;
+        top: clamp(0.75rem, 2vh, 1.25rem);
+        right: clamp(0.75rem, 2vw, 1.25rem);
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.12);
+        color: var(--clr-text);
+        font-size: 1.25rem;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        transition: background 0.25s var(--ease-out-expo);
+      }
+      .lightbox-close:hover { background: rgba(255,255,255,0.16); }
+    }
+
     /* ── Reduced Motion ──────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -530,25 +746,7 @@
         <p>Screenshots captured from the running application</p>
       </div>
 
-      <div class="screenshot-grid">
-        <figure class="screenshot-card fade-blur delay-1">
-          <img src="screenshots/library-view.png" alt="Library view showing folder tree and track list" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-          <div class="placeholder" style="display:none" aria-hidden="true">♫</div>
-          <figcaption>Library — Folder navigation &amp; track list</figcaption>
-        </figure>
-
-        <figure class="screenshot-card fade-blur delay-2">
-          <img src="screenshots/player-view.png" alt="Now playing view with album art and waveform" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-          <div class="placeholder" style="display:none" aria-hidden="true">▶</div>
-          <figcaption>Now Playing — Album art &amp; waveform</figcaption>
-        </figure>
-
-        <figure class="screenshot-card fade-blur delay-3">
-          <img src="screenshots/settings-view.png" alt="Settings view with theme and playback options" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-          <div class="placeholder" style="display:none" aria-hidden="true">⚙</div>
-          <figcaption>Settings — Theme &amp; playback options</figcaption>
-        </figure>
-      </div>
+      <div id="screenshot-grid" class="screenshot-grid" data-loading aria-busy="true"></div>
 
       <div class="feature-cards">
         <article class="feature-card fade-blur delay-2">
@@ -599,6 +797,21 @@
 
   </main>
 
+  <!-- Pointer light overlay (decorative) -->
+  <canvas id="pointer-light" aria-hidden="true"></canvas>
+
+  <!-- Lightbox dialog -->
+  <dialog id="lightbox" aria-label="Screenshot viewer">
+    <div class="lightbox-stage">
+      <span class="lightbox-counter" id="lightbox-counter" aria-hidden="true"></span>
+      <img class="lightbox-img" id="lightbox-img" alt="">
+      <span class="lightbox-caption" id="lightbox-caption"></span>
+      <button class="lightbox-btn prev" id="lightbox-prev" aria-label="Previous screenshot" type="button">‹</button>
+      <button class="lightbox-btn next" id="lightbox-next" aria-label="Next screenshot" type="button">›</button>
+      <button class="lightbox-close" id="lightbox-close" aria-label="Close viewer" type="button">✕</button>
+    </div>
+  </dialog>
+
   <script>
     // ── IntersectionObserver for scroll-triggered animations ──
     const observer = new IntersectionObserver(
@@ -648,6 +861,284 @@
         waveformContainer.appendChild(bar);
       }
     }
+
+    // ── Screenshot gallery + lightbox ──
+    (async () => {
+      const grid = document.getElementById('screenshot-grid');
+      if (!grid) return;
+
+      let items = [];
+      try {
+        const res = await fetch('screenshots.json', { cache: 'no-cache' });
+        items = await res.json();
+      } catch (err) {
+        console.warn('Could not load screenshots manifest', err);
+        grid.removeAttribute('aria-busy');
+        grid.removeAttribute('data-loading');
+        return;
+      }
+
+      const frag = document.createDocumentFragment();
+      items.forEach((it, i) => {
+        const fig = document.createElement('figure');
+        fig.className = `screenshot-card fade-blur delay-${(i % 5) + 1}`;
+        fig.tabIndex = 0;
+        fig.setAttribute('role', 'button');
+        fig.setAttribute('aria-label', `Open screenshot: ${it.caption}`);
+        fig.dataset.index = String(i);
+
+        const img = document.createElement('img');
+        img.src = it.src;
+        img.alt = it.alt;
+        img.loading = 'lazy';
+
+        const cap = document.createElement('figcaption');
+        cap.textContent = it.caption;
+
+        fig.append(img, cap);
+        frag.append(fig);
+      });
+      grid.append(frag);
+      grid.removeAttribute('aria-busy');
+      grid.removeAttribute('data-loading');
+
+      // Re-observe the new cards for fade-blur entry
+      grid.querySelectorAll('.fade-blur').forEach((el) => observer.observe(el));
+
+      // ── Lightbox wiring ──
+      const dlg     = document.getElementById('lightbox');
+      const lbImg   = document.getElementById('lightbox-img');
+      const lbCap   = document.getElementById('lightbox-caption');
+      const lbCount = document.getElementById('lightbox-counter');
+      const btnPrev = document.getElementById('lightbox-prev');
+      const btnNext = document.getElementById('lightbox-next');
+      const btnX    = document.getElementById('lightbox-close');
+
+      let currentIndex = 0;
+      let lastTrigger = null;
+      let swapping = false;
+
+      const clearAnimClasses = () => {
+        lbImg.classList.remove('opening', 'swap-out-left', 'swap-out-right', 'swap-in-left', 'swap-in-right');
+      };
+
+      const setImage = (idx, dir = 0) => {
+        const it = items[((idx % items.length) + items.length) % items.length];
+        if (!it) return;
+        currentIndex = ((idx % items.length) + items.length) % items.length;
+        lbCap.textContent = it.caption;
+        lbCount.textContent = `${currentIndex + 1} / ${items.length}`;
+
+        if (dir === 0) {
+          clearAnimClasses();
+          lbImg.src = it.src;
+          lbImg.alt = it.alt;
+          // play opening animation
+          void lbImg.offsetWidth;
+          lbImg.classList.add('opening');
+          lbImg.addEventListener('animationend', () => lbImg.classList.remove('opening'), { once: true });
+          return;
+        }
+        if (swapping) return;
+        swapping = true;
+        const outClass = dir > 0 ? 'swap-out-left' : 'swap-out-right';
+        const inClass  = dir > 0 ? 'swap-in-left'  : 'swap-in-right';
+        clearAnimClasses();
+        // restart animation
+        void lbImg.offsetWidth;
+        lbImg.classList.add(outClass);
+        const onOut = () => {
+          lbImg.classList.remove(outClass);
+          lbImg.src = it.src;
+          lbImg.alt = it.alt;
+          void lbImg.offsetWidth;
+          lbImg.classList.add(inClass);
+          const onIn = () => {
+            lbImg.classList.remove(inClass);
+            swapping = false;
+          };
+          lbImg.addEventListener('animationend', onIn, { once: true });
+        };
+        lbImg.addEventListener('animationend', onOut, { once: true });
+      };
+
+      const openAt = (idx, trigger) => {
+        lastTrigger = trigger || null;
+        if (typeof dlg.showModal === 'function') dlg.showModal();
+        else dlg.setAttribute('open', '');
+        setImage(idx, 0);
+      };
+
+      const close = () => {
+        if (!dlg.open) return;
+        dlg.classList.add('closing');
+        const done = () => {
+          dlg.classList.remove('closing');
+          dlg.removeEventListener('animationend', done);
+          dlg.close();
+          if (lastTrigger) lastTrigger.focus();
+        };
+        // Fallback in case animationend doesn't fire
+        const t = setTimeout(done, 400);
+        dlg.addEventListener('animationend', () => { clearTimeout(t); done(); }, { once: true });
+      };
+
+      grid.addEventListener('click', (e) => {
+        const card = e.target.closest('.screenshot-card');
+        if (!card) return;
+        openAt(Number(card.dataset.index), card);
+      });
+      grid.addEventListener('keydown', (e) => {
+        const card = e.target.closest('.screenshot-card');
+        if (!card) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openAt(Number(card.dataset.index), card);
+        }
+      });
+
+      btnPrev.addEventListener('click', () => setImage(currentIndex - 1, -1));
+      btnNext.addEventListener('click', () => setImage(currentIndex + 1, +1));
+      btnX.addEventListener('click', close);
+
+      dlg.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); setImage(currentIndex - 1, -1); }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); setImage(currentIndex + 1, +1); }
+      });
+      dlg.addEventListener('cancel', (e) => { e.preventDefault(); close(); });
+      // Click on backdrop (not on stage children) closes
+      dlg.addEventListener('click', (e) => {
+        if (e.target === dlg) close();
+      });
+    })();
+
+    // ── Pointer light source (multi-touch, candle flicker, decay on release) ──
+    (() => {
+      const canvas = document.getElementById('pointer-light');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const points = new Map(); // pointerId -> { x, y, tx, ty, intensity, radius, released, seed, hueShift, prevFlicker }
+      let dpr = 1;
+      let baseR = 0;
+      let accentRGB = '255, 0, 119';
+
+      const readAccent = () => {
+        const v = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+        if (!v) return;
+        const probe = document.createElement('span');
+        probe.style.color = v;
+        document.body.appendChild(probe);
+        const c = getComputedStyle(probe).color;
+        document.body.removeChild(probe);
+        const m = c.match(/(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/);
+        if (m) accentRGB = `${m[1]}, ${m[2]}, ${m[3]}`;
+      };
+
+      const resize = () => {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width  = Math.floor(innerWidth  * dpr);
+        canvas.height = Math.floor(innerHeight * dpr);
+        canvas.style.width  = innerWidth  + 'px';
+        canvas.style.height = innerHeight + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        baseR = Math.min(innerWidth, innerHeight) * 0.18;
+      };
+
+      const upsert = (id, x, y) => {
+        const cur = points.get(id);
+        if (cur) { cur.tx = x; cur.ty = y; cur.intensity = 1; cur.radius = baseR; cur.released = false; }
+        else points.set(id, {
+          x, y, tx: x, ty: y,
+          intensity: 1, radius: baseR, released: false,
+          seed: Math.random() * 1000,
+          prevFlicker: 1,
+        });
+      };
+      const release = (id) => {
+        const p = points.get(id);
+        if (p) p.released = true;
+      };
+
+      // Cheap multi-octave noise (sin combo) — looks organic enough for candle flicker
+      const flickerNoise = (t, seed) => {
+        const a = Math.sin(t * 11.7 + seed) * 0.5;
+        const b = Math.sin(t * 4.3  + seed * 1.7) * 0.3;
+        const c = Math.sin(t * 23.1 + seed * 0.6) * 0.18;
+        const d = Math.sin(t * 2.1  + seed * 2.3) * 0.12;
+        // sporadic stronger dips
+        const gust = Math.max(0, Math.sin(t * 1.3 + seed * 3.1) - 0.7) * 1.6;
+        return 1 + (a + b + c + d) * 0.18 - gust * 0.35;
+      };
+
+      let last = performance.now();
+      const draw = (now) => {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        const t = now / 1000;
+
+        ctx.clearRect(0, 0, innerWidth, innerHeight);
+        ctx.globalCompositeOperation = 'lighter';
+
+        for (const [id, p] of points) {
+          // ease toward target so the flame "trails" the pointer slightly
+          const lerp = reduced ? 1 : 0.35;
+          p.x += (p.tx - p.x) * lerp;
+          p.y += (p.ty - p.y) * lerp;
+
+          if (p.released) {
+            p.intensity *= Math.pow(0.96, dt * 60);
+            p.radius    *= Math.pow(1.02, dt * 60);
+            if (p.intensity < 0.02) { points.delete(id); continue; }
+          }
+
+          // Candle flicker: noise on intensity + small radius + slight position jitter
+          let flicker = reduced ? 1 : flickerNoise(t, p.seed);
+          // smooth toward new flicker value to avoid harsh jumps
+          flicker = p.prevFlicker + (flicker - p.prevFlicker) * 0.6;
+          p.prevFlicker = flicker;
+          flicker = Math.max(0.55, Math.min(1.25, flicker));
+
+          const jitterX = reduced ? 0 : Math.sin(t * 7.3 + p.seed)       * baseR * 0.012;
+          const jitterY = reduced ? 0 : Math.sin(t * 9.1 + p.seed * 1.9) * baseR * 0.012;
+
+          const cx = p.x + jitterX;
+          const cy = p.y + jitterY;
+          const r  = p.radius * (0.9 + 0.18 * flicker);
+          const inner = 0.55 * p.intensity * flicker;
+          const mid   = 0.18 * p.intensity * flicker;
+
+          // Warm core: shift slightly toward yellow as flicker peaks (candle flame glow)
+          const warmR = Math.min(255, Number(accentRGB.split(',')[0]) + 30 * flicker);
+          const warmG = Math.min(255, Number(accentRGB.split(',')[1]) + 60 * flicker);
+          const warmB =                Number(accentRGB.split(',')[2]);
+
+          const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+          grad.addColorStop(0,    `rgba(${warmR}, ${warmG}, ${warmB}, ${inner})`);
+          grad.addColorStop(0.35, `rgba(${accentRGB}, ${mid})`);
+          grad.addColorStop(1,    `rgba(${accentRGB}, 0)`);
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        requestAnimationFrame(draw);
+      };
+
+      readAccent();
+      resize();
+      addEventListener('resize', resize, { passive: true });
+
+      addEventListener('pointermove', (e) => upsert(e.pointerId, e.clientX, e.clientY), { passive: true });
+      addEventListener('pointerdown', (e) => upsert(e.pointerId, e.clientX, e.clientY), { passive: true });
+      addEventListener('pointerup',     (e) => release(e.pointerId), { passive: true });
+      addEventListener('pointercancel', (e) => release(e.pointerId), { passive: true });
+      addEventListener('pointerleave',  (e) => release(e.pointerId), { passive: true });
+      document.addEventListener('mouseleave', () => { for (const id of points.keys()) release(id); });
+
+      requestAnimationFrame(draw);
+    })();
   </script>
 </body>
 </html>

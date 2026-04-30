@@ -34,3 +34,9 @@ src/
 
 All IPC channels use `namespace:action` format: `library:scan`, `file:read`, `window:minimize`.
 Bridge methods `onLibraryBatch` / `onLibraryDone` return unsubscribe functions — use in `useEffect` cleanup.
+
+## Also see
+
+- code style guide: @docs/DESIGN_GUIDE.md
+- design style guide: @docs/STYLE_GUIDE.md
+- design guide:  @docs/IMPLEMENTATION_PLAN.md

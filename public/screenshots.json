@@ -1,0 +1,37 @@
+[
+  {
+    "src": "screenshots/library-view.png",
+    "alt": "Library view showing folder tree and track list",
+    "caption": "Library — Folder navigation & track list"
+  },
+  {
+    "src": "screenshots/player-view.png",
+    "alt": "Now playing view with album art and waveform",
+    "caption": "Now Playing — Album art & waveform"
+  },
+  {
+    "src": "screenshots/settings-view.png",
+    "alt": "Settings view with theme and playback options",
+    "caption": "Settings — Theme & playback options"
+  },
+  {
+    "src": "screenshots/Screenshot 2026-04-30 at 19.03.17.png",
+    "alt": "Live application capture",
+    "caption": "Live capture"
+  },
+  {
+    "src": "screenshots/Screenshot 2026-04-30 at 19.04.04.png",
+    "alt": "Live application capture",
+    "caption": "Live capture"
+  },
+  {
+    "src": "screenshots/Screenshot 2026-04-30 at 19.04.35.png",
+    "alt": "Live application capture",
+    "caption": "Live capture"
+  },
+  {
+    "src": "screenshots/Screenshot 2026-04-30 at 19.04.50.png",
+    "alt": "Live application capture",
+    "caption": "Live capture"
+  }
+]

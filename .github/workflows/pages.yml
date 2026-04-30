@@ -23,6 +23,17 @@ jobs:
         with:
           enablement: true
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Sync app design tokens into public/
+        run: cp src/app/styles/tokens.css public/tokens.css
+
+      - name: Generate screenshots manifest
+        run: node scripts/build-screenshots-manifest.mjs
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
