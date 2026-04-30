@@ -39,6 +39,11 @@ const config: ForgeConfig = {
           target: 'preload',
         },
         {
+          entry: 'src/context-menu-preload.ts',
+          config: 'vite.preload.config.ts',
+          target: 'preload',
+        },
+        {
           entry: 'src/scanner-worker.ts',
           config: 'vite.worker.config.ts',
           target: 'main',
@@ -48,6 +53,10 @@ const config: ForgeConfig = {
         {
           name: 'main_window',
           config: 'vite.renderer.config.ts',
+        },
+        {
+          name: 'context_menu_window',
+          config: 'vite.context-menu.config.ts',
         },
       ],
     }),

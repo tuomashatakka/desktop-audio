@@ -1,4 +1,4 @@
-import { AudioMetadata, Track } from "./src/app/services/types"
+import { AudioMetadata, Track, SerializableMenuItem, MediaState } from "./src/app/services/types"
 
 declare global {
   interface ElectronAPI {
@@ -24,6 +24,15 @@ declare global {
     readonly onMediaPlayPause: (cb: () => void) => () => void
     readonly onMediaNext:      (cb: () => void) => () => void
     readonly onMediaPrev:      (cb: () => void) => () => void
+
+    // Context menu
+    readonly showContextMenu:      (items: SerializableMenuItem[], x: number, y: number, width: number, height: number) => void
+    readonly hideContextMenu:      () => void
+    readonly onContextMenuAction:  (cb: (index: number) => void) => () => void
+
+    // Media state (MPRIS / native controls)
+    readonly updateMediaState: (state: MediaState) => void
+    readonly onMediaSeek:      (cb: (delta: number) => void) => () => void
   }
 
   interface Window {
