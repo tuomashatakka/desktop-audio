@@ -76,6 +76,48 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null)
   const [ analyzer, setAnalyzer ] = useState<AnalyserNode | null>(null)
 
+  // Refs for MediaSession handlers to avoid circular deps
+  const pauseRef = useRef<() => void>(() => {})
+  const resumeRef = useRef<() => void>(() => {})
+  const seekRef = useRef<(time: number) => void>(() => {})
+  const playNextRef = useRef<(tracks: readonly Track[]) => void>(() => {})
+  const playPreviousRef = useRef<(tracks: readonly Track[]) => void>(() => {})
+
+  // MediaSession: set up metadata & handlers when track changes
+  useEffect(() => {
+    if (!navigator.mediaSession || !state.currentTrack)
+      return
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title:   state.currentTrack.title || 'Unknown Title',
+      artist:  state.currentTrack.artist || 'Unknown Artist',
+      album:   state.currentTrack.album || 'Unknown Album',
+      artwork: state.currentTrack.albumArt
+        ? [
+          { src: state.currentTrack.albumArt, sizes: '96x96', type: 'image/jpeg' }
+        ]
+        : []
+    })
+
+    navigator.mediaSession.setActionHandler('play', () => {
+      resumeRef.current()
+    })
+    navigator.mediaSession.setActionHandler('pause', () => {
+      pauseRef.current()
+    })
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      playPreviousRef.current([])
+    })
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+      playNextRef.current([])
+    })
+    navigator.mediaSession.setActionHandler('seekto', details => {
+      if (details.seekTime !== undefined) {
+        seekRef.current(details.seekTime)
+      }
+    })
+  }, [ state.currentTrack ])
+
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio()
@@ -87,6 +129,13 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     const handleTimeUpdate = () => {
       setState(s =>
         ({ ...s, currentTime: audio.currentTime }))
+      if (navigator.mediaSession && state.currentTrack) {
+        navigator.mediaSession.setPositionState({
+          duration:     state.duration,
+          playbackRate: 1,
+          position:     audio.currentTime
+        })
+      }
     }
 
     const handleDurationChange = () => {
@@ -132,10 +181,17 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
 
   useEffect(() =>
     () => {
-      // Cleanup blob URLs on unmount
       const audio = audioRef.current
       if (audio && audio.src.startsWith('blob:')) {
         URL.revokeObjectURL(audio.src)
+      }
+      if (navigator.mediaSession) {
+        navigator.mediaSession.setActionHandler('play', null)
+        navigator.mediaSession.setActionHandler('pause', null)
+        navigator.mediaSession.setActionHandler('previoustrack', null)
+        navigator.mediaSession.setActionHandler('nexttrack', null)
+        navigator.mediaSession.setActionHandler('seekto', null)
+        navigator.mediaSession.metadata = null
       }
     }, [])
 
@@ -212,7 +268,6 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     if (!audio)
       return
 
-    // Reset waveform bars for new track immediately
     setState(s =>
       ({ ...s, waveformBars: null, currentTrack: track, isPlaying: true, currentTime: 0 }))
 
@@ -235,7 +290,6 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
       audio.src = audioUrl
       await audio.play()
 
-      // Decode waveform from blob (non-blocking, after playback starts)
       const ctx = audioContextRef.current
       if (ctx) {
         blob.arrayBuffer()
@@ -244,7 +298,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
           .then(bars =>
             setState(s =>
               ({ ...s, waveformBars: bars })))
-          .catch(() => {}) // non-critical — mock bars will remain
+          .catch(() => {})
       }
     }
     catch (error) {
@@ -260,6 +314,10 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     audio.pause()
     setState(s =>
       ({ ...s, isPlaying: false }))
+
+    if (navigator.mediaSession) {
+      navigator.mediaSession.playbackState = 'paused'
+    }
   }, [])
 
   const resume = useCallback(() => {
@@ -270,6 +328,10 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     audio.play().catch(console.error)
     setState(s =>
       ({ ...s, isPlaying: true }))
+
+    if (navigator.mediaSession) {
+      navigator.mediaSession.playbackState = 'playing'
+    }
   }, [])
 
   const stop = useCallback(() => {
@@ -280,7 +342,6 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     audio.pause()
     audio.currentTime = 0
 
-    // Revoke any blob URL
     if (audio.src.startsWith('blob:')) {
       URL.revokeObjectURL(audio.src)
     }
@@ -292,6 +353,11 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
         currentTime:  0,
         currentTrack: null,
       }))
+
+    if (navigator.mediaSession) {
+      navigator.mediaSession.playbackState = 'none'
+      navigator.mediaSession.metadata = null
+    }
   }, [])
 
   const seek = useCallback((time: number) => {
@@ -340,6 +406,13 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     },
     [ state.currentTrack, play ]
   )
+
+  // Sync refs after all callbacks are defined
+  pauseRef.current = pause
+  resumeRef.current = resume
+  seekRef.current = seek
+  playNextRef.current = playNext
+  playPreviousRef.current = playPrevious
 
   return (
     <AudioContext.Provider

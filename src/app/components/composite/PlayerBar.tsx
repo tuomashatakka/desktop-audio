@@ -80,7 +80,6 @@ export function PlayerBar () {
           duration={duration}
           onSeek={seek}
           bars={waveformBars}
-          barCount={80}
           compact
         />
 

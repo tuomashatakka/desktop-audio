@@ -2,3 +2,7 @@
 
 declare const CONTEXT_MENU_WINDOW_VITE_DEV_SERVER_URL: string
 declare const CONTEXT_MENU_WINDOW_VITE_NAME: string
+declare module '*.css' {
+  const content: Record<string, string>
+  export default content
+}
