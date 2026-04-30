@@ -100,20 +100,12 @@ jobs:
           git tag -f latest
           git push -f origin latest
 
-      - name: Create macOS arm64 artifact
+      - name: Collect artifacts
         run: |
           mkdir -p artifacts
-          cp out/make/zip/darwin/arm64/*.zip artifacts/ || true
-
-      - name: Create macOS x64 artifact
-        run: |
-          mkdir -p artifacts
-          cp out/make/zip/darwin/x64/*.zip artifacts/ || true
-
-      - name: Create Windows artifact
-        run: |
-          mkdir -p artifacts
-          cp out/make/zip/win32/x64/*.zip artifacts/ || true
+          find out/make -type f \( -name '*.zip' -o -name '*.deb' -o -name '*.rpm' -o -name '*.exe' -o -name '*.dmg' \) -exec cp {} artifacts/ \;
+          echo "Artifacts collected:"
+          ls -la artifacts/ || echo "No artifacts found"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -126,11 +118,6 @@ jobs:
           draft: false
           prerelease: ${{ steps.version.outputs.IS_TAG == 'false' || contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
           generate_release_notes: ${{ steps.version.outputs.IS_TAG == 'true' }}
-          files: |
-            out/make/zip/darwin/arm64/*.zip
-            out/make/zip/darwin/x64/*.zip
-            out/make/zip/win32/x64/*.zip
-            out/make/deb/*.deb
-            out/make/rpm/*.rpm
+          files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
