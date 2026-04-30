@@ -74,6 +74,15 @@ function AppContent () {
             </button>
 
             <button
+              className={`nav-item ${currentView === 'player' ? 'active' : ''}`}
+              onClick={() =>
+                setView('player')}
+            >
+              <span className='nav-icon'>▶</span>
+              Player
+            </button>
+
+            <button
               className={`nav-item ${currentView === 'settings' ? 'active' : ''}`}
               onClick={() =>
                 setView('settings')}

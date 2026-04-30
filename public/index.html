@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Desktop Audio — A beautiful, lightweight music player built with Electron and React.">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta property="og:title" content="Desktop Audio">
+  <meta property="og:description" content="A beautiful desktop music player with waveform visualization, library management, and native media controls.">
+  <meta property="og:type" content="website">
+  <title>Desktop Audio</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♫</text></svg>">
+  <style>
+    @layer reset, base, layout, components, animations;
+
+    /* ── Reset ───────────────────────────────────── */
+    @layer reset {
+      *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      img, svg { display: block; max-width: 100%; }
+      a { color: inherit; text-decoration: none; }
+      button { font: inherit; cursor: pointer; border: none; background: none; }
+    }
+
+    /* ── Design Tokens ───────────────────────────── */
+    @layer base {
+      :root {
+        --clr-bg:       #0a0a0f;
+        --clr-surface:   #12121a;
+        --clr-surface-2: #1a1a26;
+        --clr-text:      #e8e8ef;
+        --clr-text-dim:  #7a7a8e;
+        --clr-accent:    #ff5500;
+        --clr-accent-2:  #ff7733;
+        --clr-glow:      rgba(255, 85, 0, 0.35);
+
+        --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
+        --ease-in-out:    cubic-bezier(0.45, 0, 0.55, 1);
+
+        --duration-immersive: 3s;
+        --duration-fast:      0.6s;
+
+        --blur-intense: 20px;
+        --blur-subtle:  8px;
+
+        --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+      }
+    }
+
+    /* ── Base ────────────────────────────────────── */
+    @layer base {
+      html {
+        font-family: var(--font-sans);
+        color: var(--clr-text);
+        background: var(--clr-bg);
+        overflow: hidden;
+      }
+
+      body {
+        overflow: hidden;
+        height: 100dvh;
+      }
+
+      h1, h2, h3 { font-weight: 700; line-height: 1.1; }
+    }
+
+    /* ── Scroll Snap Layout ──────────────────────── */
+    @layer layout {
+      .scroll-container {
+        height: 100dvh;
+        overflow-y: auto;
+        scroll-snap-type: y mandatory;
+        scroll-behavior: smooth;
+      }
+
+      .scroll-section {
+        height: 100dvh;
+        scroll-snap-align: start;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+      }
+    }
+
+    /* ── Hero Section ────────────────────────────── */
+    #hero {
+      background:
+        radial-gradient(ellipse 60% 50% at 50% 50%, rgba(255, 85, 0, 0.06) 0%, transparent 70%),
+        var(--clr-bg);
+    }
+
+    .hero-logo {
+      font-size: clamp(4rem, 12vw, 8rem);
+      color: var(--clr-accent);
+      filter: drop-shadow(0 0 40px var(--clr-glow));
+      animation: logoPulse 4s ease-in-out infinite;
+    }
+
+    .hero-title {
+      font-size: clamp(2rem, 6vw, 4.5rem);
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, var(--clr-accent), var(--clr-accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-top: 0.2em;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(1rem, 2.5vw, 1.35rem);
+      color: var(--clr-text-dim);
+      margin-top: 0.5em;
+      max-width: 500px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .hero-scroll-hint {
+      position: absolute;
+      bottom: 3rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--clr-text-dim);
+      font-size: 0.85rem;
+      animation: scrollBounce 2s ease-in-out infinite;
+    }
+
+    .hero-scroll-hint svg {
+      width: 24px;
+      height: 24px;
+      stroke: var(--clr-text-dim);
+    }
+
+    /* Animated waveform decoration */
+    .hero-waveform {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 120px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 3px;
+      padding: 0 10%;
+      opacity: 0.15;
+      mask-image: linear-gradient(to top, black 30%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to top, black 30%, transparent 100%);
+    }
+
+    .hero-waveform .bar {
+      width: 4px;
+      border-radius: 2px 2px 0 0;
+      background: linear-gradient(to top, var(--clr-accent), var(--clr-accent-2));
+      animation: waveBar 2s ease-in-out infinite;
+    }
+
+    /* ── Features Section ────────────────────────── */
+    #features {
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 40%, rgba(255, 85, 0, 0.04) 0%, transparent 70%),
+        var(--clr-surface);
+    }
+
+    .features-header {
+      text-align: center;
+      margin-bottom: clamp(2rem, 4vh, 3rem);
+    }
+
+    .features-header h2 {
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+      letter-spacing: -0.02em;
+    }
+
+    .features-header p {
+      color: var(--clr-text-dim);
+      margin-top: 0.5em;
+      font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+    }
+
+    .screenshot-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(320px, 90vw), 1fr));
+      gap: clamp(1rem, 2vw, 1.5rem);
+      width: min(95vw, 1100px);
+      max-height: 55dvh;
+      overflow: hidden;
+    }
+
+    .screenshot-card {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--clr-surface-2);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      aspect-ratio: 16 / 10;
+    }
+
+    .screenshot-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
+    }
+
+    .screenshot-card figcaption {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 0.75rem 1rem;
+      background: linear-gradient(to top, rgba(10, 10, 15, 0.9), transparent);
+      font-size: 0.8rem;
+      color: var(--clr-text-dim);
+    }
+
+    /* Fallback when screenshot image not available */
+    .screenshot-card .placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      color: var(--clr-accent);
+      background: linear-gradient(135deg, var(--clr-bg), var(--clr-surface-2));
+    }
+
+    .screenshot-card img[src=""],
+    .screenshot-card img:not([src]) {
+      display: none;
+    }
+
+    .feature-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(220px, 45vw), 1fr));
+      gap: clamp(0.75rem, 1.5vw, 1.25rem);
+      width: min(95vw, 1100px);
+      margin-top: clamp(1.5rem, 3vh, 2.5rem);
+    }
+
+    .feature-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: clamp(1rem, 2vw, 1.5rem);
+      text-align: center;
+      transition: transform var(--duration-fast) var(--ease-out-expo),
+                  box-shadow var(--duration-fast) var(--ease-out-expo);
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(255, 85, 0, 0.1);
+    }
+
+    .feature-card .icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    .feature-card h3 {
+      font-size: 1rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .feature-card p {
+      font-size: 0.85rem;
+      color: var(--clr-text-dim);
+      line-height: 1.4;
+    }
+
+    /* ── Download Section ────────────────────────── */
+    #download {
+      background:
+        radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255, 85, 0, 0.08) 0%, transparent 70%),
+        var(--clr-bg);
+    }
+
+    .download-content {
+      text-align: center;
+      max-width: 600px;
+      padding: 0 1.5rem;
+    }
+
+    .download-content h2 {
+      font-size: clamp(1.8rem, 5vw, 3rem);
+      letter-spacing: -0.02em;
+    }
+
+    .download-content .subtitle {
+      color: var(--clr-text-dim);
+      margin-top: 0.5em;
+      font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+    }
+
+    .cta-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 2.5rem;
+    }
+
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem 2.5rem;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 1.1rem;
+      background: linear-gradient(135deg, var(--clr-accent), var(--clr-accent-2));
+      color: #fff;
+      transition: transform var(--duration-fast) var(--ease-out-expo),
+                  box-shadow var(--duration-fast) var(--ease-out-expo);
+      box-shadow: 0 4px 24px var(--clr-glow);
+      animation: ctaGlow 3s ease-in-out infinite;
+    }
+
+    .cta-btn:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 8px 40px rgba(255, 85, 0, 0.5);
+    }
+
+    .cta-btn.secondary {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: none;
+      animation: none;
+      font-size: 1rem;
+      padding: 0.75rem 2rem;
+      color: var(--clr-text-dim);
+    }
+
+    .cta-btn.secondary:hover {
+      border-color: var(--clr-accent);
+      color: var(--clr-text);
+      box-shadow: 0 4px 20px rgba(255, 85, 0, 0.15);
+    }
+
+    .download-meta {
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: var(--clr-text-dim);
+    }
+
+    .download-meta code {
+      font-family: var(--font-mono);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+    }
+
+    .download-footer {
+      position: absolute;
+      bottom: 2rem;
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.75rem;
+      color: var(--clr-text-dim);
+      opacity: 0.5;
+    }
+
+    .download-footer a:hover {
+      color: var(--clr-text);
+    }
+
+    /* ── Nav Dots ────────────────────────────────── */
+    .nav-dots {
+      position: fixed;
+      right: 1.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      z-index: 100;
+    }
+
+    .nav-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.4s var(--ease-out-expo);
+    }
+
+    .nav-dot.active {
+      background: var(--clr-accent);
+      border-color: var(--clr-accent);
+      box-shadow: 0 0 10px var(--clr-glow);
+      transform: scale(1.3);
+    }
+
+    .nav-dot:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    /* ── Animations (triggered by .in-view) ──────── */
+    @layer animations {
+      .fade-blur {
+        opacity: 0;
+        filter: blur(var(--blur-intense));
+        transform: translateY(30px);
+        transition:
+          opacity var(--duration-immersive) var(--ease-out-expo),
+          filter var(--duration-immersive) var(--ease-out-expo),
+          transform var(--duration-immersive) var(--ease-out-expo);
+      }
+
+      .fade-blur.visible {
+        opacity: 1;
+        filter: blur(0);
+        transform: translateY(0);
+      }
+
+      .fade-blur.delay-1 { transition-delay: 0.2s; }
+      .fade-blur.delay-2 { transition-delay: 0.4s; }
+      .fade-blur.delay-3 { transition-delay: 0.6s; }
+      .fade-blur.delay-4 { transition-delay: 0.8s; }
+      .fade-blur.delay-5 { transition-delay: 1.0s; }
+
+      /* Hero: always animate on load */
+      #hero .fade-blur {
+        animation: heroEntry var(--duration-immersive) var(--ease-out-expo) forwards;
+      }
+
+      @keyframes heroEntry {
+        from {
+          opacity: 0;
+          filter: blur(var(--blur-intense));
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          filter: blur(0);
+          transform: translateY(0);
+        }
+      }
+
+      /* Stagger hero children */
+      #hero .fade-blur:nth-child(1) { animation-delay: 0s; }
+      #hero .fade-blur:nth-child(2) { animation-delay: 0.3s; opacity: 0; filter: blur(20px); }
+      #hero .fade-blur:nth-child(3) { animation-delay: 0.6s; opacity: 0; filter: blur(20px); }
+    }
+
+    @keyframes logoPulse {
+      0%, 100% { filter: drop-shadow(0 0 30px var(--clr-glow)); transform: scale(1); }
+      50%      { filter: drop-shadow(0 0 60px rgba(255, 85, 0, 0.5)); transform: scale(1.05); }
+    }
+
+    @keyframes scrollBounce {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(8px); }
+    }
+
+    @keyframes ctaGlow {
+      0%, 100% { box-shadow: 0 4px 24px var(--clr-glow); }
+      50%      { box-shadow: 0 4px 40px rgba(255, 85, 0, 0.55); }
+    }
+
+    @keyframes waveBar {
+      0%, 100% { height: 20%; }
+      50%      { height: var(--h, 60%); }
+    }
+
+    /* ── Reduced Motion ──────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      .fade-blur {
+        opacity: 1;
+        filter: none;
+        transform: none;
+      }
+      #hero .fade-blur {
+        animation: none;
+        opacity: 1;
+        filter: none;
+        transform: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Dots -->
+  <nav class="nav-dots" aria-label="Page sections">
+    <a href="#hero"    class="nav-dot active" aria-label="Hero section"></a>
+    <a href="#features" class="nav-dot" aria-label="Features section"></a>
+    <a href="#download" class="nav-dot" aria-label="Download section"></a>
+  </nav>
+
+  <main class="scroll-container">
+
+    <!-- ════════ SECTION 1: HERO ════════ -->
+    <section id="hero" class="scroll-section" aria-label="Hero">
+      <div class="fade-blur hero-logo" aria-hidden="true">♫</div>
+      <h1 class="fade-blur hero-title">Desktop Audio</h1>
+      <p class="fade-blur hero-subtitle">A beautiful, lightweight music player for your desktop — built with Electron, React, and TypeScript.</p>
+
+      <div class="hero-scroll-hint">
+        <span>Scroll to explore</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+          <path d="M12 5v14M5 12l7 7 7-7"/>
+        </svg>
+      </div>
+
+      <!-- Animated waveform decoration -->
+      <div class="hero-waveform" aria-hidden="true">
+        <!-- 40 bars with varying animation heights -->
+      </div>
+    </section>
+
+    <!-- ════════ SECTION 2: FEATURES ════════ -->
+    <section id="features" class="scroll-section" aria-label="Features">
+      <div class="features-header fade-blur">
+        <h2>See It In Action</h2>
+        <p>Screenshots captured from the running application</p>
+      </div>
+
+      <div class="screenshot-grid">
+        <figure class="screenshot-card fade-blur delay-1">
+          <img src="screenshots/library-view.png" alt="Library view showing folder tree and track list" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="placeholder" style="display:none" aria-hidden="true">♫</div>
+          <figcaption>Library — Folder navigation &amp; track list</figcaption>
+        </figure>
+
+        <figure class="screenshot-card fade-blur delay-2">
+          <img src="screenshots/player-view.png" alt="Now playing view with album art and waveform" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="placeholder" style="display:none" aria-hidden="true">▶</div>
+          <figcaption>Now Playing — Album art &amp; waveform</figcaption>
+        </figure>
+
+        <figure class="screenshot-card fade-blur delay-3">
+          <img src="screenshots/settings-view.png" alt="Settings view with theme and playback options" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="placeholder" style="display:none" aria-hidden="true">⚙</div>
+          <figcaption>Settings — Theme &amp; playback options</figcaption>
+        </figure>
+      </div>
+
+      <div class="feature-cards">
+        <article class="feature-card fade-blur delay-2">
+          <span class="icon" aria-hidden="true">📁</span>
+          <h3>Library Management</h3>
+          <p>Scan folders, browse folder trees, and search through your music collection.</p>
+        </article>
+        <article class="feature-card fade-blur delay-3">
+          <span class="icon" aria-hidden="true">🎵</span>
+          <h3>Waveform Visualization</h3>
+          <p>Real-time waveform progress bars generated from audio file data.</p>
+        </article>
+        <article class="feature-card fade-blur delay-4">
+          <span class="icon" aria-hidden="true">⌨</span>
+          <h3>Native Media Keys</h3>
+          <p>Full MediaSession API support — play, pause, next, previous from your OS.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ════════ SECTION 3: DOWNLOAD ════════ -->
+    <section id="download" class="scroll-section" aria-label="Download">
+      <div class="download-content">
+        <h2 class="fade-blur">Get Desktop Audio</h2>
+        <p class="fade-blur subtitle">Free and open source — download the latest release or browse the source.</p>
+
+        <div class="cta-group">
+          <a href="https://github.com/tuomashatakka/desktop-audio/releases/latest" class="cta-btn fade-blur delay-1" target="_blank" rel="noopener">
+            <span aria-hidden="true">↓</span> Download Latest Release
+          </a>
+          <a href="https://github.com/tuomashatakka/desktop-audio" class="cta-btn secondary fade-blur delay-2" target="_blank" rel="noopener">
+            View on GitHub
+          </a>
+        </div>
+
+        <div class="download-meta fade-blur delay-3">
+          <p>Built with <code>Electron</code> + <code>React</code> + <code>TypeScript</code></p>
+          <p>Version 1.0.0 · MIT License</p>
+        </div>
+      </div>
+
+      <footer class="download-footer">
+        <a href="https://github.com/tuomashatakka/desktop-audio/issues" target="_blank" rel="noopener">Report a Bug</a>
+        <a href="https://github.com/tuomashatakka/desktop-audio/blob/main/readme.md" target="_blank" rel="noopener">Readme</a>
+        <span>© tuomashatakka</span>
+      </footer>
+    </section>
+
+  </main>
+
+  <script>
+    // ── IntersectionObserver for scroll-triggered animations ──
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          const el = entry.target;
+          if (entry.isIntersecting) {
+            el.classList.add('visible');
+          }
+        });
+      },
+      { threshold: 0.15 }
+    );
+
+    document.querySelectorAll('#features .fade-blur, #download .fade-blur').forEach(el => {
+      observer.observe(el);
+    });
+
+    // ── Nav dot active state ──
+    const sections = document.querySelectorAll('.scroll-section');
+    const dots = document.querySelectorAll('.nav-dot');
+
+    const dotObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const id = entry.target.id;
+            dots.forEach(d => d.classList.toggle('active', d.getAttribute('href') === `#${id}`));
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    sections.forEach(s => dotObserver.observe(s));
+
+    // ── Generate waveform bars ──
+    const waveformContainer = document.querySelector('.hero-waveform');
+    if (waveformContainer) {
+      const barCount = 60;
+      for (let i = 0; i < barCount; i++) {
+        const bar = document.createElement('span');
+        bar.className = 'bar';
+        const h = 20 + Math.sin(i / barCount * Math.PI * 6) * 40 + Math.random() * 30;
+        bar.style.setProperty('--h', `${h}%`);
+        bar.style.animationDelay = `${i * 0.05}s`;
+        waveformContainer.appendChild(bar);
+      }
+    }
+  </script>
+</body>
+</html>

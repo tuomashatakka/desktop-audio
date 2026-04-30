@@ -167,7 +167,7 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  min-width: 200px;
+  width: clamp(180px, 25vw, 320px);
 }
 
 .player-bar-art {
@@ -193,7 +193,6 @@
 }
 
 .player-bar-info {
-  flex: 1;
   min-width: 0;
 }
 
@@ -218,8 +217,7 @@
 }
 
 .player-bar-progress {
-  flex: 1;
-  max-width: 600px;
+  width: clamp(240px, 40vw, 600px);
   display: flex;
   align-items: center;
   gap: var(--sp-2);
