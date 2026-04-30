@@ -139,6 +139,50 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
       }
     }, [])
 
+  // Push current playback state to OS native media controls (MPRIS on Linux)
+  const mediaStateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!bridge?.updateMediaState || !state.currentTrack)
+      return
+
+    if (mediaStateDebounceRef.current)
+      clearTimeout(mediaStateDebounceRef.current)
+
+    mediaStateDebounceRef.current = setTimeout(() => {
+      if (!state.currentTrack)
+        return
+      bridge.updateMediaState({
+        title:     state.currentTrack.title,
+        artist:    state.currentTrack.artist,
+        album:     state.currentTrack.album,
+        albumArt:  state.currentTrack.albumArt,
+        isPlaying: state.isPlaying,
+        position:  state.currentTime,
+        duration:  state.duration,
+      })
+    }, 500)
+
+    return () => {
+      if (mediaStateDebounceRef.current)
+        clearTimeout(mediaStateDebounceRef.current)
+    }
+  }, [ state.currentTrack, state.isPlaying, state.currentTime, state.duration ])
+
+  // Handle seek events forwarded from MPRIS (delta in microseconds)
+  useEffect(() => {
+    if (!bridge?.onMediaSeek)
+      return
+    return bridge.onMediaSeek((delta: number) => {
+      const audio = audioRef.current
+      if (!audio)
+        return
+      const newTime = Math.max(0, audio.currentTime + delta / 1e6)
+      audio.currentTime = newTime
+      setState(s =>
+        ({ ...s, currentTime: newTime }))
+    })
+  }, [])
+
   const setupAnalyzer = useCallback(() => {
     if (!audioRef.current)
       return analyzerRef.current

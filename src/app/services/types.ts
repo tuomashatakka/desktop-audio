@@ -38,3 +38,20 @@ export interface AudioMetadata {
   readonly year?:     number
   readonly genre?:    string
 }
+
+export interface SerializableMenuItem {
+  readonly label?:     string
+  readonly icon?:      string
+  readonly danger?:    boolean
+  readonly separator?: boolean
+}
+
+export interface MediaState {
+  readonly title:     string
+  readonly artist:    string
+  readonly album:     string
+  readonly albumArt?: string
+  readonly isPlaying: boolean
+  readonly position:  number
+  readonly duration:  number
+}

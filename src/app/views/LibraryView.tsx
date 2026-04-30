@@ -5,9 +5,24 @@ import { useLibraryScanner } from '../hooks'
 import { Input, PromptDialog } from '../components/atomic'
 import { FolderTree } from '../components/composite/FolderTree'
 import { TrackTable } from '../components/composite/TrackTable'
-import { ContextMenu } from '../components/composite/ContextMenu'
-import type { ContextMenuItem } from '../components/composite/ContextMenu'
+import bridge from '../services/contextBridge'
+import type { SerializableMenuItem } from '../services/types'
 
+
+const CONTEXT_MENU_ITEMS: SerializableMenuItem[] = [
+  { label: 'Play',            icon: '▶' },
+  { label: 'Add to Playlist', icon: '♩' },
+  { separator: true },
+  { label: 'Edit Tags',       icon: '✎' },
+]
+
+const ITEM_HEIGHT      = 32
+const SEPARATOR_HEIGHT = 9
+const PADDING          = 8
+const MENU_WIDTH       = 200
+const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(i => !i.separator).length * ITEM_HEIGHT
+                       + CONTEXT_MENU_ITEMS.filter(i =>  i.separator).length * SEPARATOR_HEIGHT
+                       + PADDING * 2
 
 // eslint-disable-next-line complexity
 export function LibraryView () {
@@ -20,10 +35,9 @@ export function LibraryView () {
   const [ foldersCollapsed, setFoldersCollapsed ] = useState(false)
   const [ playlistsCollapsed, setPlaylistsCollapsed ] = useState(false)
   const [ promptOpen, setPromptOpen ] = useState(false)
-  const [ contextRect, setContextRect ] = useState<DOMRect | null>(null)
-  const [ contextTrack, setContextTrack ] = useState<Track | null>(null)
   const [ headerVisible, setHeaderVisible ] = useState(true)
-  const lastScrollY = useRef(0)
+  const lastScrollY      = useRef(0)
+  const contextTrackRef  = useRef<Track | null>(null)
 
   const handleScroll = useCallback((e: Event) => {
     const el = e.target as HTMLElement
@@ -57,36 +71,41 @@ export function LibraryView () {
     toggleFolder(path)
   }
 
-  const handleTrackPlay = (track: Track, index: number) => {
+  const handleTrackPlay = useCallback((track: Track, index: number) => {
     selectTrack(index)
     play(track)
-  }
+  }, [ selectTrack, play ])
 
   const handleNewPlaylist = () =>
     setPromptOpen(true)
 
-  const handleContextMenu = (track: Track, rect: DOMRect) => {
-    setContextTrack(track)
-    setContextRect(rect)
-  }
+  const handleContextMenu = useCallback((track: Track, rect: DOMRect) => {
+    contextTrackRef.current = track
+    bridge?.showContextMenu(
+      CONTEXT_MENU_ITEMS,
+      window.screenX + rect.left,
+      window.screenY + rect.bottom + 4,
+      MENU_WIDTH,
+      MENU_HEIGHT,
+    )
+  }, [])
 
-  const contextMenuItems: readonly ContextMenuItem[] = contextTrack
-    ? [
-      { label:  'Play',
-        icon:   '▶',
-        action: () =>
-          handleTrackPlay(contextTrack, 0) },
-      { label:  'Add to Playlist',
-        icon:   '♩',
-        action: () =>
-          setPromptOpen(true) },
-      { separator: true },
-      { label:  'Edit Tags',
-        icon:   '✎',
-        action: () =>
-          setEditingTrack(contextTrack.id) },
-    ]
-    : []
+  useEffect(() => {
+    if (!bridge?.onContextMenuAction)
+      return
+    return bridge.onContextMenuAction((index: number) => {
+      const track = contextTrackRef.current
+      if (!track)
+        return
+      switch (index) {
+        case 0: handleTrackPlay(track, 0); break
+        case 1: setPromptOpen(true); break
+        // index 2 is the separator — no action
+        case 3: setEditingTrack(track.id); break
+      }
+      contextTrackRef.current = null
+    })
+  }, [ handleTrackPlay, setEditingTrack ])
 
   const displayTracks = useMemo(() => {
     if (selectedPlaylistId) {
@@ -222,14 +241,6 @@ export function LibraryView () {
           }
         </div>
       </section>
-
-      <ContextMenu
-        items={contextMenuItems}
-        anchorRect={contextRect}
-        onClose={() => {
-          setContextRect(null); setContextTrack(null)
-        }}
-      />
 
       <PromptDialog
         open={promptOpen}

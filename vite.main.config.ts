@@ -5,7 +5,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       // better-sqlite3 is a native .node module — must not be bundled
-      external: ['better-sqlite3'],
+      // mpris-service uses D-Bus bindings that must not be bundled
+      external: ['better-sqlite3', 'mpris-service'],
     },
   },
 });

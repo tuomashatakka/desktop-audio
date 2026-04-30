@@ -64,6 +64,7 @@
     "electron-squirrel-startup": "1.0.1",
     "eslint-plugin-functional": "9.0.4",
     "eslint-plugin-unicorn": "63.0.0",
+    "mpris-service": "^2.1.2",
     "music-metadata": "11.12.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
