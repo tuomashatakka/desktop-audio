@@ -14,7 +14,7 @@ export class ElectronBridge implements Bridge {
   }
 
   onLibraryBatch (cb: (t: TrackDTO[]) => void): () => void {
-    return (this._ipc?.onLibraryBatch(cb) as (() => void)) ?? (() => {})
+    return (this._ipc?.onLibraryBatch(cb as unknown as (t: unknown[]) => void) as (() => void)) ?? (() => {})
   }
 
   onLibraryDone (cb: () => void): () => void {

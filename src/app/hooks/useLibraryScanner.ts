@@ -87,10 +87,10 @@ export function useLibraryScanner () {
     let batchCount = 0
     const t0 = Date.now()
 
-    const unsubBatch = bridge.onLibraryBatch((batch: TrackDTO[]) => {
+    const unsubBatch = bridge.onLibraryBatch((batch: unknown[]) => {
       batchCount++
 
-      for (const t of batch)
+      for (const t of batch as TrackDTO[])
         trackMap.current.set(t.id, Track.fromDTO(t))
       log.debug(`⇘ batch #${batchCount} — ${batch.length} tracks (map size: ${trackMap.current.size})`)
       setTracks([ ...trackMap.current.values() ].sort((a, b) =>

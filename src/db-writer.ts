@@ -63,7 +63,7 @@ function upsert (kind: string, payload: Record<string, unknown>): void {
     return
 
   if (kind === 'track') {
-    const stmt = db.prepare(`
+    const stmt = (db as { prepare: (sql: string) => { run: (payload: Record<string, unknown>) => void } }).prepare(`
       INSERT OR REPLACE INTO tracks
       (id, path, title, artist, album, duration, format, size, cover_color, album_art, year, genre, track_number)
       VALUES (@id, @path, @title, @artist, @album, @duration, @format, @size, @coverColor, @albumArt, @year, @genre, @trackNumber)
@@ -78,7 +78,7 @@ function deleteModel (kind: string, id: string): void {
     return
 
   if (kind === 'track') {
-    db.prepare('DELETE FROM tracks WHERE id = ?').run(id)
+    (db as { prepare: (sql: string) => { run: (id: string) => void } }).prepare('DELETE FROM tracks WHERE id = ?').run(id)
   }
 }
 

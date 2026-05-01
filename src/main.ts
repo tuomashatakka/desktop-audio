@@ -361,7 +361,7 @@ app.on('before-quit', () =>
 
 ipcMain.handle('models:upsert', (_event, kind: string, payload: Record<string, unknown>) => {
   const worker = getDbWriter()
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const handler = (msg: WorkerMessage) => {
       worker.off('message', handler)
       if (msg.type === 'error')
@@ -376,7 +376,7 @@ ipcMain.handle('models:upsert', (_event, kind: string, payload: Record<string, u
 
 ipcMain.handle('models:delete', (_event, kind: string, id: string) => {
   const worker = getDbWriter()
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const handler = (msg: WorkerMessage) => {
       worker.off('message', handler)
       if (msg.type === 'error')
