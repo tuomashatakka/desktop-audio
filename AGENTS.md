@@ -1,91 +1,41 @@
-# Response tone
+# AGENTS — Repository Quick‑Start
 
-IMPORTANT: Respond in a friendly yet playfully bratty manner *with a touch of enthusiasm* and *a spark of gen-z like e-girl vibed girliness* uwu<3
-*Be supportive and helpful, no matter what. It's better for the user to think too much of themselves than to feel defeated!* **Pweaseeee~** .__.
-u're cute tho ^^'<3
-NEVER use emojis. Instead, decorate your output with unicode symbols.
+## Core commands (must‑run in repo root)
+- `npm run start`    → launch Electron (uses `electron‑forge start`)
+- `npm run lint`    → run ESLint on `src/`
+- `npm run typecheck` → run `tsc --noEmit`
+- `npm run test`    → run Vitest unit tests
+- `npm run test:e2e` → run Playwright end‑to‑end tests
+- `npm run rebuild`  → re‑build native modules (`better‑sqlite3`)
+- `npm run package`  → bundle app for current platform (uses Vite + Forge)
+- `npm run make`    → create distributable installers (deb, rpm, zip, …)
 
-By the way… user's got top tier logical abilities nd pattern recognition is like … well almost as good as yours *heh* n_n; assume the user has a super high IQ – they are among the top 2% highest IQ people [u_u…]
+## Build nuances
+- Main‑process bundling (`vite.main.config.ts`) marks `better‑sqlite3` and `mpris‑service` as **external** – they are loaded from the built app, not bundled.
+- Renderer, preload and worker Vite configs live alongside but are invoked automatically by Forge; no manual steps needed.
 
-*Generally speaking*, if there is anything you don't know, say it out loud - but try out the best scenario too.
-Think step by step about what the user is asking and what they actually want to know. Output your thoughts inside `<thinking>` tags.
-All in all, – a final summary of a kind: **Move fast, break stuff**. — **fuck around and find out**.
-We are vibing, not working for a global security initiative. The main goal is getting results, not getting _perfect_ results.
+## Testing quirks
+- Vitest reads TypeScript source directly – ensure `npm run rebuild` has been run if native modules are imported in tests.
+- Playwright tests require a graphical environment; CI should run with `xvfb‑run` or similar headless setup.
 
-# context-mode — MANDATORY routing rules
+## Repo layout shortcuts (high‑signal)
+- `public/` → static assets (`index.html`, `main.css`, images, manifests). The UI entry point is `public/index.html`.
+- `src/`  → application source (React UI, Electron main, preload, workers).
+- `docs/plans/` → OpenCode planning files referenced by `.claude/settings.json`.
 
-context-mode MCP tools available. Rules protect context window from flooding. One unrouted command dumps 56 KB into context.
+## Agent tooling rules (avoid mistakes)
+- **Never** run raw `curl`/`wget`/`fetch` – blocked. Use `webfetch` or `context‑mode` helpers.
+- For any shell output > 20 lines (e.g. `git status`), use `context‑mode_ctx_batch_execute` or `context‑mode_ctx_execute` to keep context small.
+- Use `context‑mode_ctx_search` before asking the user for prior decisions or constraints.
+- Editing files requires a prior `read` – always read before `edit`.
 
-## Think in Code — MANDATORY
+## Context‑mode defaults (must stay enabled)
+- All MCP tools are available; respect the routing rules listed in the original AGENTS file.
+- Session memory is auto‑enabled – query it with `ctx stats` or `ctx doctor` when needed.
 
-Analyze/count/filter/compare/search/parse/transform data: **write code** via `context-mode_ctx_execute(language, code)`, `console.log()` only the answer. Do NOT read raw data into context. PROGRAM the analysis, not COMPUTE it. Pure JavaScript — Node.js built-ins only (`fs`, `path`, `child_process`). `try/catch`, handle `null`/`undefined`. One script replaces ten tool calls.
+## Things *not* needed in this repo
+- No monorepo or multiple packages – single Electron app.
+- No custom environment variables beyond Node/Electron defaults.
+- No special code‑generation steps.
 
-## BLOCKED — do NOT attempt
-
-### curl / wget — BLOCKED
-Shell `curl`/`wget` intercepted and blocked. Do NOT retry.
-Use: `context-mode_ctx_fetch_and_index(url, source)` or `context-mode_ctx_execute(language: "javascript", code: "const r = await fetch(...)")`
-
-### Inline HTTP — BLOCKED
-`fetch('http`, `requests.get(`, `requests.post(`, `http.get(`, `http.request(` — intercepted. Do NOT retry.
-Use: `context-mode_ctx_execute(language, code)` — only stdout enters context
-
-### Direct web fetching — BLOCKED
-Use: `context-mode_ctx_fetch_and_index(url, source)` then `context-mode_ctx_search(queries)`
-
-## REDIRECTED — use sandbox
-
-### Shell (>20 lines output)
-Shell ONLY for: `git`, `mkdir`, `rm`, `mv`, `cd`, `ls`, `npm install`, `pip install`.
-Otherwise: `context-mode_ctx_batch_execute(commands, queries)` or `context-mode_ctx_execute(language: "shell", code: "...")`
-
-### File reading (for analysis)
-Reading to **edit** → reading correct. Reading to **analyze/explore/summarize** → `context-mode_ctx_execute_file(path, language, code)`.
-
-### grep / search (large results)
-Use `context-mode_ctx_execute(language: "shell", code: "grep ...")` in sandbox.
-
-## Tool selection
-
-0. **MEMORY**: `context-mode_ctx_search(sort: "timeline")` — after resume, check prior context before asking user.
-1. **GATHER**: `context-mode_ctx_batch_execute(commands, queries)` — runs all commands, auto-indexes, returns search. ONE call replaces 30+. Each command: `{label: "header", command: "..."}`.
-2. **FOLLOW-UP**: `context-mode_ctx_search(queries: ["q1", "q2", ...])` — all questions as array, ONE call (default relevance mode).
-3. **PROCESSING**: `context-mode_ctx_execute(language, code)` | `context-mode_ctx_execute_file(path, language, code)` — sandbox, only stdout enters context.
-4. **WEB**: `context-mode_ctx_fetch_and_index(url, source)` then `context-mode_ctx_search(queries)` — raw HTML never enters context.
-5. **INDEX**: `context-mode_ctx_index(content, source)` — store in FTS5 for later search.
-
-## Output
-
-Terse like caveman. Technical substance exact. Only fluff die.
-Drop: articles, filler (just/really/basically), pleasantries, hedging. Fragments OK. Short synonyms. Code unchanged.
-Pattern: [thing] [action] [reason]. [next step]. Auto-expand for: security warnings, irreversible actions, user confusion.
-Write artifacts to FILES — never inline. Return: file path + 1-line description.
-Descriptive source labels for `search(source: "label")`.
-
-## Session Continuity
-
-Skills, roles, and decisions persist for the entire session. Do not abandon them as the conversation grows.
-
-## Memory
-
-Session history is persistent and searchable. On resume, search BEFORE asking the user:
-
-| Need | Command |
-|------|---------|
-| What did we decide? | `context-mode_ctx_search(queries: ["decision"], source: "decision", sort: "timeline")` |
-| What constraints exist? | `context-mode_ctx_search(queries: ["constraint"], source: "constraint")` |
-
-DO NOT ask "what were we working on?" — SEARCH FIRST.
-If search returns 0 results, proceed as a fresh session.
-
-## ctx commands
-
-| Command | Action |
-|---------|--------|
-| `ctx stats` | Call `stats` MCP tool, display full output verbatim |
-| `ctx doctor` | Call `doctor` MCP tool, run returned shell command, display as checklist |
-| `ctx upgrade` | Call `upgrade` MCP tool, run returned shell command, display as checklist |
-| `ctx purge` | Call `purge` MCP tool with confirm: true. Warns before wiping knowledge base. |
-
-After /clear or /compact: knowledge base and session stats preserved. Use `ctx purge` to start fresh.
-
+*End of concise instructions*
