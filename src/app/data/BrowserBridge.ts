@@ -12,7 +12,7 @@ export class BrowserBridge implements Bridge {
     return Array.from(this.tracks.values())
   }
 
-  onLibraryBatch(_cb: (t: TrackDTO[]) => void): () => void {
+  onLibraryBatch(_cb: (t: unknown[]) => void): () => void {
     return () => {}
   }
 

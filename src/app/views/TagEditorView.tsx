@@ -5,10 +5,10 @@ import { Button, Input } from '../components/atomic'
 
 export function TagEditorView () {
   const { setView, editingTrackId } = useUI()
-  const { tracks } = useLibrary()
+  const { registry } = useLibrary()
 
-  const track = tracks.find(t =>
-    t.id === editingTrackId) || tracks[0]
+  const track = registry.getAllTracks().find(t =>
+    t.id === editingTrackId) || registry.getAllTracks()[0]
 
   const [ formData, setFormData ] = useState({
     title:  track?.title || '',

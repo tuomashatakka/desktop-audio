@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { FolderEntry } from '../../src/app/models/FolderEntry'
 
-describe.skip('FolderEntry model', () => {
+describe('FolderEntry model', () => {
   it('creates from folder node', () => {
     const node = {
       id: 'folder-1',

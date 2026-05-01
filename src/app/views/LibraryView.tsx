@@ -26,12 +26,14 @@ const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(i => !i.separator).length * I
 
 // eslint-disable-next-line complexity
 export function LibraryView () {
-  const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist, sidebarOpen, toggleSidebar, setEditingTrack } = useUI()
-  const { folders, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, isLoading, toggleFolder } = useLibrary()
+  const { sidebarOpen, toggleSidebar, setEditingTrack, selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist } = useUI()
+  const { registry, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, isLoading, toggleFolder } = useLibrary()
   const { play, currentTrack, isPlaying } = useAudio()
   const { libraryPaths } = useSettings()
   const { scanLibrary } = useLibraryScanner()
   const bridge = useBridge()
+
+  const folders = registry.folders
 
   const [ foldersCollapsed, setFoldersCollapsed ] = useState(false)
   const [ playlistsCollapsed, setPlaylistsCollapsed ] = useState(false)
@@ -59,10 +61,10 @@ export function LibraryView () {
       : 'Library'
 
   useEffect(() => {
-    if (libraryPaths.length > 0 && folders.length === 0) {
+    if (libraryPaths.length > 0) {
       scanLibrary()
     }
-  }, [ libraryPaths, folders.length, scanLibrary ])
+  }, [ libraryPaths, scanLibrary ])
 
   const handleFolderSelect = (path: string) => {
     selectFolder(path)
@@ -137,7 +139,7 @@ export function LibraryView () {
 
           {!foldersCollapsed &&
             <FolderTree
-              folders={folders}
+              folders={Array.from(registry.folders.values()) as unknown as { id: string; name: string; path: string; children: readonly { id: string; name: string; path: string; children: readonly any[]; expanded: boolean }[]; expanded: boolean }[]}
               selectedPath={selectedFolderPath}
               onSelect={handleFolderSelect}
               onToggle={handleFolderToggle}

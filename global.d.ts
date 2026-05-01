@@ -34,9 +34,9 @@ declare global {
     readonly updateMediaState: (state: MediaState) => void
     readonly onMediaSeek:      (cb: (delta: number) => void) => () => void
 
-    // Write IPC (new)
-    readonly upsertModel?: (kind: string, payload: Record<string, unknown>) => void
-    readonly deleteModel?: (kind: string, id: string) => void
+    // Write IPC
+    readonly upsertModel: (kind: string, payload: Record<string, unknown>) => void
+    readonly deleteModel: (kind: string, id: string) => void
   }
 
   interface Window {

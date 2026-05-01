@@ -4,7 +4,7 @@ export interface Bridge {
   // Library
   scanLibrary(paths: string[]): void
   loadLibrary(): Promise<readonly TrackDTO[]>
-  onLibraryBatch(cb: (t: TrackDTO[]) => void): () => void
+  onLibraryBatch(cb: (t: unknown[]) => void): () => void
   onLibraryDone(cb: () => void): () => void
 
   // Files

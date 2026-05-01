@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { Track } from '../../src/app/models/Track'
 import type { TrackDTO } from '../../src/app/services/types'
 
-describe.skip('Track model', () => {
+describe('Track model', () => {
   it('creates from DTO', () => {
     const dto: TrackDTO = {
       id: 'track-1',

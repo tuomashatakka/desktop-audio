@@ -68,7 +68,7 @@ function TestConsumer () {
   )
 }
 
-describe.skip('SettingsContext', () => {
+describe('SettingsContext', () => {
   beforeEach(() => {
     vi.stubGlobal('localStorage', localStorageMock)
     localStorageMock.getItem.mockReturnValue(null)

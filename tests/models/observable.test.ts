@@ -23,7 +23,7 @@ class TestModel extends Model {
   }
 }
 
-describe.skip('Model dirty tracking', () => {
+describe('Model dirty tracking', () => {
   it('marks model dirty when property changes', () => {
     const model = new TestModel('test-id')
     model['_value'] = 'initial'

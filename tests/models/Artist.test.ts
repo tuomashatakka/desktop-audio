@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { Track } from '../../src/app/models/Track'
 import { Artist, ArtistIndex } from '../../src/app/models/Artist'
 
-describe.skip('Artist model', () => {
+describe('Artist model', () => {
   it('creates with name', () => {
     const artist = new Artist('Test Artist')
     expect(artist.name).toBe('Test Artist')
@@ -16,7 +16,7 @@ describe.skip('Artist model', () => {
   })
 })
 
-describe.skip('ArtistIndex', () => {
+describe('ArtistIndex', () => {
   it('adds tracks and groups by artist', () => {
     const index = new ArtistIndex()
     const track1 = new Track('1')

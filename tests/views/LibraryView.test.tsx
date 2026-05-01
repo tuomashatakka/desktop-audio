@@ -3,7 +3,7 @@ import { LibraryView } from '../../src/app/views/LibraryView'
 import { describe, it, expect } from 'vitest'
 import { renderWithProviders } from '../helpers/renderWithProviders'
 
-describe.skip('LibraryView', () => {
+describe('LibraryView', () => {
   it('renders library view', () => {
     renderWithProviders(<LibraryView />)
 

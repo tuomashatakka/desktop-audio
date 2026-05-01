@@ -13,7 +13,7 @@ class TestModel extends Model {
   }
 }
 
-describe.skip('Model base class', () => {
+describe('Model base class', () => {
   it('has id property', () => {
     const model = new TestModel('test-id')
     expect(model.id).toBe('test-id')

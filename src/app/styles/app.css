@@ -1,12 +1,34 @@
-.app-layout {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100vh;
-  overflow: hidden;
-  background: var(--bg-window);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+.app-shell {
+   display: grid;
+   grid-template-areas:
+     "titlebar titlebar"
+     "sidebar  main"
+     "player   player";
+   grid-template-columns: auto 1fr;
+   grid-template-rows: 40px 1fr auto;
+   width: 100%;
+   height: 100vh;
+   overflow: hidden;
+   background: var(--bg-window);
+   backdrop-filter: blur(20px);
+   -webkit-backdrop-filter: blur(20px);
+}
+
+.app-body {
+   display: contents;
+}
+
+.app-sidebar {
+   grid-area: sidebar;
+}
+
+.app-main {
+   grid-area: main;
+   overflow: auto;
+}
+
+.app-player {
+   grid-area: player;
 }
 
 .titlebar {
@@ -108,12 +130,7 @@
   }
 }
 
-.main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
+/* .main-content removed - now using .app-shell grid layout */
 
 .view-header {
   position: sticky;

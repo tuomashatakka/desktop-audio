@@ -87,4 +87,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () =>
       ipcRenderer.removeListener('media:seek', h)
   },
+
+  // Write IPC
+  upsertModel: (kind: string, payload: Record<string, unknown>) => {
+    ipcRenderer.send('models:upsert', kind, payload)
+  },
+  deleteModel: (kind: string, id: string) => {
+    ipcRenderer.send('models:delete', kind, id)
+  },
 })

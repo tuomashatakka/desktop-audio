@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { Track } from '../../src/app/models/Track'
 import { Album, AlbumIndex } from '../../src/app/models/Album'
 
-describe.skip('Album model', () => {
+describe('Album model', () => {
   it('creates with title and artist', () => {
     const album = new Album('Test Album', 'Test Artist', 2024, '#ff0000', 'art-url')
     expect(album.title).toBe('Test Album')
@@ -32,7 +32,7 @@ describe.skip('Album model', () => {
   })
 })
 
-describe.skip('AlbumIndex', () => {
+describe('AlbumIndex', () => {
   it('adds tracks and groups by album+artist', () => {
     const index = new AlbumIndex()
     const track1 = new Track('1')
