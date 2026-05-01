@@ -20,8 +20,8 @@ function generateId (): string {
     .slice(2, 11)
 }
 
-function buildFolderTree (rootPaths: string[], files: string[]): { id: string; name: string; path: string; children: any[]; expanded: boolean }[] {
-  const nodes: { id: string; name: string; path: string; children: any[]; expanded: boolean }[] = []
+function buildFolderTree (rootPaths: string[], files: string[]): FolderEntry[] {
+  const nodes: FolderEntry[] = []
 
   for (const rootPath of rootPaths) {
     const rootFiles = files.filter(f =>
@@ -46,17 +46,17 @@ function buildFolderTree (rootPaths: string[], files: string[]): { id: string; n
       }
     }
 
-    function buildNode (nodePath: string, isRoot: boolean): { id: string; name: string; path: string; children: any[]; expanded: boolean } {
+    function buildNode (nodePath: string, isRoot: boolean): FolderEntry {
       const childPaths = childrenMap.get(nodePath) ?? []
       const name = nodePath.split(/[/\\]/).pop() || nodePath
-      return {
+      return FolderEntry.fromFolderNode({
         id:       generateId(),
         name,
         path:     nodePath,
         children: childPaths.map(p =>
           buildNode(p, false)),
         expanded: isRoot,
-      }
+      })
     }
 
     nodes.push(buildNode(rootPath, true))
@@ -87,11 +87,11 @@ export function useLibraryScanner () {
     let batchCount = 0
     const t0 = Date.now()
 
-    const unsubBatch = bridge.onLibraryBatch((batch: unknown[]) => {
+    const unsubBatch = bridge.onLibraryBatch((batch: TrackDTO[]) => {
       batchCount++
 
-      for (const t of batch as TrackDTO[])
-        trackMap.current.set(t.id, t as unknown as Track)
+      for (const t of batch)
+        trackMap.current.set(t.id, Track.fromDTO(t))
       log.debug(`⇘ batch #${batchCount} — ${batch.length} tracks (map size: ${trackMap.current.size})`)
       setTracks([ ...trackMap.current.values() ].sort((a, b) =>
         a.title.localeCompare(b.title)))
@@ -102,7 +102,7 @@ export function useLibraryScanner () {
       const folderData = buildFolderTree(libraryPathsRef.current as string[], allTracks.map(t =>
         t.path))
       log.info(`✓ scan done — ${allTracks.length} tracks · ${folderData.length} root(s) · ◴ ${Date.now() - t0}ms`)
-      setFolders(folderData as any)
+      setFolders(folderData)
       setLoading(false)
     })
     return () => {

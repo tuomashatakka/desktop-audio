@@ -13,8 +13,8 @@ export class ElectronBridge implements Bridge {
     return (this._ipc?.loadLibrary() as Promise<readonly TrackDTO[]>) ?? Promise.resolve([])
   }
 
-  onLibraryBatch (cb: (t: unknown[]) => void): () => void {
-    return this._ipc?.onLibraryBatch(cb as any) ?? (() => {})
+  onLibraryBatch (cb: (t: TrackDTO[]) => void): () => void {
+    return (this._ipc?.onLibraryBatch(cb) as (() => void)) ?? (() => {})
   }
 
   onLibraryDone (cb: () => void): () => void {

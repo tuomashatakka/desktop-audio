@@ -41,12 +41,12 @@ export function LibrarySidebar () {
         </button>
 
         {!foldersCollapsed &&
-          <FolderTree
-            folders={folders as unknown as { id: string; name: string; path: string; children: readonly { id: string; name: string; path: string; children: readonly any[]; expanded: boolean }[]; expanded: boolean }[]}
-            selectedPath={selectedFolderPath}
-            onSelect={handleFolderSelect}
-            onToggle={handleFolderToggle}
-          />
+        <FolderTree
+          folders={folders}
+          selectedPath={selectedFolderPath}
+          onSelect={handleFolderSelect}
+          onToggle={handleFolderToggle}
+        />
         }
       </div>
 

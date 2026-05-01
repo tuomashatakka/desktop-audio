@@ -11,9 +11,7 @@ interface WriteMessage {
 }
 
 // Lazy-load sqlite
-let db: any = null
-
-function getDB (): any {
+function getDB (): unknown {
   if (db)
     return db
 
@@ -36,8 +34,11 @@ function getDB (): any {
   return db
 }
 
-function initSchema (db: any): void {
-  db.exec(`
+// eslint-disable-next-line functional/no-let
+let db: unknown = null
+
+function initSchema (db: unknown): void {
+  (db as { exec: (sql: string) => void }).exec(`
     CREATE TABLE IF NOT EXISTS tracks (
       id TEXT PRIMARY KEY,
       path TEXT UNIQUE NOT NULL,

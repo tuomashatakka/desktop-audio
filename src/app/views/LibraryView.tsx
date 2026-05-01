@@ -140,7 +140,7 @@ export function LibraryView () {
 
           {!foldersCollapsed &&
             <FolderTree
-              folders={Array.from(registry.folders.values()) as unknown as { id: string; name: string; path: string; children: readonly { id: string; name: string; path: string; children: readonly any[]; expanded: boolean }[]; expanded: boolean }[]}
+              folders={Array.from(registry.folders.values())}
               selectedPath={selectedFolderPath}
               onSelect={handleFolderSelect}
               onToggle={handleFolderToggle}
