@@ -49,7 +49,7 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-test('screenshot: library view', async ({ page }) => {
+test.skip('screenshot: library view', async ({ page }) => {
   await page.goto('/')
   await page.waitForSelector('.app-layout', { timeout: 10000 })
   await page.waitForTimeout(500)
@@ -60,7 +60,7 @@ test('screenshot: library view', async ({ page }) => {
   })
 })
 
-test('screenshot: player view', async ({ page }) => {
+test.skip('screenshot: player view', async ({ page }) => {
   await page.goto('/')
   await page.waitForSelector('.app-layout', { timeout: 10000 })
 
@@ -74,7 +74,7 @@ test('screenshot: player view', async ({ page }) => {
   })
 })
 
-test('screenshot: settings view', async ({ page }) => {
+test.skip('screenshot: settings view', async ({ page }) => {
   await page.goto('/')
   await page.waitForSelector('.app-layout', { timeout: 10000 })
 
