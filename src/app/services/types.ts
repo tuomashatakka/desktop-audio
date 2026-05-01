@@ -14,6 +14,8 @@ export interface Track {
   readonly trackNumber?: number
 }
 
+export type TrackDTO = Track
+
 export interface FolderNode {
   readonly id:       string
   readonly name:     string

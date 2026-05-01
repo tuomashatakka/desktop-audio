@@ -5,7 +5,7 @@ import { useLibraryScanner } from '../hooks'
 import { Input, PromptDialog } from '../components/atomic'
 import { FolderTree } from '../components/composite/FolderTree'
 import { TrackTable } from '../components/composite/TrackTable'
-import bridge from '../services/contextBridge'
+import { useBridge } from '../data'
 import type { SerializableMenuItem } from '../services/types'
 
 
@@ -31,6 +31,7 @@ export function LibraryView () {
   const { play, currentTrack, isPlaying } = useAudio()
   const { libraryPaths } = useSettings()
   const { scanLibrary } = useLibraryScanner()
+  const bridge = useBridge()
 
   const [ foldersCollapsed, setFoldersCollapsed ] = useState(false)
   const [ playlistsCollapsed, setPlaylistsCollapsed ] = useState(false)
@@ -81,18 +82,16 @@ export function LibraryView () {
 
   const handleContextMenu = useCallback((track: Track, rect: DOMRect) => {
     contextTrackRef.current = track
-    bridge?.showContextMenu(
+    bridge.showContextMenu(
       CONTEXT_MENU_ITEMS,
       window.screenX + rect.left,
       window.screenY + rect.bottom + 4,
       MENU_WIDTH,
       MENU_HEIGHT,
     )
-  }, [])
+  }, [ bridge ])
 
   useEffect(() => {
-    if (!bridge?.onContextMenuAction)
-      return
     return bridge.onContextMenuAction((index: number) => {
       const track = contextTrackRef.current
       if (!track)
@@ -105,7 +104,7 @@ export function LibraryView () {
       }
       contextTrackRef.current = null
     })
-  }, [ handleTrackPlay, setEditingTrack ])
+  }, [ handleTrackPlay, setEditingTrack, bridge ])
 
   const displayTracks = useMemo(() => {
     if (selectedPlaylistId) {

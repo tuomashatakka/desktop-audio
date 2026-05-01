@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useLibrary, useSettings, useAudio } from '../contexts'
 import type { Track, FolderNode } from '../services'
-import bridge from '../services/contextBridge'
-
+import { useBridge } from '../data'
 
 const log = {
   info: (msg: string) =>
@@ -66,6 +65,7 @@ export function useLibraryScanner () {
   const { setFolders, setTracks, setLoading } = useLibrary()
   const { libraryPaths } = useSettings()
   const { play } = useAudio()
+  const bridge = useBridge()
 
   const trackMap = useRef(new Map<string, Track>())
   const libraryPathsRef = useRef(libraryPaths)
@@ -105,7 +105,7 @@ export function useLibraryScanner () {
       unsubBatch()
       unsubDone()
     }
-  }, [])
+  }, [ bridge ])
 
   // DB hydration — runs once on mount for instant startup
   useEffect(() => {
@@ -122,7 +122,7 @@ export function useLibraryScanner () {
     })
       .catch(err =>
         console.error('[useLibraryScanner] DB load failed:', err))
-  }, [])
+  }, [ bridge ])
 
   const scanLibrary = useCallback(() => {
     if (libraryPaths.length === 0)
@@ -131,7 +131,7 @@ export function useLibraryScanner () {
     trackMap.current.clear()
     setLoading(true)
     bridge.scanLibrary([ ...libraryPaths ])
-  }, [ libraryPaths, setLoading ])
+  }, [ libraryPaths, setLoading, bridge ])
 
   const addAndScan = useCallback(async () =>
     await bridge.selectDirectory() ?? null, [])

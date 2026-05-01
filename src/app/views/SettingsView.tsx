@@ -1,11 +1,11 @@
 import { useSettings } from '../contexts'
 import type { RepeatMode, Theme } from '../contexts'
-import bridge from '../services/contextBridge'
+import { useBridge } from '../data'
 import { Button } from '../components/atomic'
-
 
 export function SettingsView () {
   const { libraryPaths, theme, volume, repeatMode, addLibraryPath, removeLibraryPath, setTheme, setVolume, setRepeatMode } = useSettings()
+  const bridge = useBridge()
 
   const handleAddPath = async () => {
     const path = await bridge.selectDirectory()
@@ -28,21 +28,21 @@ export function SettingsView () {
             {libraryPaths.length === 0
               ? <p className='status-message'>No library paths added</p>
               : <div className='path-list stack sm'>
-                {libraryPaths.map(path =>
-                  <div key={path} className='path-item'>
-                    <span>{path}</span>
+                  {libraryPaths.map(path =>
+                    <div key={path} className='path-item'>
+                      <span>{path}</span>
 
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      onClick={() =>
-                        removeLibraryPath(path)}
-                    >
-                      ×
-                    </Button>
-                  </div>
-                )}
-              </div>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        onClick={() =>
+                          removeLibraryPath(path)}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  )}
+                </div>
             }
 
             <Button variant='secondary' onClick={handleAddPath}>Add Folder</Button>

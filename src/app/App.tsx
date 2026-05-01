@@ -6,7 +6,7 @@ import { SettingsView } from './views/SettingsView'
 import { TagEditorView } from './views/TagEditorView'
 import { PlayerBar } from './components/composite/PlayerBar'
 import { useKeyboardShortcuts } from './hooks'
-import bridge from './services/contextBridge'
+import { useBridge } from './data'
 
 
 function AppContent () {
@@ -15,6 +15,7 @@ function AppContent () {
   const { theme } = useSettings()
   const [ isAnimating, setIsAnimating ] = useState(false)
   const [ showExpanded, setShowExpanded ] = useState(false)
+  const bridge = useBridge()
 
   // All hooks must be called unconditionally before any early return
   useKeyboardShortcuts()
@@ -97,7 +98,7 @@ function AppContent () {
           <button
             className='titlebar-btn'
             onClick={() =>
-              bridge?.minimizeWindow()}
+              bridge.minimizeWindow()}
             aria-label='Minimize'
           >
             ─
@@ -106,7 +107,7 @@ function AppContent () {
           <button
             className='titlebar-btn'
             onClick={() =>
-              bridge?.maximizeWindow()}
+              bridge.maximizeWindow()}
             aria-label='Maximize'
           >
             □
@@ -115,7 +116,7 @@ function AppContent () {
           <button
             className='titlebar-btn titlebar-btn-close'
             onClick={() =>
-              bridge?.closeWindow()}
+              bridge.closeWindow()}
             aria-label='Close'
           >
             ✕
