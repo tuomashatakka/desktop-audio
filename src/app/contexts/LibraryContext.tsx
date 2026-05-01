@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useMemo } from 'react'
-import type { Track, Playlist } from '../services/types'
+import { ModelRegistry, Track, FolderEntry } from '../models'
+import type { Playlist } from '../services/types'
 
 
 export type { Track, Playlist } from '../services/types'
@@ -14,8 +15,7 @@ export interface FolderNode {
 }
 
 interface LibraryState {
-  readonly folders:            readonly FolderNode[]
-  readonly tracks:             readonly Track[]
+  readonly registry:           ModelRegistry
   readonly playlists:          readonly Playlist[]
   readonly searchQuery:        string
   readonly selectedTrackIndex: number | null
@@ -23,38 +23,47 @@ interface LibraryState {
 }
 
 interface LibraryContextValue extends LibraryState {
-  readonly setFolders:          (folders: readonly FolderNode[]) => void
-  readonly setTracks:           (tracks: readonly Track[]) => void
+  readonly setFolders:          (folders: FolderEntry[]) => void
+  readonly setTracks:           (tracks: Track[]) => void
   readonly setSearchQuery:      (query: string) => void
   readonly selectTrack:         (index: number | null) => void
   readonly toggleFolder:        (path: string) => void
   readonly setLoading:          (loading: boolean) => void
-  readonly filteredTracks:      readonly Track[]
+  readonly filteredTracks:      Track[]
   readonly addPlaylist:         (name: string) => void
   readonly removePlaylist:      (id: string) => void
-  readonly addTracksToPlaylist: (playlistId: string, tracks: readonly Track[]) => void
+  readonly addTracksToPlaylist: (playlistId: string, tracks: Track[]) => void
 }
 
 const LibraryContext = createContext<LibraryContextValue | null>(null)
 
 export function LibraryProvider ({ children }: { readonly children: ReactNode }) {
   const [ state, setState ] = useState<LibraryState>({
-    folders:            [],
-    tracks:             [],
+    registry:           new ModelRegistry(),
     playlists:          [],
     searchQuery:        '',
     selectedTrackIndex: null,
     isLoading:          false,
   })
 
-  const setFolders = useCallback((folders: readonly FolderNode[]) => {
-    setState(s =>
-      ({ ...s, folders }))
+  const setFolders = useCallback((folders: FolderEntry[]) => {
+    setState(s => {
+      const newRegistry = new ModelRegistry()
+      for (const track of s.registry.getAllTracks())
+        newRegistry.addTrack(track)
+      for (const folder of folders)
+        newRegistry.addFolder(folder)
+      return { ...s, registry: newRegistry }
+    })
   }, [])
 
-  const setTracks = useCallback((tracks: readonly Track[]) => {
-    setState(s =>
-      ({ ...s, tracks }))
+  const setTracks = useCallback((tracks: Track[]) => {
+    setState(s => {
+      const newRegistry = new ModelRegistry()
+      for (const track of tracks)
+        newRegistry.addTrack(track)
+      return { ...s, registry: newRegistry }
+    })
   }, [])
 
   const setSearchQuery = useCallback((query: string) => {
@@ -68,11 +77,25 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
   }, [])
 
   const toggleFolder = useCallback((path: string) => {
-    setState(s =>
-      ({
-        ...s,
-        folders: toggleFolderInTree(s.folders, path),
-      }))
+    setState(s => {
+      const newRegistry = new ModelRegistry()
+      for (const track of s.registry.getAllTracks())
+        newRegistry.addTrack(track)
+      for (const [ id, folder ] of s.registry.folders) {
+        if (folder.path === path) {
+          const updated = new FolderEntry(folder.id)
+          updated.name = folder.name
+          updated.path = folder.path
+          updated.children = [ ...folder.children ]
+          updated.expanded = !folder.expanded
+          newRegistry.addFolder(updated)
+        }
+        else {
+          newRegistry.addFolder(folder)
+        }
+      }
+      return { ...s, registry: newRegistry }
+    })
   }, [])
 
   const setLoading = useCallback((loading: boolean) => {
@@ -94,7 +117,17 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
           p.id !== id) }))
   }, [])
 
-  const addTracksToPlaylist = useCallback((playlistId: string, tracks: readonly Track[]) => {
+  const selectFolder = useCallback((path: string | null) => {
+    setState(s =>
+      ({ ...s }))
+  }, [])
+
+  const selectPlaylist = useCallback((id: string | null) => {
+    setState(s =>
+      ({ ...s }))
+  }, [])
+
+  const addTracksToPlaylist = useCallback((playlistId: string, tracks: Track[]) => {
     setState(s =>
       ({
         ...s,
@@ -109,18 +142,19 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
   }, [])
 
   const filteredTracks = useMemo(() => {
+    const tracks = state.registry.getAllTracks()
     if (!state.searchQuery.trim()) {
-      return state.tracks
+      return tracks
     }
 
     const query = state.searchQuery.toLowerCase()
-    return state.tracks.filter(
+    return tracks.filter(
       track =>
         track.title.toLowerCase().includes(query) ||
         track.artist.toLowerCase().includes(query) ||
         track.album.toLowerCase().includes(query)
     )
-  }, [ state.tracks, state.searchQuery ])
+  }, [ state.registry, state.searchQuery ])
 
   return (
     <LibraryContext.Provider
@@ -141,18 +175,6 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
       {children}
     </LibraryContext.Provider>
   )
-}
-
-function toggleFolderInTree (folders: readonly FolderNode[], path: string): FolderNode[] {
-  return folders.map(folder => {
-    if (folder.path === path) {
-      return { ...folder, expanded: !folder.expanded }
-    }
-    if (folder.children.length > 0) {
-      return { ...folder, children: toggleFolderInTree(folder.children, path) }
-    }
-    return folder
-  })
 }
 
 export function useLibrary () {

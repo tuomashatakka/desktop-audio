@@ -7,7 +7,8 @@ contextBridge.exposeInMainWorld('contextMenuAPI', {
     const handler = (_: Electron.IpcRendererEvent, items: SerializableMenuItem[]) =>
       cb(items)
     ipcRenderer.on('contextmenu:items', handler)
-    return () => ipcRenderer.removeListener('contextmenu:items', handler)
+    return () =>
+      ipcRenderer.removeListener('contextmenu:items', handler)
   },
 
   sendContextMenuAction: (index: number) =>

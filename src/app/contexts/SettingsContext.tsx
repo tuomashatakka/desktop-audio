@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import bridge from '../services/contextBridge'
+import { useBridge } from '../data'
 
 
 export type RepeatMode = 'none' | 'one' | 'all'
@@ -31,47 +31,21 @@ const defaultSettings: Settings = {
 
 const STORAGE_KEY = 'desktop-audio-settings'
 
-async function getDefaultLibraryPath (): Promise<string | null> {
-  if (bridge?.getMusicDir) {
-    try {
-      return await bridge.getMusicDir()
-    }
-    catch {
-      // Ignore errors
-    }
-  }
-  return null
-}
-
-async function loadSettings (): Promise<Settings> {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      return { ...defaultSettings, ...JSON.parse(stored) }
-    }
-  }
-  catch {
-    // Ignore errors
-  }
-
-  const musicPath = await getDefaultLibraryPath()
-  return { ...defaultSettings, libraryPaths: musicPath ? [ musicPath ] : []}
-}
-
 const SettingsContext = createContext<SettingsContextValue | null>(null)
 
 export function SettingsProvider ({ children }: { readonly children: ReactNode }) {
   const [ settings, setSettings ] = useState<Settings>(defaultSettings)
   const [ initialized, setInitialized ] = useState(false)
+  const bridge = useBridge()
 
   useEffect(() => {
     const init = async () => {
-      const loaded = await loadSettings()
+      const loaded = await loadSettings(bridge)
       setSettings(loaded)
       setInitialized(true)
     }
     init()
-  }, [])
+  }, [ bridge ])
 
   useEffect(() => {
     if (!initialized)
@@ -130,6 +104,31 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
       {children}
     </SettingsContext.Provider>
   )
+}
+
+async function loadSettings (bridge: { getMusicDir(): Promise<string | null> }): Promise<Settings> {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      return { ...defaultSettings, ...JSON.parse(stored) }
+    }
+  }
+  catch {
+    // Ignore errors
+  }
+
+  const musicPath = await getDefaultLibraryPath(bridge)
+  return { ...defaultSettings, libraryPaths: musicPath ? [ musicPath ] : []}
+}
+
+async function getDefaultLibraryPath (bridge: { getMusicDir(): Promise<string | null> }): Promise<string | null> {
+  try {
+    return await bridge.getMusicDir()
+  }
+  catch {
+    // Ignore errors
+  }
+  return null
 }
 
 export function useSettings () {

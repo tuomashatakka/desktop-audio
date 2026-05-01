@@ -5,32 +5,37 @@ import { useLibraryScanner } from '../hooks'
 import { Input, PromptDialog } from '../components/atomic'
 import { FolderTree } from '../components/composite/FolderTree'
 import { TrackTable } from '../components/composite/TrackTable'
-import bridge from '../services/contextBridge'
+import { useBridge } from '../data'
 import type { SerializableMenuItem } from '../services/types'
 
 
 const CONTEXT_MENU_ITEMS: SerializableMenuItem[] = [
-  { label: 'Play',            icon: '▶' },
+  { label: 'Play', icon: '▶' },
   { label: 'Add to Playlist', icon: '♩' },
   { separator: true },
-  { label: 'Edit Tags',       icon: '✎' },
+  { label: 'Edit Tags', icon: '✎' },
 ]
 
 const ITEM_HEIGHT      = 32
 const SEPARATOR_HEIGHT = 9
 const PADDING          = 8
 const MENU_WIDTH       = 200
-const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(i => !i.separator).length * ITEM_HEIGHT
-                       + CONTEXT_MENU_ITEMS.filter(i =>  i.separator).length * SEPARATOR_HEIGHT
-                       + PADDING * 2
+const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(i =>
+  !i.separator).length * ITEM_HEIGHT +
+                       CONTEXT_MENU_ITEMS.filter(i =>
+                         i.separator).length * SEPARATOR_HEIGHT +
+                       PADDING * 2
 
 // eslint-disable-next-line complexity
 export function LibraryView () {
-  const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist, sidebarOpen, toggleSidebar, setEditingTrack } = useUI()
-  const { folders, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, isLoading, toggleFolder } = useLibrary()
+  const { sidebarOpen, toggleSidebar, setEditingTrack, selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist } = useUI()
+  const { registry, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, isLoading, toggleFolder } = useLibrary()
   const { play, currentTrack, isPlaying } = useAudio()
   const { libraryPaths } = useSettings()
   const { scanLibrary } = useLibraryScanner()
+  const bridge = useBridge()
+
+  const folders = registry.folders
 
   const [ foldersCollapsed, setFoldersCollapsed ] = useState(false)
   const [ playlistsCollapsed, setPlaylistsCollapsed ] = useState(false)
@@ -58,10 +63,10 @@ export function LibraryView () {
       : 'Library'
 
   useEffect(() => {
-    if (libraryPaths.length > 0 && folders.length === 0) {
+    if (libraryPaths.length > 0) {
       scanLibrary()
     }
-  }, [ libraryPaths, folders.length, scanLibrary ])
+  }, [ libraryPaths, scanLibrary ])
 
   const handleFolderSelect = (path: string) => {
     selectFolder(path)
@@ -81,19 +86,17 @@ export function LibraryView () {
 
   const handleContextMenu = useCallback((track: Track, rect: DOMRect) => {
     contextTrackRef.current = track
-    bridge?.showContextMenu(
+    bridge.showContextMenu(
       CONTEXT_MENU_ITEMS,
       window.screenX + rect.left,
       window.screenY + rect.bottom + 4,
       MENU_WIDTH,
       MENU_HEIGHT,
     )
-  }, [])
+  }, [ bridge ])
 
-  useEffect(() => {
-    if (!bridge?.onContextMenuAction)
-      return
-    return bridge.onContextMenuAction((index: number) => {
+  useEffect(() =>
+    bridge.onContextMenuAction((index: number) => {
       const track = contextTrackRef.current
       if (!track)
         return
@@ -104,8 +107,7 @@ export function LibraryView () {
         case 3: setEditingTrack(track.id); break
       }
       contextTrackRef.current = null
-    })
-  }, [ handleTrackPlay, setEditingTrack ])
+    }), [ handleTrackPlay, setEditingTrack, bridge ])
 
   const displayTracks = useMemo(() => {
     if (selectedPlaylistId) {
@@ -138,7 +140,7 @@ export function LibraryView () {
 
           {!foldersCollapsed &&
             <FolderTree
-              folders={folders}
+              folders={Array.from(registry.folders.values())}
               selectedPath={selectedFolderPath}
               onSelect={handleFolderSelect}
               onToggle={handleFolderToggle}

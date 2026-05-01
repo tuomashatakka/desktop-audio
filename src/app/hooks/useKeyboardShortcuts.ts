@@ -1,12 +1,13 @@
 import { useEffect, useCallback } from 'react'
 import { useAudio, useLibrary, useUI } from '../contexts'
-import bridge from '../services/contextBridge'
+import { useBridge } from '../data'
 
 
 export function useKeyboardShortcuts () {
   const { isPlaying, currentTrack, volume, pause, resume, setVolume, playNext, playPrevious } = useAudio()
   const { filteredTracks } = useLibrary()
   const { currentView, setView, playerExpanded, togglePlayerExpanded } = useUI()
+  const bridge = useBridge()
 
   // eslint-disable-next-line complexity
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -69,9 +70,6 @@ export function useKeyboardShortcuts () {
   // ─── Media key IPC subscriptions ──────────────────────────────────────────
 
   useEffect(() => {
-    if (!bridge)
-      return
-
     const unsub1 = bridge.onMediaPlayPause(() => {
       if (currentTrack)
         void (isPlaying ? pause() : resume())
@@ -83,5 +81,5 @@ export function useKeyboardShortcuts () {
     return () => {
       unsub1(); unsub2(); unsub3()
     }
-  }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, filteredTracks ])
+  }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, filteredTracks, bridge ])
 }

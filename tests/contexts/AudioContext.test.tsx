@@ -1,6 +1,37 @@
 import { AudioProvider, useAudio } from '../../src/app/contexts/AudioContext'
 import type { Track } from '../../src/app/services/types'
 import { render, act, screen } from '@testing-library/react'
+import { BridgeProvider } from '../../src/app/data/BridgeContext'
+import type { Bridge } from '../../src/app/data/Bridge'
+
+const mockBridge: Bridge = {
+  scanLibrary: vi.fn(),
+  loadLibrary: vi.fn().mockResolvedValue([]),
+  onLibraryBatch: vi.fn(() => () => {}),
+  onLibraryDone: vi.fn(() => () => {}),
+  selectDirectory: vi.fn(),
+  getMusicDir: vi.fn(),
+  readFile: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
+  getAudioMetadata: vi.fn(),
+  minimizeWindow: vi.fn(),
+  maximizeWindow: vi.fn(),
+  closeWindow: vi.fn(),
+  isMaximized: vi.fn(),
+  onMediaPlayPause: vi.fn(() => () => {}),
+  onMediaNext: vi.fn(() => () => {}),
+  onMediaPrev: vi.fn(() => () => {}),
+  showContextMenu: vi.fn(),
+  hideContextMenu: vi.fn(),
+  onContextMenuAction: vi.fn(() => () => {}),
+  updateMediaState: vi.fn(),
+  onMediaSeek: vi.fn(() => () => {}),
+  upsertModel: vi.fn(),
+  deleteModel: vi.fn(),
+}
+
+function wrapWithBridge(ui: React.ReactNode) {
+  return <BridgeProvider value={mockBridge}>{ui}</BridgeProvider>
+}
 
 const mockTrack: Track = {
   id: 'track-1',
@@ -65,9 +96,11 @@ describe('AudioContext', () => {
 
   it('provides default values', () => {
     render(
-      <AudioProvider>
-        <TestConsumer />
-      </AudioProvider>
+      wrapWithBridge(
+        <AudioProvider>
+          <TestConsumer />
+        </AudioProvider>
+      )
     )
 
     expect(screen.getByTestId('playing')).toHaveTextContent('false')
@@ -80,9 +113,11 @@ describe('AudioContext', () => {
 
   it('setVolume updates volume', async () => {
     render(
-      <AudioProvider>
-        <TestConsumer />
-      </AudioProvider>
+      wrapWithBridge(
+        <AudioProvider>
+          <TestConsumer />
+        </AudioProvider>
+      )
     )
 
     await act(async () => {
@@ -94,9 +129,11 @@ describe('AudioContext', () => {
 
   it('setVolume clamps volume between 0 and 1', async () => {
     render(
-      <AudioProvider>
-        <TestConsumer />
-      </AudioProvider>
+      wrapWithBridge(
+        <AudioProvider>
+          <TestConsumer />
+        </AudioProvider>
+      )
     )
 
     await act(async () => {

@@ -33,6 +33,10 @@ declare global {
     // Media state (MPRIS / native controls)
     readonly updateMediaState: (state: MediaState) => void
     readonly onMediaSeek:      (cb: (delta: number) => void) => () => void
+
+    // Write IPC
+    readonly upsertModel: (kind: string, payload: Record<string, unknown>) => void
+    readonly deleteModel: (kind: string, id: string) => void
   }
 
   interface Window {

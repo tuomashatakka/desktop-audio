@@ -47,6 +47,8 @@ jobs:
 
       - name: Run tests
         run: bun run test
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
   build:
     runs-on: ubuntu-latest

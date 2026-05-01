@@ -1,6 +1,37 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { SettingsProvider, useSettings } from '../../src/app/contexts/SettingsContext'
+import { BridgeProvider } from '../../src/app/data/BridgeContext'
+import type { Bridge } from '../../src/app/data/Bridge'
+
+const mockBridge: Bridge = {
+  scanLibrary: vi.fn(),
+  loadLibrary: vi.fn().mockResolvedValue([]),
+  onLibraryBatch: vi.fn(() => () => {}),
+  onLibraryDone: vi.fn(() => () => {}),
+  selectDirectory: vi.fn(),
+  getMusicDir: vi.fn().mockResolvedValue(null),
+  readFile: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
+  getAudioMetadata: vi.fn(),
+  minimizeWindow: vi.fn(),
+  maximizeWindow: vi.fn(),
+  closeWindow: vi.fn(),
+  isMaximized: vi.fn(),
+  onMediaPlayPause: vi.fn(() => () => {}),
+  onMediaNext: vi.fn(() => () => {}),
+  onMediaPrev: vi.fn(() => () => {}),
+  showContextMenu: vi.fn(),
+  hideContextMenu: vi.fn(),
+  onContextMenuAction: vi.fn(() => () => {}),
+  updateMediaState: vi.fn(),
+  onMediaSeek: vi.fn(() => () => {}),
+  upsertModel: vi.fn(),
+  deleteModel: vi.fn(),
+}
+
+function wrapWithBridge(ui: React.ReactNode) {
+  return <BridgeProvider value={mockBridge}>{ui}</BridgeProvider>
+}
 
 const localStorageMock = {
   getItem: vi.fn(),
@@ -53,9 +84,11 @@ describe('SettingsContext', () => {
 
   it('provides default values', () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithBridge(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     expect(screen.getByTestId('paths')).toHaveTextContent('')
@@ -66,9 +99,11 @@ describe('SettingsContext', () => {
 
   it('addLibraryPath adds path to list', async () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithBridge(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     await act(async () => {
@@ -81,9 +116,11 @@ describe('SettingsContext', () => {
 
   it('addLibraryPath does not duplicate paths', async () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithBridge(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     await act(async () => {
@@ -97,9 +134,11 @@ describe('SettingsContext', () => {
 
   it('removeLibraryPath removes path from list', async () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithBridge(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     await act(async () => {
@@ -113,9 +152,11 @@ describe('SettingsContext', () => {
 
   it('setTheme updates theme', async () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithBridge(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     await act(async () => {
@@ -128,9 +169,11 @@ describe('SettingsContext', () => {
 
   it('setVolume clamps volume between 0 and 1', async () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithBridge(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     await act(async () => {
@@ -143,9 +186,11 @@ describe('SettingsContext', () => {
 
   it('setRepeatMode updates repeat mode', async () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithBridge(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     await act(async () => {

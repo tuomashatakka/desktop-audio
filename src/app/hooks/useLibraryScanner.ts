@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useLibrary, useSettings, useAudio } from '../contexts'
-import type { Track, FolderNode } from '../services'
-import bridge from '../services/contextBridge'
+import { Track } from '../models'
+import type { TrackDTO, FolderNode } from '../services/types'
+import { useBridge } from '../data'
+
+// Track is already imported from '../models'
+import { FolderEntry } from '../models'
 
 
 const log = {
@@ -16,8 +20,8 @@ function generateId (): string {
     .slice(2, 11)
 }
 
-function buildFolderTree (rootPaths: string[], files: string[]): FolderNode[] {
-  const nodes: FolderNode[] = []
+function buildFolderTree (rootPaths: string[], files: string[]): FolderEntry[] {
+  const nodes: FolderEntry[] = []
 
   for (const rootPath of rootPaths) {
     const rootFiles = files.filter(f =>
@@ -42,17 +46,17 @@ function buildFolderTree (rootPaths: string[], files: string[]): FolderNode[] {
       }
     }
 
-    function buildNode (nodePath: string, isRoot: boolean): FolderNode {
+    function buildNode (nodePath: string, isRoot: boolean): FolderEntry {
       const childPaths = childrenMap.get(nodePath) ?? []
       const name = nodePath.split(/[/\\]/).pop() || nodePath
-      return {
+      return FolderEntry.fromFolderNode({
         id:       generateId(),
         name,
         path:     nodePath,
         children: childPaths.map(p =>
           buildNode(p, false)),
         expanded: isRoot,
-      }
+      })
     }
 
     nodes.push(buildNode(rootPath, true))
@@ -66,6 +70,7 @@ export function useLibraryScanner () {
   const { setFolders, setTracks, setLoading } = useLibrary()
   const { libraryPaths } = useSettings()
   const { play } = useAudio()
+  const bridge = useBridge()
 
   const trackMap = useRef(new Map<string, Track>())
   const libraryPathsRef = useRef(libraryPaths)
@@ -82,11 +87,11 @@ export function useLibraryScanner () {
     let batchCount = 0
     const t0 = Date.now()
 
-    const unsubBatch = bridge.onLibraryBatch(batch => {
+    const unsubBatch = bridge.onLibraryBatch((batch: unknown[]) => {
       batchCount++
 
-      for (const t of batch)
-        trackMap.current.set(t.id, t)
+      for (const t of batch as TrackDTO[])
+        trackMap.current.set(t.id, Track.fromDTO(t))
       log.debug(`⇘ batch #${batchCount} — ${batch.length} tracks (map size: ${trackMap.current.size})`)
       setTracks([ ...trackMap.current.values() ].sort((a, b) =>
         a.title.localeCompare(b.title)))
@@ -94,10 +99,10 @@ export function useLibraryScanner () {
     })
     const unsubDone = bridge.onLibraryDone(() => {
       const allTracks = [ ...trackMap.current.values() ]
-      const folders   = buildFolderTree(libraryPathsRef.current as string[], allTracks.map(t =>
+      const folderData = buildFolderTree(libraryPathsRef.current as string[], allTracks.map(t =>
         t.path))
-      log.info(`✓ scan done — ${allTracks.length} tracks · ${folders.length} root(s) · ◴ ${Date.now() - t0}ms`)
-      setFolders(folders)
+      log.info(`✓ scan done — ${allTracks.length} tracks · ${folderData.length} root(s) · ◴ ${Date.now() - t0}ms`)
+      setFolders(folderData)
       setLoading(false)
     })
     return () => {
@@ -105,16 +110,16 @@ export function useLibraryScanner () {
       unsubBatch()
       unsubDone()
     }
-  }, [])
+  }, [ bridge ])
 
   // DB hydration — runs once on mount for instant startup
   useEffect(() => {
-    bridge.loadLibrary().then(tracks => {
+    bridge.loadLibrary().then((tracks: readonly TrackDTO[]) => {
       if (tracks.length > 0) {
         log.info(`▤ DB hydrated — ${tracks.length} tracks`)
         for (const t of tracks)
-          trackMap.current.set(t.id, t)
-        setTracks([ ...tracks ] as Track[])
+          trackMap.current.set(t.id, Track.fromDTO(t))
+        setTracks([ ...trackMap.current.values() ])
       }
       else {
         log.info('▤ DB empty (first run)')
@@ -122,7 +127,7 @@ export function useLibraryScanner () {
     })
       .catch(err =>
         console.error('[useLibraryScanner] DB load failed:', err))
-  }, [])
+  }, [ bridge ])
 
   const scanLibrary = useCallback(() => {
     if (libraryPaths.length === 0)
@@ -131,7 +136,7 @@ export function useLibraryScanner () {
     trackMap.current.clear()
     setLoading(true)
     bridge.scanLibrary([ ...libraryPaths ])
-  }, [ libraryPaths, setLoading ])
+  }, [ libraryPaths, setLoading, bridge ])
 
   const addAndScan = useCallback(async () =>
     await bridge.selectDirectory() ?? null, [])

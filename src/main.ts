@@ -76,8 +76,11 @@ const createPopoverWindow = () => {
     )
   }
 
-  popoverWindow.on('blur', () => popoverWindow?.hide())
-  popoverWindow.on('closed', () => { popoverWindow = null })
+  popoverWindow.on('blur', () =>
+    popoverWindow?.hide())
+  popoverWindow.on('closed', () => {
+    popoverWindow = null
+  })
 }
 
 app.on('ready', () => {
@@ -91,14 +94,16 @@ app.on('will-quit', () =>
   mediaControls.teardown())
 
 app.on('window-all-closed', () => {
-  const userWindows = BrowserWindow.getAllWindows().filter(w => w !== popoverWindow)
+  const userWindows = BrowserWindow.getAllWindows().filter(w =>
+    w !== popoverWindow)
   if (process.platform !== 'darwin' && userWindows.length === 0) {
     app.quit()
   }
 })
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().filter(w => w !== popoverWindow).length === 0) {
+  if (BrowserWindow.getAllWindows().filter(w =>
+    w !== popoverWindow).length === 0) {
     createWindow()
   }
 })
@@ -319,3 +324,67 @@ ipcMain.on('contextmenu:action', (_event, { index }: { index: number }) => {
 
 ipcMain.on('media:state-update', (_event, state: MediaState) =>
   mediaControls.updateState(state))
+
+// ─── DB Writer worker ───────────────────────────────────────────────────────
+
+type WriterMessage =
+  { type: 'ready' } |
+  { type: 'done' } |
+  { type: 'error'; message: string }
+
+// eslint-disable-next-line functional/no-let
+let dbWriter: Worker | null = null
+
+function getDbWriter (): Worker {
+  if (dbWriter)
+    return dbWriter
+
+  const dbPath = path.join(app.getPath('appData'), 'library.db')
+  dbWriter = new Worker(
+    path.join(__dirname, 'db-writer.js'),
+    { workerData: { dbPath }}
+  )
+  dbWriter.on('error', err =>
+    console.error('[db-writer]', err))
+  dbWriter.on('exit', code => {
+    if (code !== 0)
+      console.error('[db-writer] exited with code', code)
+    dbWriter = null
+  })
+  return dbWriter
+}
+
+app.on('before-quit', () =>
+  dbWriter?.terminate())
+
+// ─── Model write handlers ───────────────────────────────────────────────────
+
+ipcMain.handle('models:upsert', (_event, kind: string, payload: Record<string, unknown>) => {
+  const worker = getDbWriter()
+  return new Promise<void>((resolve, reject) => {
+    const handler = (msg: WorkerMessage) => {
+      worker.off('message', handler)
+      if (msg.type === 'error')
+        reject(new Error(msg.message))
+      else
+        resolve()
+    }
+    worker.on('message', handler)
+    worker.postMessage({ type: 'upsert', kind, payload })
+  })
+})
+
+ipcMain.handle('models:delete', (_event, kind: string, id: string) => {
+  const worker = getDbWriter()
+  return new Promise<void>((resolve, reject) => {
+    const handler = (msg: WorkerMessage) => {
+      worker.off('message', handler)
+      if (msg.type === 'error')
+        reject(new Error(msg.message))
+      else
+        resolve()
+    }
+    worker.on('message', handler)
+    worker.postMessage({ type: 'delete', kind, id })
+  })
+})
