@@ -11,720 +11,43 @@
   <title>Desktop Audio</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♫</text></svg>">
   <link rel="stylesheet" href="tokens.css">
-  <style>
-    @layer reset, base, layout, components, animations, lightbox;
-
-    /* ── Reset ───────────────────────────────────── */
-    @layer reset {
-      *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-      html { scroll-behavior: smooth; }
-      img, svg { display: block; max-width: 100%; }
-      a { color: inherit; text-decoration: none; }
-      button { font: inherit; cursor: pointer; border: none; background: none; }
-    }
-
-    /* ── Design Tokens — alias to app tokens (tokens.css) ── */
-    @layer base {
-      :root {
-        /* Color aliases mapped onto the app's design tokens. */
-        --clr-bg:        var(--bg);
-        --clr-surface:   var(--bg-raised);
-        --clr-surface-2: var(--bg-input);
-        --clr-text:      var(--text);
-        --clr-text-dim:  var(--text-dim);
-        --clr-accent:    var(--accent);
-        --clr-accent-2:  var(--accent-hover);
-        --clr-glow:      hsl(337 100% 50% / 0.35);
-
-        --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
-        --ease-in-out:    cubic-bezier(0.45, 0, 0.55, 1);
-
-        --duration-immersive: 3s;
-        --duration-fast:      0.6s;
-
-        --blur-intense: 20px;
-        --blur-subtle:  8px;
-
-        --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-        --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-      }
-    }
-
-    /* ── Base ────────────────────────────────────── */
-    @layer base {
-      html {
-        font-family: var(--font-sans);
-        color: var(--clr-text);
-        background: var(--clr-bg);
-        overflow: hidden;
-      }
-
-      body {
-        overflow: hidden;
-        height: 100dvh;
-      }
-
-      h1, h2, h3 { font-weight: 700; line-height: 1.1; }
-    }
-
-    /* ── Scroll Snap Layout ──────────────────────── */
-    @layer layout {
-      .scroll-container {
-        height: 100dvh;
-        overflow-y: auto;
-        scroll-snap-type: y mandatory;
-        scroll-behavior: smooth;
-      }
-
-      .scroll-section {
-        height: 100dvh;
-        scroll-snap-align: start;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-        overflow: hidden;
-      }
-    }
-
-    /* ── Hero Section ────────────────────────────── */
-    #hero {
-      background:
-        radial-gradient(ellipse 60% 50% at 50% 50%, rgba(255, 85, 0, 0.06) 0%, transparent 70%),
-        var(--clr-bg);
-    }
-
-    .hero-logo {
-      font-size: clamp(4rem, 12vw, 8rem);
-      color: var(--clr-accent);
-      filter: drop-shadow(0 0 40px var(--clr-glow));
-      animation: logoPulse 4s ease-in-out infinite;
-    }
-
-    .hero-title {
-      font-size: clamp(2rem, 6vw, 4.5rem);
-      letter-spacing: -0.03em;
-      background: linear-gradient(135deg, var(--clr-accent), var(--clr-accent-2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-top: 0.2em;
-    }
-
-    .hero-subtitle {
-      font-size: clamp(1rem, 2.5vw, 1.35rem);
-      color: var(--clr-text-dim);
-      margin-top: 0.5em;
-      max-width: 500px;
-      text-align: center;
-      line-height: 1.5;
-    }
-
-    .hero-scroll-hint {
-      position: absolute;
-      bottom: 3rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.5rem;
-      color: var(--clr-text-dim);
-      font-size: 0.85rem;
-      animation: scrollBounce 2s ease-in-out infinite;
-    }
-
-    .hero-scroll-hint svg {
-      width: 24px;
-      height: 24px;
-      stroke: var(--clr-text-dim);
-    }
-
-    /* Animated waveform decoration */
-    .hero-waveform {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 120px;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      gap: 3px;
-      padding: 0 10%;
-      opacity: 0.15;
-      mask-image: linear-gradient(to top, black 30%, transparent 100%);
-      -webkit-mask-image: linear-gradient(to top, black 30%, transparent 100%);
-    }
-
-    .hero-waveform .bar {
-      width: 4px;
-      border-radius: 2px 2px 0 0;
-      background: linear-gradient(to top, var(--clr-accent), var(--clr-accent-2));
-      animation: waveBar 2s ease-in-out infinite;
-    }
-
-    /* ── Features Section ────────────────────────── */
-    #features {
-      background:
-        radial-gradient(ellipse 80% 60% at 50% 40%, rgba(255, 85, 0, 0.04) 0%, transparent 70%),
-        var(--clr-surface);
-    }
-
-    .features-header {
-      text-align: center;
-      margin-bottom: clamp(2rem, 4vh, 3rem);
-    }
-
-    .features-header h2 {
-      font-size: clamp(1.5rem, 4vw, 2.5rem);
-      letter-spacing: -0.02em;
-    }
-
-    .features-header p {
-      color: var(--clr-text-dim);
-      margin-top: 0.5em;
-      font-size: clamp(0.9rem, 1.5vw, 1.1rem);
-    }
-
-    .screenshot-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(320px, 90vw), 1fr));
-      gap: clamp(1rem, 2vw, 1.5rem);
-      width: min(95vw, 1100px);
-      max-height: 55dvh;
-      overflow: hidden;
-    }
-
-    .screenshot-card {
-      position: relative;
-      border-radius: 12px;
-      overflow: hidden;
-      background: var(--clr-surface-2);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      aspect-ratio: 16 / 10;
-    }
-
-    .screenshot-card img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: top;
-    }
-
-    .screenshot-card figcaption {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 0.75rem 1rem;
-      background: linear-gradient(to top, rgba(10, 10, 15, 0.9), transparent);
-      font-size: 0.8rem;
-      color: var(--clr-text-dim);
-    }
-
-    /* Fallback when screenshot image not available */
-    .screenshot-card .placeholder {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 3rem;
-      color: var(--clr-accent);
-      background: linear-gradient(135deg, var(--clr-bg), var(--clr-surface-2));
-    }
-
-    .screenshot-card img[src=""],
-    .screenshot-card img:not([src]) {
-      display: none;
-    }
-
-    .feature-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(220px, 45vw), 1fr));
-      gap: clamp(0.75rem, 1.5vw, 1.25rem);
-      width: min(95vw, 1100px);
-      margin-top: clamp(1.5rem, 3vh, 2.5rem);
-    }
-
-    .feature-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 12px;
-      padding: clamp(1rem, 2vw, 1.5rem);
-      text-align: center;
-      transition: transform var(--duration-fast) var(--ease-out-expo),
-                  box-shadow var(--duration-fast) var(--ease-out-expo);
-    }
-
-    .feature-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 40px rgba(255, 85, 0, 0.1);
-    }
-
-    .feature-card .icon {
-      font-size: 2rem;
-      margin-bottom: 0.5rem;
-      display: block;
-    }
-
-    .feature-card h3 {
-      font-size: 1rem;
-      margin-bottom: 0.3rem;
-    }
-
-    .feature-card p {
-      font-size: 0.85rem;
-      color: var(--clr-text-dim);
-      line-height: 1.4;
-    }
-
-    /* ── Download Section ────────────────────────── */
-    #download {
-      background:
-        radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255, 85, 0, 0.08) 0%, transparent 70%),
-        var(--clr-bg);
-    }
-
-    .download-content {
-      text-align: center;
-      max-width: 600px;
-      padding: 0 1.5rem;
-    }
-
-    .download-content h2 {
-      font-size: clamp(1.8rem, 5vw, 3rem);
-      letter-spacing: -0.02em;
-    }
-
-    .download-content .subtitle {
-      color: var(--clr-text-dim);
-      margin-top: 0.5em;
-      font-size: clamp(0.95rem, 1.5vw, 1.1rem);
-    }
-
-    .cta-group {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1rem;
-      margin-top: 2.5rem;
-    }
-
-    .cta-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 1rem 2.5rem;
-      border-radius: 999px;
-      font-weight: 600;
-      font-size: 1.1rem;
-      background: linear-gradient(135deg, var(--clr-accent), var(--clr-accent-2));
-      color: #fff;
-      transition: transform var(--duration-fast) var(--ease-out-expo),
-                  box-shadow var(--duration-fast) var(--ease-out-expo);
-      box-shadow: 0 4px 24px var(--clr-glow);
-      animation: ctaGlow 3s ease-in-out infinite;
-    }
-
-    .cta-btn:hover {
-      transform: translateY(-2px) scale(1.02);
-      box-shadow: 0 8px 40px rgba(255, 85, 0, 0.5);
-    }
-
-    .cta-btn.secondary {
-      background: transparent;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      box-shadow: none;
-      animation: none;
-      font-size: 1rem;
-      padding: 0.75rem 2rem;
-      color: var(--clr-text-dim);
-    }
-
-    .cta-btn.secondary:hover {
-      border-color: var(--clr-accent);
-      color: var(--clr-text);
-      box-shadow: 0 4px 20px rgba(255, 85, 0, 0.15);
-    }
-
-    .download-meta {
-      margin-top: 2rem;
-      font-size: 0.8rem;
-      color: var(--clr-text-dim);
-    }
-
-    .download-meta code {
-      font-family: var(--font-mono);
-      background: rgba(255, 255, 255, 0.05);
-      padding: 0.15em 0.4em;
-      border-radius: 4px;
-    }
-
-    .download-footer {
-      position: absolute;
-      bottom: 2rem;
-      display: flex;
-      gap: 1.5rem;
-      font-size: 0.75rem;
-      color: var(--clr-text-dim);
-      opacity: 0.5;
-    }
-
-    .download-footer a:hover {
-      color: var(--clr-text);
-    }
-
-    /* ── Nav Dots ────────────────────────────────── */
-    .nav-dots {
-      position: fixed;
-      right: 1.5rem;
-      top: 50%;
-      transform: translateY(-50%);
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      z-index: 100;
-    }
-
-    .nav-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      transition: all 0.4s var(--ease-out-expo);
-    }
-
-    .nav-dot.active {
-      background: var(--clr-accent);
-      border-color: var(--clr-accent);
-      box-shadow: 0 0 10px var(--clr-glow);
-      transform: scale(1.3);
-    }
-
-    .nav-dot:hover {
-      background: rgba(255, 255, 255, 0.4);
-    }
-
-    /* ── Animations (triggered by .in-view) ──────── */
-    @layer animations {
-      .fade-blur {
-        opacity: 0;
-        filter: blur(var(--blur-intense));
-        transform: translateY(30px);
-        transition:
-          opacity var(--duration-immersive) var(--ease-out-expo),
-          filter var(--duration-immersive) var(--ease-out-expo),
-          transform var(--duration-immersive) var(--ease-out-expo);
-      }
-
-      .fade-blur.visible {
-        opacity: 1;
-        filter: blur(0);
-        transform: translateY(0);
-      }
-
-      .fade-blur.delay-1 { transition-delay: 0.2s; }
-      .fade-blur.delay-2 { transition-delay: 0.4s; }
-      .fade-blur.delay-3 { transition-delay: 0.6s; }
-      .fade-blur.delay-4 { transition-delay: 0.8s; }
-      .fade-blur.delay-5 { transition-delay: 1.0s; }
-
-      /* Hero: always animate on load */
-      #hero .fade-blur {
-        animation: heroEntry var(--duration-immersive) var(--ease-out-expo) forwards;
-      }
-
-      @keyframes heroEntry {
-        from {
-          opacity: 0;
-          filter: blur(var(--blur-intense));
-          transform: translateY(30px);
-        }
-        to {
-          opacity: 1;
-          filter: blur(0);
-          transform: translateY(0);
-        }
-      }
-
-      /* Stagger hero children */
-      #hero .fade-blur:nth-child(1) { animation-delay: 0s; }
-      #hero .fade-blur:nth-child(2) { animation-delay: 0.3s; opacity: 0; filter: blur(20px); }
-      #hero .fade-blur:nth-child(3) { animation-delay: 0.6s; opacity: 0; filter: blur(20px); }
-    }
-
-    @keyframes logoPulse {
-      0%, 100% { filter: drop-shadow(0 0 30px var(--clr-glow)); transform: scale(1); }
-      50%      { filter: drop-shadow(0 0 60px rgba(255, 85, 0, 0.5)); transform: scale(1.05); }
-    }
-
-    @keyframes scrollBounce {
-      0%, 100% { transform: translateY(0); }
-      50%      { transform: translateY(8px); }
-    }
-
-    @keyframes ctaGlow {
-      0%, 100% { box-shadow: 0 4px 24px var(--clr-glow); }
-      50%      { box-shadow: 0 4px 40px rgba(255, 85, 0, 0.55); }
-    }
-
-    @keyframes waveBar {
-      0%, 100% { height: 20%; }
-      50%      { height: var(--h, 60%); }
-    }
-
-    /* ── Screenshot grid: allow internal scroll when many cards ── */
-    .screenshot-grid {
-      max-height: 60dvh;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding: 0.25rem;
-      scrollbar-width: thin;
-      scrollbar-color: var(--clr-accent) transparent;
-      mask-image: linear-gradient(to bottom, transparent 0, black 4%, black 96%, transparent 100%);
-      -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 4%, black 96%, transparent 100%);
-    }
-    .screenshot-card {
-      cursor: zoom-in;
-      transition: transform 0.5s var(--ease-out-expo), box-shadow 0.5s var(--ease-out-expo);
-    }
-    .screenshot-card:hover,
-    .screenshot-card:focus-visible {
-      transform: translateY(-4px);
-      box-shadow: 0 18px 44px -12px var(--clr-glow);
-      outline: none;
-    }
-
-    /* ── Pointer light canvas (decorative, screen blend) ── */
-    #pointer-light {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      pointer-events: none;
-      mix-blend-mode: screen;
-      z-index: 50;
-    }
-
-    /* ── Lightbox dialog ── */
-    @layer lightbox {
-      dialog#lightbox {
-        position: fixed;
-        inset: 0;
-        width: 100vw;
-        height: 100vh;
-        max-width: 100vw;
-        max-height: 100vh;
-        margin: 0;
-        padding: 0;
-        border: 0;
-        background: transparent;
-        color: var(--clr-text);
-        overflow: hidden;
-      }
-
-      dialog#lightbox::backdrop {
-        background: rgba(0, 0, 0, 0.6);
-        backdrop-filter: blur(40px) saturate(140%);
-        -webkit-backdrop-filter: blur(40px) saturate(140%);
-        animation: backdrop-in 0.5s var(--ease-out-expo) forwards;
-      }
-      dialog#lightbox.closing::backdrop {
-        animation: backdrop-out 0.35s var(--ease-in-out) forwards;
-      }
-
-      @keyframes backdrop-in {
-        from { background: rgba(0,0,0,0); backdrop-filter: blur(0) saturate(100%); -webkit-backdrop-filter: blur(0) saturate(100%); }
-        to   { background: rgba(0,0,0,0.6); backdrop-filter: blur(40px) saturate(140%); -webkit-backdrop-filter: blur(40px) saturate(140%); }
-      }
-      @keyframes backdrop-out {
-        to { background: rgba(0,0,0,0); backdrop-filter: blur(0) saturate(100%); -webkit-backdrop-filter: blur(0) saturate(100%); }
-      }
-
-      /* Vignette over the entire page while modal is open */
-      dialog#lightbox::before,
-      dialog#lightbox::after {
-        content: "";
-        position: fixed;
-        inset: -10vmax;
-        pointer-events: none;
-        z-index: -1;
-      }
-      dialog#lightbox::before {
-        background: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.85) 100%);
-        mix-blend-mode: multiply;
-      }
-      dialog#lightbox::after {
-        background: radial-gradient(ellipse at center, hsl(337 60% 30% / 0.18) 0%, transparent 65%);
-        mix-blend-mode: overlay;
-      }
-
-      .lightbox-stage {
-        position: absolute;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        padding: clamp(1rem, 4vw, 4rem);
-      }
-
-      .lightbox-img {
-        display: block;
-        max-width: min(92vw, 1600px);
-        max-height: 86vh;
-        object-fit: contain;
-        border-radius: 14px;
-        box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7);
-        transition:
-          transform 480ms var(--ease-out-expo),
-          opacity 320ms ease,
-          filter 320ms ease;
-        will-change: transform, opacity, filter;
-      }
-
-      /* Open scale-in (one-shot via .opening class so it doesn't clobber later swap transitions) */
-      dialog#lightbox .lightbox-img.opening {
-        animation: img-open 0.6s var(--ease-out-expo) both;
-      }
-      @keyframes img-open {
-        from { opacity: 0; transform: scale(0.94); filter: blur(12px); }
-        to   { opacity: 1; transform: scale(1); filter: blur(0); }
-      }
-      dialog#lightbox.closing .lightbox-img {
-        animation: img-close 0.32s var(--ease-in-out) forwards;
-      }
-      @keyframes img-close {
-        to { opacity: 0; transform: scale(0.96); filter: blur(8px); }
-      }
-
-      /* Slide swap for prev/next — animations only (no transition class) */
-      .lightbox-img.swap-out-left  { animation: swap-out-to-left  0.28s var(--ease-in-out) forwards; }
-      .lightbox-img.swap-out-right { animation: swap-out-to-right 0.28s var(--ease-in-out) forwards; }
-      .lightbox-img.swap-in-left   { animation: swap-in-from-right 0.42s var(--ease-out-expo) both; }
-      .lightbox-img.swap-in-right  { animation: swap-in-from-left  0.42s var(--ease-out-expo) both; }
-      @keyframes swap-out-to-left  {
-        to { opacity: 0; transform: translateX(-6%) scale(0.97); filter: blur(8px); }
-      }
-      @keyframes swap-out-to-right {
-        to { opacity: 0; transform: translateX( 6%) scale(0.97); filter: blur(8px); }
-      }
-      @keyframes swap-in-from-right {
-        from { opacity: 0; transform: translateX( 6%) scale(0.97); filter: blur(8px); }
-        to   { opacity: 1; transform: translateX(0)   scale(1);   filter: blur(0); }
-      }
-      @keyframes swap-in-from-left {
-        from { opacity: 0; transform: translateX(-6%) scale(0.97); filter: blur(8px); }
-        to   { opacity: 1; transform: translateX(0)   scale(1);   filter: blur(0); }
-      }
-
-      .lightbox-caption {
-        position: absolute;
-        left: 50%;
-        bottom: clamp(1rem, 3vh, 2rem);
-        transform: translateX(-50%);
-        padding: 0.5rem 1rem;
-        font-size: 0.85rem;
-        color: var(--clr-text-dim);
-        background: rgba(0,0,0,0.4);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 999px;
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        white-space: nowrap;
-        max-width: 80vw;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .lightbox-counter {
-        position: absolute;
-        top: clamp(1rem, 3vh, 1.5rem);
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 0.75rem;
-        font-family: var(--font-mono);
-        color: var(--clr-text-dim);
-        letter-spacing: 0.1em;
-      }
-
-      .lightbox-btn {
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 56px;
-        height: 56px;
-        display: grid;
-        place-items: center;
-        border-radius: 999px;
-        background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.12);
-        color: var(--clr-text);
-        font-size: 1.5rem;
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        transition: background 0.25s var(--ease-out-expo), transform 0.25s var(--ease-out-expo);
-      }
-      .lightbox-btn:hover { background: rgba(255,255,255,0.14); transform: translateY(-50%) scale(1.06); }
-      .lightbox-btn.prev  { left: clamp(0.5rem, 2vw, 2rem); }
-      .lightbox-btn.next  { right: clamp(0.5rem, 2vw, 2rem); }
-
-      .lightbox-close {
-        position: absolute;
-        top: clamp(0.75rem, 2vh, 1.25rem);
-        right: clamp(0.75rem, 2vw, 1.25rem);
-        width: 44px;
-        height: 44px;
-        display: grid;
-        place-items: center;
-        border-radius: 999px;
-        background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.12);
-        color: var(--clr-text);
-        font-size: 1.25rem;
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        transition: background 0.25s var(--ease-out-expo);
-      }
-      .lightbox-close:hover { background: rgba(255,255,255,0.16); }
-    }
-
-    /* ── Reduced Motion ──────────────────────────── */
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-      }
-      .fade-blur {
-        opacity: 1;
-        filter: none;
-        transform: none;
-      }
-      #hero .fade-blur {
-        animation: none;
-        opacity: 1;
-        filter: none;
-        transform: none;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="main.css">
 </head>
 <body>
   <!-- Navigation Dots -->
   <nav class="nav-dots" aria-label="Page sections">
-    <a href="#hero"    class="nav-dot active" aria-label="Hero section"></a>
-    <a href="#features" class="nav-dot" aria-label="Features section"></a>
-    <a href="#download" class="nav-dot" aria-label="Download section"></a>
+    <a href="#hero"     class="nav-dot active" aria-label="Hero"></a>
+    <a href="#features" class="nav-dot" aria-label="Features"></a>
+    <a href="#player"   class="nav-dot" aria-label="Player"></a>
+    <a href="#library"  class="nav-dot" aria-label="Library"></a>
+    <a href="#download" class="nav-dot" aria-label="Download"></a>
   </nav>
 
   <main class="scroll-container">
 
     <!-- ════════ SECTION 1: HERO ════════ -->
     <section id="hero" class="scroll-section" aria-label="Hero">
+      <div class="hero-gradient-overlay" aria-hidden="true"></div>
+      <div class="hero-h-bloom" aria-hidden="true"></div>
+      <canvas id="hero-canvas" aria-hidden="true"></canvas>
+
       <div class="fade-blur hero-logo" aria-hidden="true">♫</div>
       <h1 class="fade-blur hero-title">Desktop Audio</h1>
-      <p class="fade-blur hero-subtitle">A beautiful, lightweight music player for your desktop — built with Electron, React, and TypeScript.</p>
+
+      <div class="hero-text-block">
+        <p class="typewriter-line" data-html='You&#39;ve ever tried finding a <strong>stable</strong>, <strong>regular</strong> music player for any linux?'>
+          <span class="typed-text"></span><span class="typing-cursor"></span>
+        </p>
+        <p class="typewriter-line" data-html='Or maybe you finally got fed up with apple&#39;s desktop apps getting so unbelieveably <strong>counter-intuitive</strong> they stopped being actually usable?'>
+          <span class="typed-text"></span><span class="typing-cursor"></span>
+        </p>
+        <p class="typewriter-line" data-html="Or maybe you're just a web crawler, indexing me.">
+          <span class="typed-text"></span><span class="typing-cursor"></span>
+        </p>
+        <p class="typewriter-line" data-html='Anyway ~ didn&#39;t find a music player…so i made one. <strong>Here it is.</strong>'>
+          <span class="typed-text"></span><span class="typing-cursor"></span>
+        </p>
+      </div>
 
       <div class="hero-scroll-hint">
         <span>Scroll to explore</span>
@@ -733,10 +56,7 @@
         </svg>
       </div>
 
-      <!-- Animated waveform decoration -->
-      <div class="hero-waveform" aria-hidden="true">
-        <!-- 40 bars with varying animation heights -->
-      </div>
+      <div class="hero-waveform" aria-hidden="true"></div>
     </section>
 
     <!-- ════════ SECTION 2: FEATURES ════════ -->
@@ -750,24 +70,70 @@
 
       <div class="feature-cards">
         <article class="feature-card fade-blur delay-2">
-          <span class="icon" aria-hidden="true">📁</span>
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon-draw">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+          </span>
           <h3>Library Management</h3>
           <p>Scan folders, browse folder trees, and search through your music collection.</p>
         </article>
         <article class="feature-card fade-blur delay-3">
-          <span class="icon" aria-hidden="true">🎵</span>
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="icon-draw">
+              <line x1="4" y1="22" x2="4" y2="8"/>
+              <line x1="9" y1="22" x2="9" y2="4"/>
+              <line x1="14" y1="22" x2="14" y2="12"/>
+              <line x1="19" y1="22" x2="19" y2="2"/>
+            </svg>
+          </span>
           <h3>Waveform Visualization</h3>
           <p>Real-time waveform progress bars generated from audio file data.</p>
         </article>
         <article class="feature-card fade-blur delay-4">
-          <span class="icon" aria-hidden="true">⌨</span>
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon-draw">
+              <rect x="2" y="6" width="20" height="12" rx="2"/>
+              <line x1="6" y1="10" x2="6" y2="10.01"/>
+              <line x1="10" y1="10" x2="10" y2="10.01"/>
+              <line x1="14" y1="10" x2="14" y2="10.01"/>
+              <line x1="18" y1="10" x2="18" y2="10.01"/>
+              <line x1="8" y1="14" x2="16" y2="14"/>
+            </svg>
+          </span>
           <h3>Native Media Keys</h3>
           <p>Full MediaSession API support — play, pause, next, previous from your OS.</p>
         </article>
       </div>
     </section>
 
-    <!-- ════════ SECTION 3: DOWNLOAD ════════ -->
+    <!-- ═══════ SECTION 3: PLAYER ════════ -->
+    <section id="player" class="scroll-section" aria-label="Player">
+      <div class="split-layout">
+        <div class="split-text fade-blur">
+          <h2>A Player That Doesn't Get In The Way</h2>
+          <p>The interface is designed to be non-obtrusive — compact, responsive, and usable even on smaller screens. Controls stay out of your way until you need them, and the layout adapts so nothing ever feels cramped.</p>
+        </div>
+        <div class="split-image fade-blur delay-2">
+          <img src="screenshots/player-view.png" alt="Now playing view" loading="lazy">
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ SECTION 4: LIBRARY ════════ -->
+    <section id="library" class="scroll-section" aria-label="Library">
+      <div class="split-layout reverse">
+        <div class="split-image fade-blur">
+          <img src="screenshots/library-view.png" alt="Library view" loading="lazy">
+        </div>
+        <div class="split-text fade-blur delay-2">
+          <h2>Your Library, Your Way</h2>
+          <p>Even a music library with few to no metadata looks and feels perfectly fine — tracks are organized, searchable, and browsable regardless. But when you have metadata? It feels <strong>incredible AF</strong>. Album art, artists, genres — everything snaps into place beautifully.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ SECTION 5: DOWNLOAD ════════ -->
     <section id="download" class="scroll-section" aria-label="Download">
       <div class="download-content">
         <h2 class="fade-blur">Get Desktop Audio</h2>
@@ -800,6 +166,9 @@
   <!-- Pointer light overlay (decorative) -->
   <canvas id="pointer-light" aria-hidden="true"></canvas>
 
+  <!-- Full-page glitch overlay -->
+  <canvas id="glitch-overlay" aria-hidden="true"></canvas>
+
   <!-- Lightbox dialog -->
   <dialog id="lightbox" aria-label="Screenshot viewer">
     <div class="lightbox-stage">
@@ -817,328 +186,1047 @@
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach(entry => {
-          const el = entry.target;
-          if (entry.isIntersecting) {
-            el.classList.add('visible');
-          }
-        });
+          const el = entry.target
+          el.classList.toggle('visible', entry.isIntersecting)
+        })
       },
       { threshold: 0.15 }
-    );
+    )
 
-    document.querySelectorAll('#features .fade-blur, #download .fade-blur').forEach(el => {
-      observer.observe(el);
-    });
+    document.querySelectorAll('#features .fade-blur, #download .fade-blur, #player .fade-blur, #library .fade-blur').forEach(el => {
+      observer.observe(el)
+    })
 
     // ── Nav dot active state ──
-    const sections = document.querySelectorAll('.scroll-section');
-    const dots = document.querySelectorAll('.nav-dot');
+    const sections = document.querySelectorAll('.scroll-section')
+    const dots = document.querySelectorAll('.nav-dot')
 
     const dotObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
-            const id = entry.target.id;
-            dots.forEach(d => d.classList.toggle('active', d.getAttribute('href') === `#${id}`));
+            const id = entry.target.id
+            dots.forEach(d => d.classList.toggle('active', d.getAttribute('href') === `#${id}`))
           }
-        });
+        })
       },
       { threshold: 0.5 }
-    );
+    )
 
-    sections.forEach(s => dotObserver.observe(s));
+    sections.forEach(s => dotObserver.observe(s))
+
+    // ── Typewriter engine for hero paragraphs ──
+    function typeText () {
+      const lines = document.querySelectorAll('.typewriter-line')
+      const SPEED = 35
+      const START_DELAY = 1200
+
+      const extractPlainText = (html) => {
+        const tmp = document.createElement('div')
+        tmp.innerHTML = html
+        return tmp.textContent
+      }
+
+      const typeLine = (line, delay) => {
+        setTimeout(() => {
+          const fullHTML = line.getAttribute('data-html')
+          const plain = extractPlainText(fullHTML)
+          const textSpan = line.querySelector('.typed-text')
+          const cursor = line.querySelector('.typing-cursor')
+          if (!textSpan || !cursor || !plain) return
+
+          let i = 0
+          const tick = () => {
+            if (i < plain.length) {
+              textSpan.textContent += plain[i]
+              i++
+              setTimeout(tick, SPEED + Math.random() * 25)
+            } else {
+              textSpan.innerHTML = fullHTML
+              line.querySelectorAll('strong').forEach((s, idx) => {
+                s.style.animationDelay = `${idx * 0.15}s`
+                s.classList.add('strong-highlight')
+                s.addEventListener('animationend', () => s.classList.remove('strong-highlight'), { once: true })
+              })
+              cursor.style.animationDelay = '0.8s'
+              cursor.style.animationDuration = '0.4s'
+              cursor.style.animationIterationCount = '3'
+              setTimeout(() => { cursor.style.display = 'none' }, 2000)
+            }
+          }
+          tick()
+        }, delay)
+      }
+
+      let totalDelay = START_DELAY
+      lines.forEach((line) => {
+        typeLine(line, totalDelay)
+        const plain = extractPlainText(line.getAttribute('data-html'))
+        totalDelay += plain.length * (SPEED + 12) + 400
+      })
+    }
+
+    typeText()
+    renderGallery()
+    applyLighting()
+    drawEffects()
+    applyGlitchEffect()
+
+    // ── Parallax scroll for hero background elements ──
+    const heroSection = document.getElementById('hero')
+    const heroGradient = heroSection?.querySelector('.hero-gradient-overlay')
+    const heroCanvas = document.getElementById('hero-canvas')
+
+    const scrollContainer = document.querySelector('.scroll-container')
+    if (scrollContainer && heroSection) {
+      scrollContainer.addEventListener('scroll', () => {
+        const scrollY = scrollContainer.scrollTop
+        const heroH = heroSection.offsetHeight
+        if (scrollY <= heroH) {
+          const offset = scrollY * 0.35
+          const scale = 1 + scrollY / heroH * 0.08
+          const parallaxStyle = `translateY(${offset}px) scale(${scale})`
+          if (heroGradient) heroGradient.style.transform = parallaxStyle
+          if (heroCanvas) heroCanvas.style.transform = parallaxStyle
+          scrollPanX = -(scrollY / heroH) * 40
+          scrollPanY = -(scrollY / heroH) * 25
+        }
+      }, { passive: true })
+    }
 
     // ── Generate waveform bars ──
-    const waveformContainer = document.querySelector('.hero-waveform');
+    const waveformContainer = document.querySelector('.hero-waveform')
     if (waveformContainer) {
-      const barCount = 60;
+      const barCount = 60
       for (let i = 0; i < barCount; i++) {
-        const bar = document.createElement('span');
-        bar.className = 'bar';
-        const h = 20 + Math.sin(i / barCount * Math.PI * 6) * 40 + Math.random() * 30;
-        bar.style.setProperty('--h', `${h}%`);
-        bar.style.animationDelay = `${i * 0.05}s`;
-        waveformContainer.appendChild(bar);
+        const bar = document.createElement('span')
+        bar.className = 'bar'
+        const h = 20 + Math.sin(i / barCount * Math.PI * 6) * 40 + Math.random() * 30
+        bar.style.setProperty('--h', `${h}%`)
+        bar.style.animationDelay = `${i * 0.05}s`
+        waveformContainer.appendChild(bar)
       }
     }
 
     // ── Screenshot gallery + lightbox ──
-    (async () => {
-      const grid = document.getElementById('screenshot-grid');
-      if (!grid) return;
+    async function renderGallery () {
+      const grid = document.getElementById('screenshot-grid')
+      if (!grid) return
 
-      let items = [];
+      let items = []
       try {
-        const res = await fetch('screenshots.json', { cache: 'no-cache' });
-        items = await res.json();
+        const res = await fetch('screenshots.json', { cache: 'no-cache' })
+        items = await res.json()
       } catch (err) {
-        console.warn('Could not load screenshots manifest', err);
-        grid.removeAttribute('aria-busy');
-        grid.removeAttribute('data-loading');
-        return;
+        console.warn('Could not load screenshots manifest', err)
+        grid.removeAttribute('aria-busy')
+        grid.removeAttribute('data-loading')
+        return
       }
 
-      const frag = document.createDocumentFragment();
+      const frag = document.createDocumentFragment()
       items.forEach((it, i) => {
-        const fig = document.createElement('figure');
-        fig.className = `screenshot-card fade-blur delay-${(i % 5) + 1}`;
-        fig.tabIndex = 0;
-        fig.setAttribute('role', 'button');
-        fig.setAttribute('aria-label', `Open screenshot: ${it.caption}`);
-        fig.dataset.index = String(i);
+        const fig = document.createElement('figure')
+        fig.className = `screenshot-card fade-blur delay-${(i % 5) + 1}`
+        fig.tabIndex = 0
+        fig.setAttribute('role', 'button')
+        fig.setAttribute('aria-label', `Open screenshot: ${it.caption}`)
+        fig.dataset.index = String(i)
 
-        const img = document.createElement('img');
-        img.src = it.src;
-        img.alt = it.alt;
-        img.loading = 'lazy';
+        const img = document.createElement('img')
+        img.src = it.src
+        img.alt = it.alt
+        img.loading = 'lazy'
 
-        const cap = document.createElement('figcaption');
-        cap.textContent = it.caption;
+        const cap = document.createElement('figcaption')
+        cap.textContent = it.caption
 
-        fig.append(img, cap);
-        frag.append(fig);
-      });
-      grid.append(frag);
-      grid.removeAttribute('aria-busy');
-      grid.removeAttribute('data-loading');
+        fig.append(img, cap)
+        frag.append(fig)
+      })
+      grid.append(frag)
+      grid.removeAttribute('aria-busy')
+      grid.removeAttribute('data-loading')
 
       // Re-observe the new cards for fade-blur entry
-      grid.querySelectorAll('.fade-blur').forEach((el) => observer.observe(el));
+      grid.querySelectorAll('.fade-blur').forEach((el) => observer.observe(el))
 
       // ── Lightbox wiring ──
-      const dlg     = document.getElementById('lightbox');
-      const lbImg   = document.getElementById('lightbox-img');
-      const lbCap   = document.getElementById('lightbox-caption');
-      const lbCount = document.getElementById('lightbox-counter');
-      const btnPrev = document.getElementById('lightbox-prev');
-      const btnNext = document.getElementById('lightbox-next');
-      const btnX    = document.getElementById('lightbox-close');
+      const dlg     = document.getElementById('lightbox')
+      const lbImg   = document.getElementById('lightbox-img')
+      const lbCap   = document.getElementById('lightbox-caption')
+      const lbCount = document.getElementById('lightbox-counter')
+      const btnPrev = document.getElementById('lightbox-prev')
+      const btnNext = document.getElementById('lightbox-next')
+      const btnX    = document.getElementById('lightbox-close')
 
-      let currentIndex = 0;
-      let lastTrigger = null;
-      let swapping = false;
+      let currentIndex = 0
+      let lastTrigger = null
+      let swapping = false
 
       const clearAnimClasses = () => {
-        lbImg.classList.remove('opening', 'swap-out-left', 'swap-out-right', 'swap-in-left', 'swap-in-right');
-      };
+        lbImg.classList.remove('opening', 'swap-out-left', 'swap-out-right', 'swap-in-left', 'swap-in-right')
+      }
 
       const setImage = (idx, dir = 0) => {
-        const it = items[((idx % items.length) + items.length) % items.length];
-        if (!it) return;
-        currentIndex = ((idx % items.length) + items.length) % items.length;
-        lbCap.textContent = it.caption;
-        lbCount.textContent = `${currentIndex + 1} / ${items.length}`;
+        const it = items[((idx % items.length) + items.length) % items.length]
+        if (!it) return
+        currentIndex = ((idx % items.length) + items.length) % items.length
+        lbCap.textContent = it.caption
+        lbCount.textContent = `${currentIndex + 1} / ${items.length}`
 
         if (dir === 0) {
-          clearAnimClasses();
-          lbImg.src = it.src;
-          lbImg.alt = it.alt;
-          // play opening animation
-          void lbImg.offsetWidth;
-          lbImg.classList.add('opening');
-          lbImg.addEventListener('animationend', () => lbImg.classList.remove('opening'), { once: true });
-          return;
+          clearAnimClasses()
+          lbImg.src = it.src
+          lbImg.alt = it.alt
+          void lbImg.offsetWidth
+          lbImg.classList.add('opening')
+          lbImg.addEventListener('animationend', () => lbImg.classList.remove('opening'), { once: true })
+          return
         }
-        if (swapping) return;
-        swapping = true;
-        const outClass = dir > 0 ? 'swap-out-left' : 'swap-out-right';
-        const inClass  = dir > 0 ? 'swap-in-left'  : 'swap-in-right';
-        clearAnimClasses();
-        // restart animation
-        void lbImg.offsetWidth;
-        lbImg.classList.add(outClass);
+        if (swapping) return
+        swapping = true
+        const outClass = dir > 0 ? 'swap-out-left' : 'swap-out-right'
+        const inClass  = dir > 0 ? 'swap-in-left'  : 'swap-in-right'
+        clearAnimClasses()
+        void lbImg.offsetWidth
+        lbImg.classList.add(outClass)
         const onOut = () => {
-          lbImg.classList.remove(outClass);
-          lbImg.src = it.src;
-          lbImg.alt = it.alt;
-          void lbImg.offsetWidth;
-          lbImg.classList.add(inClass);
+          lbImg.classList.remove(outClass)
+          lbImg.src = it.src
+          lbImg.alt = it.alt
+          void lbImg.offsetWidth
+          lbImg.classList.add(inClass)
           const onIn = () => {
-            lbImg.classList.remove(inClass);
-            swapping = false;
-          };
-          lbImg.addEventListener('animationend', onIn, { once: true });
-        };
-        lbImg.addEventListener('animationend', onOut, { once: true });
-      };
+            lbImg.classList.remove(inClass)
+            swapping = false
+          }
+          lbImg.addEventListener('animationend', onIn, { once: true })
+        }
+        lbImg.addEventListener('animationend', onOut, { once: true })
+      }
 
       const openAt = (idx, trigger) => {
-        lastTrigger = trigger || null;
-        if (typeof dlg.showModal === 'function') dlg.showModal();
-        else dlg.setAttribute('open', '');
-        setImage(idx, 0);
-      };
+        lastTrigger = trigger || null
+        if (typeof dlg.showModal === 'function') dlg.showModal()
+        else dlg.setAttribute('open', '')
+        setImage(idx, 0)
+      }
 
       const close = () => {
-        if (!dlg.open) return;
-        dlg.classList.add('closing');
+        if (!dlg.open) return
+        dlg.classList.add('closing')
         const done = () => {
-          dlg.classList.remove('closing');
-          dlg.removeEventListener('animationend', done);
-          dlg.close();
-          if (lastTrigger) lastTrigger.focus();
-        };
-        // Fallback in case animationend doesn't fire
-        const t = setTimeout(done, 400);
-        dlg.addEventListener('animationend', () => { clearTimeout(t); done(); }, { once: true });
-      };
+          dlg.classList.remove('closing')
+          dlg.removeEventListener('animationend', done)
+          dlg.close()
+          if (lastTrigger) lastTrigger.focus()
+        }
+        const t = setTimeout(done, 400)
+        dlg.addEventListener('animationend', () => {
+          clearTimeout(t)
+          done()
+        }, { once: true })
+      }
 
       grid.addEventListener('click', (e) => {
-        const card = e.target.closest('.screenshot-card');
-        if (!card) return;
-        openAt(Number(card.dataset.index), card);
-      });
+        const card = e.target.closest('.screenshot-card')
+        if (!card) return
+        openAt(Number(card.dataset.index), card)
+      })
       grid.addEventListener('keydown', (e) => {
-        const card = e.target.closest('.screenshot-card');
-        if (!card) return;
+        const card = e.target.closest('.screenshot-card')
+        if (!card) return
         if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          openAt(Number(card.dataset.index), card);
+          e.preventDefault()
+          openAt(Number(card.dataset.index), card)
         }
-      });
+      })
 
-      btnPrev.addEventListener('click', () => setImage(currentIndex - 1, -1));
-      btnNext.addEventListener('click', () => setImage(currentIndex + 1, +1));
-      btnX.addEventListener('click', close);
+      btnPrev.addEventListener('click', () => setImage(currentIndex - 1, -1))
+      btnNext.addEventListener('click', () => setImage(currentIndex + 1, +1))
+      btnX.addEventListener('click', close)
 
       dlg.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowLeft')  { e.preventDefault(); setImage(currentIndex - 1, -1); }
-        else if (e.key === 'ArrowRight') { e.preventDefault(); setImage(currentIndex + 1, +1); }
-      });
-      dlg.addEventListener('cancel', (e) => { e.preventDefault(); close(); });
-      // Click on backdrop (not on stage children) closes
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault()
+          setImage(currentIndex - 1, -1)
+        }
+        else if (e.key === 'ArrowRight') {
+          e.preventDefault()
+          setImage(currentIndex + 1, +1)
+        }
+      })
+      dlg.addEventListener('cancel', (e) => {
+        e.preventDefault()
+        close()
+      })
       dlg.addEventListener('click', (e) => {
-        if (e.target === dlg) close();
-      });
-    })();
+        if (e.target === dlg)
+          close()
+      })
+    }
 
     // ── Pointer light source (multi-touch, candle flicker, decay on release) ──
-    (() => {
-      const canvas = document.getElementById('pointer-light');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function applyLighting () {
+      const canvas = document.getElementById('pointer-light')
+      if (!canvas) return
+      const ctx = canvas.getContext('2d')
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
 
-      const points = new Map(); // pointerId -> { x, y, tx, ty, intensity, radius, released, seed, hueShift, prevFlicker }
-      let dpr = 1;
-      let baseR = 0;
-      let accentRGB = '255, 0, 119';
+      const points = new Map()
+      let dpr = 1
+      let baseR = 0
+      let accentRGB = '255, 0, 119'
 
       const readAccent = () => {
-        const v = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-        if (!v) return;
-        const probe = document.createElement('span');
-        probe.style.color = v;
-        document.body.appendChild(probe);
-        const c = getComputedStyle(probe).color;
-        document.body.removeChild(probe);
-        const m = c.match(/(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/);
-        if (m) accentRGB = `${m[1]}, ${m[2]}, ${m[3]}`;
-      };
+        const v = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+        if (!v) return
+        const probe = document.createElement('span')
+        probe.style.color = v
+        document.body.appendChild(probe)
+        const c = getComputedStyle(probe).color
+        document.body.removeChild(probe)
+        const m = c.match(/(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/)
+        if (m) accentRGB = `${m[1]}, ${m[2]}, ${m[3]}`
+      }
 
       const resize = () => {
-        dpr = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width  = Math.floor(innerWidth  * dpr);
-        canvas.height = Math.floor(innerHeight * dpr);
-        canvas.style.width  = innerWidth  + 'px';
-        canvas.style.height = innerHeight + 'px';
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        baseR = Math.min(innerWidth, innerHeight) * 0.18;
-      };
+        dpr = Math.min(window.devicePixelRatio || 1, 2)
+        canvas.width  = Math.floor(innerWidth  * dpr)
+        canvas.height = Math.floor(innerHeight * dpr)
+        canvas.style.width  = innerWidth  + 'px'
+        canvas.style.height = innerHeight + 'px'
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        baseR = Math.min(innerWidth, innerHeight) * 0.18
+      }
 
       const upsert = (id, x, y) => {
-        const cur = points.get(id);
-        if (cur) { cur.tx = x; cur.ty = y; cur.intensity = 1; cur.radius = baseR; cur.released = false; }
+        const cur = points.get(id)
+        if (cur) {
+          cur.tx = x
+          cur.ty = y
+          cur.intensity = 1
+          cur.radius = baseR
+          cur.released = false
+        }
         else points.set(id, {
-          x, y, tx: x, ty: y,
-          intensity: 1, radius: baseR, released: false,
+          x,
+          y,
+          tx: x,
+          ty: y,
+          intensity: 1,
+          radius: baseR,
+          released: false,
           seed: Math.random() * 1000,
           prevFlicker: 1,
-        });
-      };
+        })
+      }
       const release = (id) => {
-        const p = points.get(id);
-        if (p) p.released = true;
-      };
+        const p = points.get(id)
+        if (p)
+          p.released = true
+      }
 
-      // Cheap multi-octave noise (sin combo) — looks organic enough for candle flicker
       const flickerNoise = (t, seed) => {
-        const a = Math.sin(t * 11.7 + seed) * 0.5;
-        const b = Math.sin(t * 4.3  + seed * 1.7) * 0.3;
-        const c = Math.sin(t * 23.1 + seed * 0.6) * 0.18;
-        const d = Math.sin(t * 2.1  + seed * 2.3) * 0.12;
-        // sporadic stronger dips
-        const gust = Math.max(0, Math.sin(t * 1.3 + seed * 3.1) - 0.7) * 1.6;
-        return 1 + (a + b + c + d) * 0.18 - gust * 0.35;
-      };
+        const a = Math.sin(t * 11.7 + seed) * 0.5
+        const b = Math.sin(t * 4.3  + seed * 1.7) * 0.3
+        const c = Math.sin(t * 23.1 + seed * 0.6) * 0.18
+        const d = Math.sin(t * 2.1  + seed * 2.3) * 0.12
+        const gust = Math.max(0, Math.sin(t * 1.3 + seed * 3.1) - 0.7) * 1.6
+        return 1 + (a + b + c + d) * 0.18 - gust * 0.35
+      }
 
-      let last = performance.now();
+      let last = performance.now()
       const draw = (now) => {
-        const dt = Math.min(0.05, (now - last) / 1000);
-        last = now;
-        const t = now / 1000;
+        const dt = Math.min(0.05, (now - last) / 1000)
+        last = now
+        const t = now / 1000
 
-        ctx.clearRect(0, 0, innerWidth, innerHeight);
-        ctx.globalCompositeOperation = 'lighter';
+        ctx.clearRect(0, 0, innerWidth, innerHeight)
+        ctx.globalCompositeOperation = 'lighter'
 
         for (const [id, p] of points) {
-          // ease toward target so the flame "trails" the pointer slightly
-          const lerp = reduced ? 1 : 0.35;
-          p.x += (p.tx - p.x) * lerp;
-          p.y += (p.ty - p.y) * lerp;
+          const lerp = reduced ? 1 : 0.35
+          p.x += (p.tx - p.x) * lerp
+          p.y += (p.ty - p.y) * lerp
 
           if (p.released) {
-            p.intensity *= Math.pow(0.96, dt * 60);
-            p.radius    *= Math.pow(1.02, dt * 60);
-            if (p.intensity < 0.02) { points.delete(id); continue; }
+            p.intensity *= Math.pow(0.96, dt * 60)
+            p.radius    *= Math.pow(1.02, dt * 60)
+            if (p.intensity < 0.02) {
+              points.delete(id)
+              continue
+            }
           }
 
-          // Candle flicker: noise on intensity + small radius + slight position jitter
-          let flicker = reduced ? 1 : flickerNoise(t, p.seed);
-          // smooth toward new flicker value to avoid harsh jumps
-          flicker = p.prevFlicker + (flicker - p.prevFlicker) * 0.6;
-          p.prevFlicker = flicker;
-          flicker = Math.max(0.55, Math.min(1.25, flicker));
+          let flicker = reduced ? 1 : flickerNoise(t, p.seed)
+          flicker = p.prevFlicker + (flicker - p.prevFlicker) * 0.6
+          p.prevFlicker = flicker
+          flicker = Math.max(0.55, Math.min(1.25, flicker))
 
-          const jitterX = reduced ? 0 : Math.sin(t * 7.3 + p.seed)       * baseR * 0.012;
-          const jitterY = reduced ? 0 : Math.sin(t * 9.1 + p.seed * 1.9) * baseR * 0.012;
+          const jitterX = reduced ? 0 : Math.sin(t * 7.3 + p.seed)       * baseR * 0.012
+          const jitterY = reduced ? 0 : Math.sin(t * 9.1 + p.seed * 1.9) * baseR * 0.012
 
-          const cx = p.x + jitterX;
-          const cy = p.y + jitterY;
-          const r  = p.radius * (0.9 + 0.18 * flicker);
-          const inner = 0.55 * p.intensity * flicker;
-          const mid   = 0.18 * p.intensity * flicker;
+          const cx = p.x + jitterX
+          const cy = p.y + jitterY
+          const r  = p.radius * (0.9 + 0.18 * flicker)
+          const inner = 0.55 * p.intensity * flicker
+          const mid   = 0.18 * p.intensity * flicker
 
-          // Warm core: shift slightly toward yellow as flicker peaks (candle flame glow)
-          const warmR = Math.min(255, Number(accentRGB.split(',')[0]) + 30 * flicker);
-          const warmG = Math.min(255, Number(accentRGB.split(',')[1]) + 60 * flicker);
-          const warmB =                Number(accentRGB.split(',')[2]);
+          const warmR = Math.min(255, Number(accentRGB.split(',')[0]) + 30 * flicker)
+          const warmG = Math.min(255, Number(accentRGB.split(',')[1]) + 60 * flicker)
+          const warmB =                Number(accentRGB.split(',')[2])
 
-          const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-          grad.addColorStop(0,    `rgba(${warmR}, ${warmG}, ${warmB}, ${inner})`);
-          grad.addColorStop(0.35, `rgba(${accentRGB}, ${mid})`);
-          grad.addColorStop(1,    `rgba(${accentRGB}, 0)`);
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.arc(cx, cy, r, 0, Math.PI * 2);
-          ctx.fill();
+          const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
+          grad.addColorStop(0,    `rgba(${warmR}, ${warmG}, ${warmB}, ${inner})`)
+          grad.addColorStop(0.35, `rgba(${accentRGB}, ${mid})`)
+          grad.addColorStop(1,    `rgba(${accentRGB}, 0)`)
+          ctx.fillStyle = grad
+          ctx.beginPath()
+          ctx.arc(cx, cy, r, 0, Math.PI * 2)
+          ctx.fill()
         }
-        requestAnimationFrame(draw);
-      };
+        requestAnimationFrame(draw)
+      }
 
-      readAccent();
-      resize();
-      addEventListener('resize', resize, { passive: true });
+      readAccent()
+      resize()
+      addEventListener('resize', resize, { passive: true })
 
-      addEventListener('pointermove', (e) => upsert(e.pointerId, e.clientX, e.clientY), { passive: true });
-      addEventListener('pointerdown', (e) => upsert(e.pointerId, e.clientX, e.clientY), { passive: true });
-      addEventListener('pointerup',     (e) => release(e.pointerId), { passive: true });
-      addEventListener('pointercancel', (e) => release(e.pointerId), { passive: true });
-      addEventListener('pointerleave',  (e) => release(e.pointerId), { passive: true });
-      document.addEventListener('mouseleave', () => { for (const id of points.keys()) release(id); });
+      addEventListener('pointermove', (e) => upsert(e.pointerId, e.clientX, e.clientY), { passive: true })
+      addEventListener('pointerdown', (e) => upsert(e.pointerId, e.clientX, e.clientY), { passive: true })
+      addEventListener('pointerup',     (e) => release(e.pointerId), { passive: true })
+      addEventListener('pointercancel', (e) => release(e.pointerId), { passive: true })
+      addEventListener('pointerleave',  (e) => release(e.pointerId), { passive: true })
+      document.addEventListener('mouseleave', () => { for (const id of points.keys()) release(id) })
 
-      requestAnimationFrame(draw);
-    })();
+      requestAnimationFrame(draw)
+    }
+
+    // ── Hero canvas: sine waves + wireframe stars + cursor gradient ──
+    function drawEffects () {
+      const canvas = document.getElementById('hero-canvas')
+      if (!canvas) return
+      const ctx = canvas.getContext('2d')
+      const overlay = document.querySelector('.hero-gradient-overlay')
+      const hBloom = document.querySelector('.hero-h-bloom')
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+      const waveformContainer = document.querySelector('.hero-waveform')
+
+      let dpr = 1
+      let W = 0, H = 0
+      let mouseX = -1000, mouseY = -1000
+      let smoothMouseX = -1000, smoothMouseY = -1000
+      let gradX = -1000, gradY = -1000
+      let scrollPanX = 0, scrollPanY = 0
+
+      const STAR_COUNT = 55
+      const WAVE_BAND = 0.14        // fraction of H around wave Y where stars are suppressed
+      const NEAREST_K = 3           // connections per vertex
+      const HIGHLIGHT_RADIUS = 380
+      const FLARE_RADIUS = 180
+      const stars = []
+      const sparks = []
+      const gravityWaves = []
+      let prevHighlightedEdges = new Set()
+      let lastProminentEdgeKey = null
+
+      const generateStars = () => {
+        stars.length = 0
+        const waveY = H * 0.55
+        const bandTop = waveY - H * WAVE_BAND
+        const bandBot = waveY + H * WAVE_BAND
+        for (let i = 0; i < STAR_COUNT; i++) {
+          let y
+          do {
+            y = Math.random() * H
+          } while (y > bandTop && y < bandBot && Math.random() > 0.15)
+          stars.push({
+            x: Math.random() * W,
+            y,
+            size: Math.random() * 1.8 + 0.6,
+            baseAlpha: Math.random() * 0.06 + 0.01,
+          })
+        }
+      }
+
+      const resize = () => {
+        dpr = Math.min(window.devicePixelRatio || 1, 2)
+        const hero = document.getElementById('hero')
+        W = hero.offsetWidth
+        H = hero.offsetHeight
+        canvas.width = Math.floor(W * dpr)
+        canvas.height = Math.floor(H * dpr)
+        canvas.style.width = W + 'px'
+        canvas.style.height = H + 'px'
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        generateStars()
+      }
+
+      const onPointerMove = (e) => {
+        const rect = canvas.getBoundingClientRect()
+        mouseX = e.clientX - rect.left
+        mouseY = e.clientY - rect.top
+      }
+      const onPointerLeave = () => {
+        mouseX = -1000
+        mouseY = -1000
+      }
+
+      canvas.addEventListener('pointermove', onPointerMove, { passive: true })
+      canvas.addEventListener('pointerleave', onPointerLeave, { passive: true })
+      document.addEventListener('pointermove', (e) => {
+        const rect = canvas.getBoundingClientRect()
+        mouseX = e.clientX - rect.left
+        mouseY = e.clientY - rect.top
+      }, { passive: true })
+
+      const updateGradient = (gx, gy) => {
+        if (!overlay) return
+        const nx = gx / W
+        const ny = gy / H
+        const angle = 120 + (nx - 0.5) * 30 + (ny - 0.5) * 15
+        const hueShift1 = (nx - 0.5) * 20
+        const hueShift2 = (ny - 0.5) * 15
+
+        overlay.style.background = `linear-gradient(
+          ${angle}deg,
+          hsl(${340 + hueShift1} 80% 85% / 0.10) 0%,
+          hsl(${280 + hueShift2} 70% 80% / 0.08) 35%,
+          hsl(${220 - hueShift1} 75% 82% / 0.10) 65%,
+          hsl(${300 + hueShift2} 60% 88% / 0.08) 100%
+        )`
+
+        if (hBloom) {
+          hBloom.style.transform = `translateY(${gy}px)`
+        }
+      }
+
+      const drawFlare = (x, y, alpha, radius) => {
+        if (alpha < 0.05) return
+        const len = radius * 3.5
+        const thin = radius * 0.2
+
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.globalAlpha = alpha
+
+        const outerGrad = ctx.createRadialGradient(x, y, radius * 0.3, x, y, radius * 2)
+        outerGrad.addColorStop(0, `rgba(255, 220, 240, ${alpha * 0.15})`)
+        outerGrad.addColorStop(1, 'rgba(255, 180, 210, 0)')
+        ctx.fillStyle = outerGrad
+        ctx.beginPath()
+        ctx.arc(x, y, radius * 2, 0, Math.PI * 2)
+        ctx.fill()
+
+        const hGrad = ctx.createLinearGradient(x - len, y, x + len, y)
+        hGrad.addColorStop(0, 'rgba(255, 200, 220, 0)')
+        hGrad.addColorStop(0.35, `rgba(255, 220, 240, ${alpha * 0.6})`)
+        hGrad.addColorStop(0.5, `rgba(255, 250, 255, ${alpha})`)
+        hGrad.addColorStop(0.65, `rgba(255, 220, 240, ${alpha * 0.6})`)
+        hGrad.addColorStop(1, 'rgba(255, 200, 220, 0)')
+        ctx.fillStyle = hGrad
+        ctx.fillRect(x - len, y - thin, len * 2, thin * 2)
+
+        const vGrad = ctx.createLinearGradient(x, y - len * 0.7, x, y + len * 0.7)
+        vGrad.addColorStop(0, 'rgba(255, 200, 220, 0)')
+        vGrad.addColorStop(0.35, `rgba(255, 220, 240, ${alpha * 0.5})`)
+        vGrad.addColorStop(0.5, `rgba(255, 250, 255, ${alpha * 0.9})`)
+        vGrad.addColorStop(0.65, `rgba(255, 220, 240, ${alpha * 0.5})`)
+        vGrad.addColorStop(1, 'rgba(255, 200, 220, 0)')
+        ctx.fillStyle = vGrad
+        ctx.fillRect(x - thin, y - len * 0.7, thin * 2, len * 1.4)
+
+        const diagLen = len * 0.6
+        const diagThin = thin * 0.6
+        ctx.rotate(Math.PI / 4)
+        const dGrad1 = ctx.createLinearGradient(x - diagLen, y, x + diagLen, y)
+        dGrad1.addColorStop(0, 'rgba(255, 200, 220, 0)')
+        dGrad1.addColorStop(0.5, `rgba(255, 230, 245, ${alpha * 0.4})`)
+        dGrad1.addColorStop(1, 'rgba(255, 200, 220, 0)')
+        ctx.fillStyle = dGrad1
+        ctx.fillRect(x - diagLen, y - diagThin, diagLen * 2, diagThin * 2)
+        ctx.rotate(-Math.PI / 2)
+        const dGrad2 = ctx.createLinearGradient(x - diagLen, y, x + diagLen, y)
+        dGrad2.addColorStop(0, 'rgba(255, 200, 220, 0)')
+        dGrad2.addColorStop(0.5, `rgba(255, 230, 245, ${alpha * 0.4})`)
+        dGrad2.addColorStop(1, 'rgba(255, 200, 220, 0)')
+        ctx.fillStyle = dGrad2
+        ctx.fillRect(x - diagLen, y - diagThin, diagLen * 2, diagThin * 2)
+        ctx.rotate(Math.PI / 4)
+
+        const cGrad = ctx.createRadialGradient(x, y, 0, x, y, radius)
+        cGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`)
+        cGrad.addColorStop(0.2, `rgba(255, 230, 245, ${alpha * 0.7})`)
+        cGrad.addColorStop(0.5, `rgba(255, 200, 225, ${alpha * 0.3})`)
+        cGrad.addColorStop(1, 'rgba(255, 180, 210, 0)')
+        ctx.fillStyle = cGrad
+        ctx.beginPath()
+        ctx.arc(x, y, radius, 0, Math.PI * 2)
+        ctx.fill()
+
+        ctx.restore()
+      }
+
+      const spawnSparks = (x1, y1, x2, y2, count = 12) => {
+        for (let i = 0; i < count; i++) {
+          const t = Math.random()
+          const px = x1 + (x2 - x1) * t
+          const py = y1 + (y2 - y1) * t
+          const angle = Math.atan2(y2 - y1, x2 - x1) + (Math.random() - 0.5) * Math.PI * 0.8
+          const speed = 0.5 + Math.random() * 2
+          sparks.push({
+            x: px, y: py,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            decay: 0.02 + Math.random() * 0.03,
+            size: 0.8 + Math.random() * 1.5,
+            hue: 320 + Math.random() * 40,
+          })
+        }
+      }
+
+      const drawSparks = () => {
+        ctx.globalCompositeOperation = 'lighter'
+        for (let i = sparks.length - 1; i >= 0; i--) {
+          const s = sparks[i]
+          s.x += s.vx
+          s.y += s.vy
+          s.vy += 0.02
+          s.life -= s.decay
+          if (s.life <= 0) { sparks.splice(i, 1); continue }
+          ctx.globalAlpha = s.life * 0.9
+          ctx.fillStyle = `hsl(${s.hue}, 100%, ${70 + s.life * 30}%)`
+          ctx.beginPath()
+          ctx.arc(s.x, s.y, s.size * s.life, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        ctx.globalAlpha = 1
+        ctx.globalCompositeOperation = 'source-over'
+      }
+
+      const spawnGravityWave = (x, y, maxRadius = 120) => {
+        gravityWaves.push({ x, y, radius: 2, maxRadius, life: 1, speed: 2.5 })
+      }
+
+      const drawGravityWaves = () => {
+        ctx.globalCompositeOperation = 'lighter'
+        for (let i = gravityWaves.length - 1; i >= 0; i--) {
+          const w = gravityWaves[i]
+          w.radius += w.speed
+          w.life = 1 - w.radius / w.maxRadius
+          if (w.life <= 0) { gravityWaves.splice(i, 1); continue }
+          const alpha = w.life * 0.6
+          const lineWidth = 1 + w.life * 2
+
+          ctx.globalAlpha = alpha
+          ctx.strokeStyle = `rgba(255, 200, 230, ${alpha})`
+          ctx.lineWidth = lineWidth
+          ctx.beginPath()
+          ctx.arc(w.x, w.y, w.radius, 0, Math.PI * 2)
+          ctx.stroke()
+
+          if (w.radius > 15) {
+            ctx.globalAlpha = alpha * 0.3
+            ctx.strokeStyle = `rgba(255, 170, 220, ${alpha * 0.5})`
+            ctx.lineWidth = lineWidth * 0.5
+            ctx.beginPath()
+            ctx.arc(w.x, w.y, w.radius * 0.6, 0, Math.PI * 2)
+            ctx.stroke()
+          }
+        }
+        ctx.globalAlpha = 1
+        ctx.globalCompositeOperation = 'source-over'
+      }
+
+      const drawSineWave = (time, yOffset, amplitude, frequency, speed, baseAlpha, baseColor, highlightColor, displacements) => {
+        const segmentLen = 4
+        const barCount = displacements ? displacements.length : 0
+
+        for (let x = 0; x < W; x += segmentLen) {
+          const xEnd = Math.min(x + segmentLen, W)
+          const phase1 = x * frequency + time * speed
+          const phase2 = xEnd * frequency + time * speed
+
+          let disp1 = 0, disp2 = 0
+          if (displacements && barCount > 0) {
+            const barIdx = Math.min(Math.floor((x / W) * barCount), barCount - 1)
+            const barIdx2 = Math.min(Math.floor((xEnd / W) * barCount), barCount - 1)
+            disp1 = displacements[barIdx] * 35
+            disp2 = displacements[barIdx2] * 35
+          }
+
+          const y1 = yOffset + Math.sin(phase1) * amplitude + disp1
+          const y2 = yOffset + Math.sin(phase2) * amplitude + disp2
+
+          const midX = (x + xEnd) / 2
+          const midY = (y1 + y2) / 2
+          const dx = midX - smoothMouseX
+          const dy = midY - smoothMouseY
+          const dist = Math.sqrt(dx * dx + dy * dy)
+
+          const hasPointer = smoothMouseX > -500
+          const highlightRadius = 200
+
+          let alpha, color, lineWidth
+
+          if (hasPointer && dist < highlightRadius) {
+            const proximity = 1 - dist / highlightRadius
+            const eased = proximity * proximity
+            alpha = baseAlpha + eased * 0.6
+            color = eased > 0.3 ? highlightColor : baseColor
+            lineWidth = 1.5 + eased * 2
+          } else {
+            alpha = baseAlpha
+            color = baseColor
+            lineWidth = 1.5
+          }
+
+          ctx.beginPath()
+          ctx.strokeStyle = color
+          ctx.lineWidth = lineWidth
+          ctx.globalAlpha = alpha
+          ctx.globalCompositeOperation = 'lighter'
+          ctx.moveTo(x, y1)
+          ctx.lineTo(xEnd, y2)
+          ctx.stroke()
+        }
+
+        ctx.globalAlpha = 1
+        ctx.globalCompositeOperation = 'source-over'
+      }
+
+      let last = performance.now()
+      let waveTime = 0
+      let frameCount = 0
+      let cachedBars = null
+
+      const draw = (now) => {
+        const dt = Math.min(0.05, (now - last) / 1000)
+        last = now
+        if (!reduced) waveTime += dt * 0.8
+        frameCount++
+
+        const lerp = reduced ? 1 : 0.12
+        smoothMouseX += (mouseX - smoothMouseX) * lerp
+        smoothMouseY += (mouseY - smoothMouseY) * lerp
+
+        const gradLerp = reduced ? 1 : 0.04
+        gradX += (mouseX - gradX) * gradLerp
+        gradY += (mouseY - gradY) * gradLerp
+
+        const hasPointer = smoothMouseX > -500
+        if (hasPointer) {
+          updateGradient(gradX, gradY)
+        } else {
+          if (hBloom) hBloom.style.transform = 'translateY(-2000px)'
+        }
+
+        // Pan offset: scroll + pointer influence
+        const pointerPanX = hasPointer ? (smoothMouseX / W - 0.5) * 30 : 0
+        const pointerPanY = hasPointer ? (smoothMouseY / H - 0.5) * 20 : 0
+        const panX = scrollPanX + pointerPanX
+        const panY = scrollPanY + pointerPanY
+
+        // Compute pan-adjusted positions once per frame
+        const rx = new Float32Array(stars.length)
+        const ry = new Float32Array(stars.length)
+        for (let i = 0; i < stars.length; i++) {
+          rx[i] = stars[i].x + panX
+          ry[i] = stars[i].y + panY
+        }
+
+        ctx.clearRect(0, 0, W, H)
+
+        const waveY = H * 0.55
+        drawSineWave(
+          waveTime, waveY, 25, 0.012, 1.2,
+          0.3,
+          'rgba(255, 120, 180, 0.5)',
+          'rgba(255, 180, 220, 1.0)',
+          null
+        )
+        drawSineWave(
+          waveTime + 1.5, waveY + 15, 18, 0.009, 0.5,
+          0.2,
+          'rgba(180, 140, 255, 0.4)',
+          'rgba(200, 170, 255, 1.0)',
+          cachedBars
+        )
+
+        // Draw stars with pan offsets
+        for (let i = 0; i < stars.length; i++) {
+          const px = rx[i]
+          const py = ry[i]
+          const dx = px - smoothMouseX
+          const dy = py - smoothMouseY
+          const dist = Math.sqrt(dx * dx + dy * dy)
+
+          let alpha = stars[i].baseAlpha
+          let flareAlpha = 0
+          let sizeMult = 1
+
+          if (hasPointer && dist < HIGHLIGHT_RADIUS) {
+            const proximity = 1 - dist / HIGHLIGHT_RADIUS
+            const eased = proximity * (2 - proximity)
+            alpha = stars[i].baseAlpha + eased * 0.85
+            sizeMult = 1 + eased * 3
+            if (dist < FLARE_RADIUS) {
+              flareAlpha = (1 - dist / FLARE_RADIUS) * 0.95
+            }
+          }
+
+          ctx.globalAlpha = alpha
+          ctx.fillStyle = '#fff'
+          ctx.beginPath()
+          ctx.arc(px, py, stars[i].size * sizeMult, 0, Math.PI * 2)
+          ctx.fill()
+
+          if (hasPointer && dist < HIGHLIGHT_RADIUS * 0.7) {
+            const proximity = 1 - dist / (HIGHLIGHT_RADIUS * 0.7)
+            const haloAlpha = proximity * 0.4
+            const haloGrad = ctx.createRadialGradient(px, py, 0, px, py, stars[i].size * 6)
+            haloGrad.addColorStop(0, `rgba(255, 200, 230, ${haloAlpha})`)
+            haloGrad.addColorStop(1, 'rgba(255, 180, 220, 0)')
+            ctx.fillStyle = haloGrad
+            ctx.beginPath()
+            ctx.arc(px, py, stars[i].size * 6, 0, Math.PI * 2)
+            ctx.fill()
+          }
+
+          if (flareAlpha > 0.05) {
+            drawFlare(px, py, flareAlpha, stars[i].size * 6)
+          }
+        }
+
+        // Draw wireframe edges — each star connects to its NEAREST_K closest neighbors
+        if (hasPointer) {
+          const currentHighlighted = new Set()
+        let mostProminentEdge = null
+        let maxProximity = -1
+
+        for (let i = 0; i < stars.length; i++) {
+          // Find K nearest neighbors
+          const dists = []
+          for (let j = 0; j < stars.length; j++) {
+            if (i === j) continue
+            const ddx = rx[i] - rx[j]
+            const ddy = ry[i] - ry[j]
+            dists.push({ j, d: ddx * ddx + ddy * ddy })
+          }
+          dists.sort((a, b) => a.d - b.d)
+          const neighbors = dists.slice(0, NEAREST_K)
+
+          for (const { j, d } of neighbors) {
+            const pairKey = i < j ? `${i}-${j}` : `${j}-${i}`
+            if (currentHighlighted.has(pairKey)) continue
+            currentHighlighted.add(pairKey)
+
+            const midX = (rx[i] + rx[j]) / 2
+            const midY = (ry[i] + ry[j]) / 2
+            const midDx = midX - smoothMouseX
+            const midDy = midY - smoothMouseY
+            const midDist = Math.sqrt(midDx * midDx + midDy * midDy)
+
+            const starDist = Math.min(
+              Math.sqrt((rx[i] - smoothMouseX) ** 2 + (ry[i] - smoothMouseY) ** 2),
+              Math.sqrt((rx[j] - smoothMouseX) ** 2 + (ry[j] - smoothMouseY) ** 2)
+            )
+
+            if (midDist > HIGHLIGHT_RADIUS && starDist > HIGHLIGHT_RADIUS) continue
+
+            const proximity = midDist < HIGHLIGHT_RADIUS
+              ? 1 - midDist / HIGHLIGHT_RADIUS
+              : Math.max(0, 1 - starDist / HIGHLIGHT_RADIUS) * 0.5
+
+            const eased = proximity * proximity
+            ctx.globalAlpha = eased * 0.7
+            ctx.lineWidth = 0.6 + eased * 1.8
+            ctx.strokeStyle = `rgba(255, 200, 230, ${eased})`
+            ctx.beginPath()
+            ctx.moveTo(rx[i], ry[i])
+            ctx.lineTo(rx[j], ry[j])
+            ctx.stroke()
+
+            if (eased > maxProximity) {
+              maxProximity = eased
+              mostProminentEdge = { x1: rx[i], y1: ry[i], x2: rx[j], y2: ry[j] }
+            }
+          }
+        }
+
+        // Emit particles from the most prominent edge
+        if (mostProminentEdge && frameCount % 2 === 0) {
+          spawnSparks(mostProminentEdge.x1, mostProminentEdge.y1, mostProminentEdge.x2, mostProminentEdge.y2, 8)
+        }
+
+        // Gravity waves on finished edges
+        for (const oldKey of prevHighlightedEdges) {
+          if (!currentHighlighted.has(oldKey)) {
+            const parts = oldKey.split('-').map(Number)
+            const si = parts[0], sj = parts[1]
+            if (stars[si] && stars[sj]) {
+              const mx = (rx[si] + rx[sj]) / 2
+              const my = (ry[si] + ry[sj]) / 2
+              spawnGravityWave(mx, my, 120)
+            }
+          }
+        }
+        prevHighlightedEdges = currentHighlighted
+      } else {
+          if (prevHighlightedEdges.size > 0) {
+            for (const oldKey of prevHighlightedEdges) {
+              const parts = oldKey.split('-').map(Number)
+              const si = parts[0], sj = parts[1]
+              if (stars[si] && stars[sj]) {
+                const mx = (rx[si] + rx[sj]) / 2
+                const my = (ry[si] + ry[sj]) / 2
+                spawnGravityWave(mx, my, 80)
+              }
+            }
+            prevHighlightedEdges.clear()
+          }
+        }
+
+        drawSparks()
+        drawGravityWaves()
+
+        ctx.globalAlpha = 1
+        requestAnimationFrame(draw)
+      }
+
+      resize()
+      addEventListener('resize', () => { resize(); prevHighlightedEdges.clear() }, { passive: true })
+      requestAnimationFrame(draw)
+    }
+
+    // ── Full-page glitch overlay ──
+    function applyGlitchEffect () {
+      const canvas = document.getElementById('glitch-overlay')
+      if (!canvas) return
+      const ctx = canvas.getContext('2d')
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+      if (reduced) return
+
+      let dpr = 1, W = 0, H = 0
+      let cursorX = -1000, cursorY = -1000
+      let smoothX = -1000, smoothY = -1000
+      let glitchTime = 0
+
+      const resize = () => {
+        dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+        W = innerWidth
+        H = innerHeight
+        canvas.width = Math.floor(W * dpr)
+        canvas.height = Math.floor(H * dpr)
+        canvas.style.width = W + 'px'
+        canvas.style.height = H + 'px'
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      }
+
+      addEventListener('pointermove', (e) => {
+        cursorX = e.clientX
+        cursorY = e.clientY
+      }, { passive: true })
+      addEventListener('pointerleave', () => { cursorX = -1000; cursorY = -1000 }, { passive: true })
+
+      const drawScanlines = (intensity) => {
+        ctx.globalAlpha = intensity * 0.15
+        ctx.fillStyle = '#000'
+        for (let y = 0; y < H; y += 4) {
+          ctx.fillRect(0, y, W, 1)
+        }
+      }
+
+      const drawColorBlocks = (intensity) => {
+        const count = Math.floor(intensity * 30)
+        const colors = [
+          `rgba(255, 0, 60, ${intensity * 0.4})`,
+          `rgba(0, 200, 255, ${intensity * 0.3})`,
+          `rgba(255, 255, 0, ${intensity * 0.2})`,
+        ]
+        for (let i = 0; i < count; i++) {
+          ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)]
+          const x = Math.random() * W
+          const y = Math.random() * H
+          const w = 20 + Math.random() * 80 * intensity
+          const h = 1 + Math.random() * 4
+          ctx.fillRect(x, y, w, h)
+        }
+      }
+
+      const drawFragmentation = (intensity, cy) => {
+        if (intensity < 0.02) return
+        const count = Math.floor(intensity * 15)
+        for (let i = 0; i < count; i++) {
+          const y = cy + (Math.random() - 0.5) * 300
+          const h = 1 + Math.random() * 3
+          const shift = (Math.random() - 0.5) * 80 * intensity
+          ctx.fillStyle = `rgba(255, 220, 240, ${intensity * 0.3})`
+          ctx.fillRect(shift, y, W, h)
+          ctx.fillStyle = `rgba(100, 200, 255, ${intensity * 0.2})`
+          ctx.fillRect(shift * 0.5, y + 2, W, h)
+        }
+      }
+
+      const drawDigitalNoise = (intensity) => {
+        const count = Math.floor(intensity * 200)
+        ctx.fillStyle = `rgba(255, 255, 255, ${intensity * 0.15})`
+        for (let i = 0; i < count; i++) {
+          const x = Math.random() * W
+          const y = Math.random() * H
+          const s = 1 + Math.random() * 2
+          ctx.fillRect(x, y, s, s)
+        }
+      }
+
+      let frame = 0
+      const render = (now) => {
+        requestAnimationFrame(render)
+        frame++
+        if (frame % 2 !== 0) return
+
+        const dt = 0.016
+        glitchTime += dt
+
+        smoothX += (cursorX - smoothX) * 0.08
+        smoothY += (cursorY - smoothY) * 0.08
+
+        const hasCursor = cursorY > -500
+
+        const pulse = Math.sin(glitchTime * 0.7) * 0.5 + 0.5
+        const randomJitter = Math.random() * 0.015
+        let baseIntensity = 0.008 + pulse * 0.012 + randomJitter
+
+        let cursorBoost = 0
+        if (hasCursor) {
+          const yDist = Math.abs(smoothY - cursorY)
+          const xFactor = Math.max(0, 1 - Math.abs(smoothX - W / 2) / (W * 0.6))
+          cursorBoost = Math.max(0, 1 - yDist / 500) * xFactor * 0.08
+        }
+
+        const intensity = baseIntensity + cursorBoost
+
+        ctx.clearRect(0, 0, W, H)
+        ctx.globalCompositeOperation = 'screen'
+        ctx.globalAlpha = 1
+
+        if (intensity > 0.005) {
+          drawScanlines(intensity)
+          drawColorBlocks(intensity)
+          drawDigitalNoise(intensity)
+          if (hasCursor && cursorBoost > 0.01) {
+            drawFragmentation(cursorBoost, smoothY)
+          }
+        }
+      }
+    }
+
+      resize()
+      addEventListener('resize', resize, { passive: true })
+      requestAnimationFrame(render)
   </script>
 </body>
 </html>
