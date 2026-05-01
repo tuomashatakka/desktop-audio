@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react'
 import { Model } from './Model'
 
-export function useObservable<K extends string, V>(model: Model | null, key: K): V | undefined {
+
+export function useObservable<K extends string, V> (model: Model | null, key: K): V | undefined {
   return useSyncExternalStore(
     (onStoreChange: () => void) => {
       if (!model)
@@ -14,15 +15,15 @@ export function useObservable<K extends string, V>(model: Model | null, key: K):
       }
     },
     () => {
-        if (!model)
-          return undefined
-        return (model as unknown as Record<string, unknown>)[key] as V
-      },
-    () => undefined,
+      if (!model)
+        return
+      return (model as unknown as Record<string, unknown>)[key] as V
+    },
+    () => {},
   )
 }
 
-export function useModelDirty(model: Model | null): boolean {
+export function useModelDirty (model: Model | null): boolean {
   return useSyncExternalStore(
     (onStoreChange: () => void) => {
       if (!model)
@@ -34,7 +35,9 @@ export function useModelDirty(model: Model | null): boolean {
         model.removeEventListener('flush', onStoreChange)
       }
     },
-    () => model?.dirty ?? false,
-    () => false,
+    () =>
+      model?.dirty ?? false,
+    () =>
+      false,
   )
 }

@@ -26,11 +26,15 @@ export function init (win: BrowserWindow): void {
     supportedInterfaces: [ 'player' ],
   })
 
-  mprisPlayer.on('play',     () => win.webContents.send('media:play-pause'))
-  mprisPlayer.on('pause',    () => win.webContents.send('media:play-pause'))
-  mprisPlayer.on('next',     () => win.webContents.send('media:next'))
-  mprisPlayer.on('previous', () => win.webContents.send('media:prev'))
-  mprisPlayer.on('seek',     (delta: number) =>
+  mprisPlayer.on('play', () =>
+    win.webContents.send('media:play-pause'))
+  mprisPlayer.on('pause', () =>
+    win.webContents.send('media:play-pause'))
+  mprisPlayer.on('next', () =>
+    win.webContents.send('media:next'))
+  mprisPlayer.on('previous', () =>
+    win.webContents.send('media:prev'))
+  mprisPlayer.on('seek', (delta: number) =>
     win.webContents.send('media:seek', delta))
 }
 
@@ -44,12 +48,12 @@ export function updateState (state: MediaState): void {
     'xesam:title':   state.title,
     'xesam:artist':  [ state.artist ],
     'xesam:album':   state.album,
-    ...(!state.albumArt?.startsWith('data:') && state.albumArt
+    ...!state.albumArt?.startsWith('data:') && state.albumArt
       ? { 'mpris:artUrl': state.albumArt }
-      : {}),
+      : {},
   }
   mprisPlayer.playbackStatus = state.isPlaying ? 'Playing' : 'Paused'
-  mprisPlayer.position       = state.position * 1e6
+  mprisPlayer.position = state.position * 1e6
 }
 
 export function teardown (): void {

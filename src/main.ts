@@ -76,8 +76,11 @@ const createPopoverWindow = () => {
     )
   }
 
-  popoverWindow.on('blur', () => popoverWindow?.hide())
-  popoverWindow.on('closed', () => { popoverWindow = null })
+  popoverWindow.on('blur', () =>
+    popoverWindow?.hide())
+  popoverWindow.on('closed', () => {
+    popoverWindow = null
+  })
 }
 
 app.on('ready', () => {
@@ -91,14 +94,16 @@ app.on('will-quit', () =>
   mediaControls.teardown())
 
 app.on('window-all-closed', () => {
-  const userWindows = BrowserWindow.getAllWindows().filter(w => w !== popoverWindow)
+  const userWindows = BrowserWindow.getAllWindows().filter(w =>
+    w !== popoverWindow)
   if (process.platform !== 'darwin' && userWindows.length === 0) {
     app.quit()
   }
 })
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().filter(w => w !== popoverWindow).length === 0) {
+  if (BrowserWindow.getAllWindows().filter(w =>
+    w !== popoverWindow).length === 0) {
     createWindow()
   }
 })
@@ -330,14 +335,14 @@ type WriterMessage =
 // eslint-disable-next-line functional/no-let
 let dbWriter: Worker | null = null
 
-function getDbWriter(): Worker {
+function getDbWriter (): Worker {
   if (dbWriter)
     return dbWriter
 
   const dbPath = path.join(app.getPath('appData'), 'library.db')
   dbWriter = new Worker(
     path.join(__dirname, 'db-writer.js'),
-    { workerData: { dbPath } }
+    { workerData: { dbPath }}
   )
   dbWriter.on('error', err =>
     console.error('[db-writer]', err))
@@ -362,7 +367,7 @@ ipcMain.handle('models:upsert', (_event, kind: string, payload: Record<string, u
       if (msg.type === 'error')
         reject(new Error(msg.message))
       else
-        resolve(undefined)
+        resolve()
     }
     worker.on('message', handler)
     worker.postMessage({ type: 'upsert', kind, payload })
@@ -377,7 +382,7 @@ ipcMain.handle('models:delete', (_event, kind: string, id: string) => {
       if (msg.type === 'error')
         reject(new Error(msg.message))
       else
-        resolve(undefined)
+        resolve()
     }
     worker.on('message', handler)
     worker.postMessage({ type: 'delete', kind, id })

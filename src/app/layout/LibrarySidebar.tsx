@@ -3,6 +3,7 @@ import { FolderTree } from '../components/composite/FolderTree'
 import type { FolderEntry } from '../models'
 import { useState } from 'react'
 
+
 export function LibrarySidebar () {
   const { registry, playlists, toggleFolder, addPlaylist } = useLibrary()
   const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist } = useUI()
@@ -30,7 +31,9 @@ export function LibrarySidebar () {
       <div className='sidebar-section'>
         <button
           className='sidebar-section-header'
-          onClick={() => setFoldersCollapsed(c => !c)}
+          onClick={() =>
+            setFoldersCollapsed(c =>
+              !c)}
           aria-expanded={!foldersCollapsed}
         >
           <span className={`section-chevron ${foldersCollapsed ? '' : 'open'}`}>›</span>
@@ -51,7 +54,9 @@ export function LibrarySidebar () {
       <div className='sidebar-section'>
         <button
           className='sidebar-section-header'
-          onClick={() => setPlaylistsCollapsed(c => !c)}
+          onClick={() =>
+            setPlaylistsCollapsed(c =>
+              !c)}
           aria-expanded={!playlistsCollapsed}
         >
           <span className={`section-chevron ${playlistsCollapsed ? '' : 'open'}`}>›</span>
@@ -78,7 +83,8 @@ export function LibrarySidebar () {
                 <button
                   key={playlist.id}
                   className={`playlist-item ${selectedPlaylistId === playlist.id ? 'active' : ''}`}
-                  onClick={() => selectPlaylist(playlist.id)}
+                  onClick={() =>
+                    selectPlaylist(playlist.id)}
                 >
                   <span className='playlist-icon' aria-hidden='true'>♩</span>
                   <span className='playlist-name'>{playlist.name}</span>

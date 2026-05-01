@@ -1,5 +1,6 @@
 import type { SerializableMenuItem, MediaState, TrackDTO } from '../services/types'
 
+
 export interface Bridge {
   // Library
   scanLibrary(paths: string[]): void

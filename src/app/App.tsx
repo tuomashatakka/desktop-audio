@@ -48,12 +48,12 @@ function AppContent () {
         </div>
       }
       player={
-        currentTrack ? (
-          <>
+        currentTrack
+          ? <>
             <PlayerBar />
             <ExpandedPlayerPortal />
           </>
-        ) : undefined
+          : undefined
       }
     />
   )

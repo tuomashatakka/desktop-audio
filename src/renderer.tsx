@@ -4,6 +4,7 @@ import { BridgeProvider, ElectronBridge, BrowserBridge } from './app/data'
 
 import './index.css'
 
+
 const useBrowserBridge = typeof window !== 'undefined' && !window.electronAPI
 const bridge = useBrowserBridge ? new BrowserBridge() : new ElectronBridge()
 

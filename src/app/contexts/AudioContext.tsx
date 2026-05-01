@@ -226,17 +226,17 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   }, [ state.currentTrack, state.isPlaying, state.currentTime, state.duration, bridge ])
 
   // Handle seek events forwarded from MPRIS (delta in microseconds)
-  useEffect(() => {
-    return bridge.onMediaSeek((delta: number) => {
+  useEffect(() =>
+    bridge.onMediaSeek((delta: number) => {
       const audio = audioRef.current
       if (!audio)
         return
+
       const newTime = Math.max(0, audio.currentTime + delta / 1e6)
       audio.currentTime = newTime
       setState(s =>
         ({ ...s, currentTime: newTime }))
-    })
-  }, [ bridge ])
+    }), [ bridge ])
 
   const setupAnalyzer = useCallback(() => {
     if (!audioRef.current)

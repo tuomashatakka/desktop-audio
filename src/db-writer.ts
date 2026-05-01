@@ -2,17 +2,18 @@ import { parentPort } from 'node:worker_threads'
 import path from 'node:path'
 import fs from 'node:fs'
 
+
 interface WriteMessage {
-  type: 'upsert' | 'delete'
-  kind: string
+  type:     'upsert' | 'delete'
+  kind:     string
   payload?: Record<string, unknown>
-  id?: string
+  id?:      string
 }
 
 // Lazy-load sqlite
 let db: any = null
 
-function getDB(): any {
+function getDB (): any {
   if (db)
     return db
 
@@ -26,7 +27,8 @@ function getDB(): any {
     const Database = require('better-sqlite3')
     db = new Database(dbPath)
     initSchema(db)
-  } catch (e) {
+  }
+  catch (e) {
     console.error('[db-writer] Failed to open DB:', e)
     return null
   }
@@ -34,7 +36,7 @@ function getDB(): any {
   return db
 }
 
-function initSchema(db: any): void {
+function initSchema (db: any): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS tracks (
       id TEXT PRIMARY KEY,
@@ -54,7 +56,7 @@ function initSchema(db: any): void {
   `)
 }
 
-function upsert(kind: string, payload: Record<string, unknown>): void {
+function upsert (kind: string, payload: Record<string, unknown>): void {
   const db = getDB()
   if (!db)
     return
@@ -69,7 +71,7 @@ function upsert(kind: string, payload: Record<string, unknown>): void {
   }
 }
 
-function deleteModel(kind: string, id: string): void {
+function deleteModel (kind: string, id: string): void {
   const db = getDB()
   if (!db)
     return
@@ -83,10 +85,12 @@ parentPort?.on('message', (msg: WriteMessage) => {
   try {
     if (msg.type === 'upsert' && msg.payload) {
       upsert(msg.kind, msg.payload)
-    } else if (msg.type === 'delete' && msg.id) {
+    }
+    else if (msg.type === 'delete' && msg.id) {
       deleteModel(msg.kind, msg.id)
     }
-  } catch (err) {
+  }
+  catch (err) {
     console.error('[db-writer] Error:', err)
   }
 })

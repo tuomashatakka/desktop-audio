@@ -2,6 +2,7 @@ import { useUI, useAudio } from '../contexts'
 import { PlayerView } from '../views/PlayerView'
 import { useEffect, useState } from 'react'
 
+
 export function ExpandedPlayerPortal () {
   const { playerExpanded, togglePlayerExpanded } = useUI()
   const { currentTrack } = useAudio()
@@ -12,7 +13,8 @@ export function ExpandedPlayerPortal () {
     if (playerExpanded && !showExpanded) {
       setIsAnimating(true)
       setShowExpanded(true)
-      setTimeout(() => setIsAnimating(false), 300)
+      setTimeout(() =>
+        setIsAnimating(false), 300)
     }
     else if (!playerExpanded && showExpanded) {
       setIsAnimating(true)

@@ -39,7 +39,7 @@ const LibraryContext = createContext<LibraryContextValue | null>(null)
 
 export function LibraryProvider ({ children }: { readonly children: ReactNode }) {
   const [ state, setState ] = useState<LibraryState>({
-    registry:    new ModelRegistry(),
+    registry:           new ModelRegistry(),
     playlists:          [],
     searchQuery:        '',
     selectedTrackIndex: null,
@@ -81,15 +81,16 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
       const newRegistry = new ModelRegistry()
       for (const track of s.registry.getAllTracks())
         newRegistry.addTrack(track)
-      for (const [id, folder] of s.registry.folders) {
+      for (const [ id, folder ] of s.registry.folders) {
         if (folder.path === path) {
           const updated = new FolderEntry(folder.id)
           updated.name = folder.name
           updated.path = folder.path
-          updated.children = [...folder.children]
+          updated.children = [ ...folder.children ]
           updated.expanded = !folder.expanded
           newRegistry.addFolder(updated)
-        } else {
+        }
+        else {
           newRegistry.addFolder(folder)
         }
       }
@@ -117,11 +118,13 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
   }, [])
 
   const selectFolder = useCallback((path: string | null) => {
-    setState(s => ({ ...s }))
+    setState(s =>
+      ({ ...s }))
   }, [])
 
   const selectPlaylist = useCallback((id: string | null) => {
-    setState(s => ({ ...s }))
+    setState(s =>
+      ({ ...s }))
   }, [])
 
   const addTracksToPlaylist = useCallback((playlistId: string, tracks: Track[]) => {

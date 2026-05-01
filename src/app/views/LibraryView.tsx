@@ -10,19 +10,21 @@ import type { SerializableMenuItem } from '../services/types'
 
 
 const CONTEXT_MENU_ITEMS: SerializableMenuItem[] = [
-  { label: 'Play',            icon: '▶' },
+  { label: 'Play', icon: '▶' },
   { label: 'Add to Playlist', icon: '♩' },
   { separator: true },
-  { label: 'Edit Tags',       icon: '✎' },
+  { label: 'Edit Tags', icon: '✎' },
 ]
 
 const ITEM_HEIGHT      = 32
 const SEPARATOR_HEIGHT = 9
 const PADDING          = 8
 const MENU_WIDTH       = 200
-const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(i => !i.separator).length * ITEM_HEIGHT
-                       + CONTEXT_MENU_ITEMS.filter(i =>  i.separator).length * SEPARATOR_HEIGHT
-                       + PADDING * 2
+const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(i =>
+  !i.separator).length * ITEM_HEIGHT +
+                       CONTEXT_MENU_ITEMS.filter(i =>
+                         i.separator).length * SEPARATOR_HEIGHT +
+                       PADDING * 2
 
 // eslint-disable-next-line complexity
 export function LibraryView () {
@@ -93,8 +95,8 @@ export function LibraryView () {
     )
   }, [ bridge ])
 
-  useEffect(() => {
-    return bridge.onContextMenuAction((index: number) => {
+  useEffect(() =>
+    bridge.onContextMenuAction((index: number) => {
       const track = contextTrackRef.current
       if (!track)
         return
@@ -105,8 +107,7 @@ export function LibraryView () {
         case 3: setEditingTrack(track.id); break
       }
       contextTrackRef.current = null
-    })
-  }, [ handleTrackPlay, setEditingTrack, bridge ])
+    }), [ handleTrackPlay, setEditingTrack, bridge ])
 
   const displayTracks = useMemo(() => {
     if (selectedPlaylistId) {

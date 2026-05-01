@@ -1,6 +1,7 @@
 import { useUI } from '../contexts'
 import { useBridge } from '../data'
 
+
 export function Titlebar () {
   const { currentView, setView } = useUI()
   const bridge = useBridge()
@@ -15,7 +16,8 @@ export function Titlebar () {
       <nav className='titlebar-nav'>
         <button
           className={`nav-item ${currentView === 'library' ? 'active' : ''}`}
-          onClick={() => setView('library')}
+          onClick={() =>
+            setView('library')}
         >
           <span className='nav-icon'>♫</span>
           Library
@@ -23,7 +25,8 @@ export function Titlebar () {
 
         <button
           className={`nav-item ${currentView === 'player' ? 'active' : ''}`}
-          onClick={() => setView('player')}
+          onClick={() =>
+            setView('player')}
         >
           <span className='nav-icon'>▶</span>
           Player
@@ -31,7 +34,8 @@ export function Titlebar () {
 
         <button
           className={`nav-item ${currentView === 'settings' ? 'active' : ''}`}
-          onClick={() => setView('settings')}
+          onClick={() =>
+            setView('settings')}
         >
           <span className='nav-icon'>⚙</span>
           Settings
@@ -41,7 +45,8 @@ export function Titlebar () {
       <div className='titlebar-controls'>
         <button
           className='titlebar-btn'
-          onClick={() => bridge.minimizeWindow()}
+          onClick={() =>
+            bridge.minimizeWindow()}
           aria-label='Minimize'
         >
           ─
@@ -49,7 +54,8 @@ export function Titlebar () {
 
         <button
           className='titlebar-btn'
-          onClick={() => bridge.maximizeWindow()}
+          onClick={() =>
+            bridge.maximizeWindow()}
           aria-label='Maximize'
         >
           □
@@ -57,7 +63,8 @@ export function Titlebar () {
 
         <button
           className='titlebar-btn titlebar-btn-close'
-          onClick={() => bridge.closeWindow()}
+          onClick={() =>
+            bridge.closeWindow()}
           aria-label='Close'
         >
           ✕

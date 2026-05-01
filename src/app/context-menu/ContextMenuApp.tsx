@@ -3,9 +3,9 @@ import type { SerializableMenuItem } from '../services/types'
 
 
 interface ContextMenuAPI {
-  onContextMenuItems: (cb: (items: SerializableMenuItem[]) => void) => () => void
+  onContextMenuItems:    (cb: (items: SerializableMenuItem[]) => void) => () => void
   sendContextMenuAction: (index: number) => void
-  closeContextMenu: () => void
+  closeContextMenu:      () => void
 }
 
 declare global {
@@ -21,7 +21,8 @@ export function ContextMenuApp () {
     const api = window.contextMenuAPI
     if (!api)
       return
-    return api.onContextMenuItems(received => setItems(received))
+    return api.onContextMenuItems(received =>
+      setItems(received))
   }, [])
 
   const handleAction = (index: number) => {
@@ -38,6 +39,7 @@ export function ContextMenuApp () {
         style={{ position: 'fixed', inset: 0, zIndex: 0 }}
         onClick={handleClose}
       />
+
       <ul className='context-menu-list' role='menu' style={{ position: 'relative', zIndex: 1 }}>
         {items.map((item, i) =>
           item.separator
@@ -46,7 +48,8 @@ export function ContextMenuApp () {
               <button
                 role='menuitem'
                 className={`context-menu-item ${item.danger ? 'danger' : ''}`}
-                onClick={() => handleAction(i)}
+                onClick={() =>
+                  handleAction(i)}
               >
                 {item.icon && <span className='context-menu-icon' aria-hidden='true'>{item.icon}</span>}
                 {item.label}

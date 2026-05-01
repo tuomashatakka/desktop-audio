@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { useBridge } from '../data'
 
+
 export type RepeatMode = 'none' | 'one' | 'all'
 
 export type Theme = 'dark' | 'light'

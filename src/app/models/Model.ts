@@ -1,27 +1,28 @@
 import { Bridge } from '../data/Bridge'
 
+
 const DB_WRITE_DEBOUNCE_MS = 150
 
 export class Model extends EventTarget {
   readonly id: string
   #dirty = false
   #flushTimer: ReturnType<typeof setTimeout> | null = null
-  #bridge: Bridge | null = null
+  #bridge:     Bridge | null = null
 
-  constructor(id: string) {
+  constructor (id: string) {
     super()
     this.id = id
   }
 
-  static [Symbol.hasInstance](instance: unknown): boolean {
+  static [Symbol.hasInstance] (instance: unknown): boolean {
     return typeof instance === 'object' && instance !== null && 'id' in instance!
   }
 
-  get dirty(): boolean {
+  get dirty (): boolean {
     return this.#dirty
   }
 
-  markDirty(): void {
+  markDirty (): void {
     if (!this.#dirty) {
       this.#dirty = true
       this.dispatchEvent(new Event('dirty'))
@@ -29,23 +30,24 @@ export class Model extends EventTarget {
     this.#scheduleFlush()
   }
 
-  #scheduleFlush(): void {
+  #scheduleFlush (): void {
     if (this.#flushTimer)
       clearTimeout(this.#flushTimer)
     this.#flushTimer = setTimeout(() =>
       this.flush(), DB_WRITE_DEBOUNCE_MS)
   }
 
-  setBridge(bridge: Bridge): void {
+  setBridge (bridge: Bridge): void {
     this.#bridge = bridge
   }
 
-  toJSON(): Record<string, unknown> {
+  toJSON (): Record<string, unknown> {
     const result: Record<string, unknown> = { id: this.id }
     const allKeys = Object.getOwnPropertyNames(this)
     for (const key of allKeys) {
       if (key.startsWith('_') || key.startsWith('#') || key === 'id')
         continue
+
       const descriptor = Object.getOwnPropertyDescriptor(this, key)
       if (descriptor && typeof descriptor.get === 'function')
         result[key] = descriptor.get.call(this)
@@ -53,7 +55,7 @@ export class Model extends EventTarget {
     return result
   }
 
-  flush(): void {
+  flush (): void {
     if (!this.#dirty)
       return
     this.#dirty = false
@@ -71,7 +73,7 @@ export class Model extends EventTarget {
     return model
   }
 
-  destroy(): void {
+  destroy (): void {
     if (this.#flushTimer)
       clearTimeout(this.#flushTimer)
     this.#dirty = false

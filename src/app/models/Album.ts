@@ -1,14 +1,15 @@
 import { Track } from './Track'
 
-export class Album {
-  readonly title: string
-  readonly artist: string
-  readonly year?: number
-  readonly coverColor?: string
-  readonly albumArt?: string
-  tracks: Track[] = []
 
-  constructor(title: string, artist: string, year?: number, coverColor?: string, albumArt?: string) {
+export class Album {
+  readonly title:       string
+  readonly artist:      string
+  readonly year?:       number
+  readonly coverColor?: string
+  readonly albumArt?:   string
+  tracks:               Track[] = []
+
+  constructor (title: string, artist: string, year?: number, coverColor?: string, albumArt?: string) {
     this.title = title
     this.artist = artist
     this.year = year
@@ -16,11 +17,12 @@ export class Album {
     this.albumArt = albumArt
   }
 
-  get duration(): number {
-    return this.tracks.reduce((sum, t) => sum + t.duration, 0)
+  get duration (): number {
+    return this.tracks.reduce((sum, t) =>
+      sum + t.duration, 0)
   }
 
-  get trackCount(): number {
+  get trackCount (): number {
     return this.tracks.length
   }
 }
@@ -28,7 +30,7 @@ export class Album {
 export class AlbumIndex {
   readonly #albums = new Map<string, Album>()
 
-  addTrack(track: Track): void {
+  addTrack (track: Track): void {
     const key = `${track.album}\x00${track.artist}`
     let album = this.#albums.get(key)
     if (!album) {
@@ -39,26 +41,27 @@ export class AlbumIndex {
       album.tracks.push(track)
   }
 
-  removeTrack(track: Track): void {
+  removeTrack (track: Track): void {
     const key = `${track.album}\x00${track.artist}`
     const album = this.#albums.get(key)
     if (album) {
-      album.tracks = album.tracks.filter(t => t.id !== track.id)
+      album.tracks = album.tracks.filter(t =>
+        t.id !== track.id)
       if (album.tracks.length === 0)
         this.#albums.delete(key)
     }
   }
 
-  getAlbums(): Album[] {
+  getAlbums (): Album[] {
     return Array.from(this.#albums.values()).sort((a, b) =>
       a.title.localeCompare(b.title))
   }
 
-  getAlbum(title: string, artist: string): Album | undefined {
+  getAlbum (title: string, artist: string): Album | undefined {
     return this.#albums.get(`${title}\x00${artist}`)
   }
 
-  clear(): void {
+  clear (): void {
     this.#albums.clear()
   }
 }

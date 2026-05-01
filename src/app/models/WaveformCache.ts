@@ -3,15 +3,15 @@ export class WaveformCache {
   readonly #maxEntries = 32
   readonly #cache = new Map<string, Float32Array>()
 
-  private constructor() {}
+  private constructor () {}
 
-  static get instance(): WaveformCache {
+  static get instance (): WaveformCache {
     if (!WaveformCache.#instance)
       WaveformCache.#instance = new WaveformCache()
     return WaveformCache.#instance
   }
 
-  get(trackId: string): Float32Array | undefined {
+  get (trackId: string): Float32Array | undefined {
     const data = this.#cache.get(trackId)
     if (data) {
       // LRU: move to end
@@ -21,10 +21,11 @@ export class WaveformCache {
     return data
   }
 
-  set(trackId: string, waveform: Float32Array): void {
+  set (trackId: string, waveform: Float32Array): void {
     if (this.#cache.has(trackId)) {
       this.#cache.delete(trackId)
-    } else if (this.#cache.size >= this.#maxEntries) {
+    }
+    else if (this.#cache.size >= this.#maxEntries) {
       // Evict least recently used
       const firstKey = this.#cache.keys().next().value
       if (firstKey)
@@ -33,11 +34,11 @@ export class WaveformCache {
     this.#cache.set(trackId, waveform)
   }
 
-  clear(): void {
+  clear (): void {
     this.#cache.clear()
   }
 
-  get size(): number {
+  get size (): number {
     return this.#cache.size
   }
 }
