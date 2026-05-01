@@ -32,10 +32,11 @@ export class AlbumIndex {
 
   addTrack (track: Track): void {
     const key = `${track.album}\x00${track.artist}`
-    const album = this.#albums.get(key)
+    let album = this.#albums.get(key)
     if (!album) {
       const newAlbum = new Album(track.album, track.artist, track.year, track.coverColor, track.albumArt)
       this.#albums.set(key, newAlbum)
+      album = newAlbum
     }
     if (!album.tracks.includes(track))
       album.tracks.push(track)
