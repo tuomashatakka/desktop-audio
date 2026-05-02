@@ -1,19 +1,22 @@
 import { createRoot } from 'react-dom/client'
 import { App } from './app/App'
-import { BridgeProvider, ElectronBridge, BrowserBridge } from './app/data'
+import { HostProvider, DataProvider, ElectronHost, BrowserHost, IpcDataSource, WebFsDataSource } from './app/data'
 
 import './index.css'
 
 
-const useBrowserBridge = typeof window !== 'undefined' && !window.electronAPI
-const bridge = useBrowserBridge ? new BrowserBridge() : new ElectronBridge()
+const isElectron = typeof window !== 'undefined' && Boolean(window.electronAPI)
+const host = isElectron ? new ElectronHost() : new BrowserHost()
+const data = isElectron ? new IpcDataSource() : new WebFsDataSource()
 
 const container = document.querySelector('#app')
 if (container) {
   const root = createRoot(container)
   root.render(
-    <BridgeProvider value={bridge}>
-      <App />
-    </BridgeProvider>
+    <HostProvider value={host}>
+      <DataProvider value={data}>
+        <App />
+      </DataProvider>
+    </HostProvider>
   )
 }

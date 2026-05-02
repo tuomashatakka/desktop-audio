@@ -1,7 +1,19 @@
-export type { Bridge } from './Bridge'
+// Host adapters (window controls, media keys, context menu)
+export type { HostBridge } from './HostBridge'
+export { ElectronHost } from './ElectronHost'
+export { BrowserHost } from './BrowserHost'
+export { HostProvider, useHost } from './HostContext'
 
-export { ElectronBridge } from './ElectronBridge'
+// Data source interface and adapters
+export type { DataSource, DataEvent, DataListener, LibraryRoot, AudioMetadata } from './DataSource'
+export { IpcDataSource } from './IpcDataSource'
+export { WebFsDataSource } from './WebFsDataSource'
+export { DataProvider, useData } from './DataContext'
 
-export { BrowserBridge } from './BrowserBridge'
+// IndexedDB helpers
+export { openDB, idbGet, idbSet, idbDelete, idbGetAll } from './idb'
 
-export { BridgeProvider, useBridge } from './BridgeContext'
+// Keep old names for backward compatibility during migration
+export { ElectronHost as ElectronBridge } from './ElectronHost'
+export { BrowserHost as BrowserBridge } from './BrowserHost'
+export { HostProvider as BridgeProvider, useHost as useBridge } from './HostContext'

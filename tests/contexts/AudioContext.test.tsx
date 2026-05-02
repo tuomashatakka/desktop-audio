@@ -1,18 +1,11 @@
 import { AudioProvider, useAudio } from '../../src/app/contexts/AudioContext'
 import type { Track } from '../../src/app/services/types'
 import { render, act, screen } from '@testing-library/react'
-import { BridgeProvider } from '../../src/app/data/BridgeContext'
-import type { Bridge } from '../../src/app/data/Bridge'
+import { HostProvider } from '../../src/app/data/HostContext'
+import { DataProvider } from '../../src/app/data/DataContext'
+import type { HostBridge, DataSource } from '../../src/app/data'
 
-const mockBridge: Bridge = {
-  scanLibrary: vi.fn(),
-  loadLibrary: vi.fn().mockResolvedValue([]),
-  onLibraryBatch: vi.fn(() => () => {}),
-  onLibraryDone: vi.fn(() => () => {}),
-  selectDirectory: vi.fn(),
-  getMusicDir: vi.fn(),
-  readFile: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
-  getAudioMetadata: vi.fn(),
+const mockHost: HostBridge = {
   minimizeWindow: vi.fn(),
   maximizeWindow: vi.fn(),
   closeWindow: vi.fn(),
@@ -25,12 +18,29 @@ const mockBridge: Bridge = {
   onContextMenuAction: vi.fn(() => () => {}),
   updateMediaState: vi.fn(),
   onMediaSeek: vi.fn(() => () => {}),
-  upsertModel: vi.fn(),
-  deleteModel: vi.fn(),
 }
 
-function wrapWithBridge(ui: React.ReactNode) {
-  return <BridgeProvider value={mockBridge}>{ui}</BridgeProvider>
+const mockDataSource: DataSource = {
+  addRoot: vi.fn(),
+  removeRoot: vi.fn(),
+  listRoots: vi.fn(),
+  scan: vi.fn(),
+  load: vi.fn(),
+  subscribe: vi.fn(() => () => {}),
+  readBytes: vi.fn(),
+  readMetadata: vi.fn(),
+  upsertTrack: vi.fn(),
+  deleteTrack: vi.fn(),
+}
+
+function wrapWithProviders(ui: React.ReactNode) {
+  return (
+    <HostProvider value={mockHost}>
+      <DataProvider value={mockDataSource}>
+        {ui}
+      </DataProvider>
+    </HostProvider>
+  )
 }
 
 const mockTrack: Track = {
@@ -96,7 +106,7 @@ describe('AudioContext', () => {
 
   it('provides default values', () => {
     render(
-      wrapWithBridge(
+      wrapWithProviders(
         <AudioProvider>
           <TestConsumer />
         </AudioProvider>
@@ -113,7 +123,7 @@ describe('AudioContext', () => {
 
   it('setVolume updates volume', async () => {
     render(
-      wrapWithBridge(
+      wrapWithProviders(
         <AudioProvider>
           <TestConsumer />
         </AudioProvider>
@@ -129,7 +139,7 @@ describe('AudioContext', () => {
 
   it('setVolume clamps volume between 0 and 1', async () => {
     render(
-      wrapWithBridge(
+      wrapWithProviders(
         <AudioProvider>
           <TestConsumer />
         </AudioProvider>

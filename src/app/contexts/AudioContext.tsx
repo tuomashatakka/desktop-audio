@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import type { Track } from './LibraryContext'
-import { useBridge } from '../data'
+import { useHost, useData } from '../data'
 
 
 interface AudioState {
@@ -75,7 +75,8 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   const audioContextRef = useRef<globalThis.AudioContext | null>(null)
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null)
   const [ analyzer, setAnalyzer ] = useState<AnalyserNode | null>(null)
-  const bridge = useBridge()
+  const host = useHost()
+  const data = useData()
 
   // Refs for MediaSession handlers to avoid circular deps
   const pauseRef = useRef<() => void>(() => {})
@@ -205,10 +206,10 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     if (mediaStateDebounceRef.current)
       clearTimeout(mediaStateDebounceRef.current)
 
-    mediaStateDebounceRef.current = setTimeout(() => {
+     mediaStateDebounceRef.current = setTimeout(() => {
       if (!state.currentTrack)
         return
-      bridge.updateMediaState({
+      host.updateMediaState({
         title:     state.currentTrack.title,
         artist:    state.currentTrack.artist,
         album:     state.currentTrack.album,
@@ -218,16 +219,16 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
         duration:  state.duration,
       })
     }, 500)
-
+ 
     return () => {
       if (mediaStateDebounceRef.current)
         clearTimeout(mediaStateDebounceRef.current)
     }
-  }, [ state.currentTrack, state.isPlaying, state.currentTime, state.duration, bridge ])
+  }, [ state.currentTrack, state.isPlaying, state.currentTime, state.duration, host ])
 
   // Handle seek events forwarded from MPRIS (delta in microseconds)
   useEffect(() =>
-    bridge.onMediaSeek((delta: number) => {
+    host.onMediaSeek((delta: number) => {
       const audio = audioRef.current
       if (!audio)
         return
@@ -236,7 +237,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
       audio.currentTime = newTime
       setState(s =>
         ({ ...s, currentTime: newTime }))
-    }), [ bridge ])
+    }), [ host ])
 
   const setupAnalyzer = useCallback(() => {
     if (!audioRef.current)
@@ -273,7 +274,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     try {
       setupAnalyzer()
 
-      const buffer = await bridge.readFile(track.path)
+      const buffer = await data.readBytes(track.id)
       if (!buffer) {
         throw new Error('Failed to read file')
       }

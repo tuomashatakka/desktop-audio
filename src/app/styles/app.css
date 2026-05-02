@@ -186,7 +186,7 @@
 .player-bar-track {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   min-width: 0;
 }
 
@@ -279,28 +279,25 @@
 
 /* ─── Player-bar responsive breakpoints ─────────────────── */
 
-@container player-bar (max-width: 720px) {
+@container (max-width: 720px) {
   .player-bar-volume { display: none; }
-  .player-bar { grid-template-columns: minmax(140px, 28%) auto 1fr; }
 }
 
-@container player-bar (max-width: 520px) {
-  .player-bar { grid-template-columns: minmax(120px, 32%) auto 1fr; }
+@container (max-width: 520px) {
+  .player-bar { grid-template-columns: minmax(120px, 30%) auto 1fr; }
   .player-bar-progress .player-bar-time { display: none; }
 }
 
-@container player-bar (max-width: 380px) {
+@container (max-width: 380px) {
   .player-bar {
     grid-template-columns: 1fr auto;
     grid-auto-rows: auto;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
   }
 
   .player-bar-track    { grid-column: 1; grid-row: 1; }
-  .player-bar-controls { grid-column: 2; grid-row: 1; gap: var(--sp-1); }
+  .player-bar-controls { grid-column: 2; grid-row: 1; }
   .player-bar-progress { grid-column: 1 / -1; grid-row: 2; }
-  .player-bar-controls > button { font-size: var(--text-base); }
+  .player-bar-controls > button { width: 32px; height: 32px; font-size: 14px; }
 }
 
 .expanded-player {

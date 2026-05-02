@@ -2,11 +2,12 @@ import { useUI, useLibrary, useAudio, useSettings } from '../contexts'
 import type { Track } from '../contexts'
 import { useMemo, useEffect, useState, useCallback, useRef } from 'react'
 import { useLibraryScanner } from '../hooks'
-import { Input, PromptDialog } from '../components/atomic'
+import { Input, PromptDialog, Popover } from '../components/atomic'
 import { FolderTree } from '../components/composite/FolderTree'
 import { TrackTable } from '../components/composite/TrackTable'
-import { useBridge } from '../data'
+import { useHost } from '../data'
 import type { SerializableMenuItem } from '../services/types'
+import type { Grouping, Density } from '../contexts'
 
 
 const CONTEXT_MENU_ITEMS: SerializableMenuItem[] = [
@@ -28,12 +29,12 @@ const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(i =>
 
 // eslint-disable-next-line complexity
 export function LibraryView () {
-  const { sidebarOpen, toggleSidebar, setEditingTrack, selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist } = useUI()
+  const { sidebarOpen, toggleSidebar, setEditingTrack, selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist, density, setDensity, grouping, setGrouping } = useUI()
   const { registry, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, isLoading, toggleFolder } = useLibrary()
   const { play, currentTrack, isPlaying } = useAudio()
   const { libraryPaths } = useSettings()
   const { scanLibrary } = useLibraryScanner()
-  const bridge = useBridge()
+  const host = useHost()
 
   const folders = registry.folders
 
@@ -43,6 +44,8 @@ export function LibraryView () {
   const [ headerVisible, setHeaderVisible ] = useState(true)
   const lastScrollY      = useRef(0)
   const contextTrackRef  = useRef<Track | null>(null)
+  const [ configOpen, setConfigOpen ] = useState(false)
+  const configBtnRef     = useRef<HTMLButtonElement>(null)
 
   const handleScroll = useCallback((e: Event) => {
     const el = e.target as HTMLElement
@@ -86,17 +89,17 @@ export function LibraryView () {
 
   const handleContextMenu = useCallback((track: Track, rect: DOMRect) => {
     contextTrackRef.current = track
-    bridge.showContextMenu(
+    host.showContextMenu(
       CONTEXT_MENU_ITEMS,
       window.screenX + rect.left,
       window.screenY + rect.bottom + 4,
       MENU_WIDTH,
       MENU_HEIGHT,
     )
-  }, [ bridge ])
+  }, [ host ])
 
   useEffect(() =>
-    bridge.onContextMenuAction((index: number) => {
+    host.onContextMenuAction((index: number) => {
       const track = contextTrackRef.current
       if (!track)
         return
@@ -107,7 +110,7 @@ export function LibraryView () {
         case 3: setEditingTrack(track.id); break
       }
       contextTrackRef.current = null
-    }), [ handleTrackPlay, setEditingTrack, bridge ])
+    }), [ handleTrackPlay, setEditingTrack, host ])
 
   const displayTracks = useMemo(() => {
     if (selectedPlaylistId) {
@@ -209,14 +212,70 @@ export function LibraryView () {
 
           <h2>{headerTitle}</h2>
 
-          <Input
-            wrapperClass='search-input'
-            type='search'
-            placeholder='Search tracks...'
-            value={searchQuery}
-            onChange={e =>
-              setSearchQuery(e.target.value)}
-          />
+          <div className='header-controls cluster'>
+            <Input
+              wrapperClass='search-input'
+              type='search'
+              placeholder='Search tracks...'
+              value={searchQuery}
+              onChange={e =>
+                setSearchQuery(e.target.value)}
+            />
+
+            {/* Density toggle buttons */}
+            <div className='density-toggle' role='radiogroup' aria-label='Row density'>
+              {(['compact', 'normal', 'relaxed'] as Density[]).map(d =>
+                <button
+                  key={d}
+                  role='radio'
+                  aria-checked={density === d}
+                  className={density === d ? 'active' : ''}
+                  onClick={() => setDensity(d)}
+                  title={`${d} density`}
+                >
+                  {d === 'compact' ? '≡' : d === 'normal' ? '≢' : '='}
+                </button>
+              )}
+            </div>
+
+            {/* Config caret button */}
+            <button
+              ref={configBtnRef}
+              className='config-caret-btn'
+              onClick={() => setConfigOpen(o => !o)}
+              aria-label='View options'
+              title='View options'
+            >
+              ⌄
+            </button>
+
+            {configBtnRef.current &&
+              <Popover
+                open={configOpen}
+                anchorRect={configBtnRef.current.getBoundingClientRect()}
+                onClose={() => setConfigOpen(false)}
+                placement='bottom'
+              >
+                <div className='config-dropdown'>
+                  <fieldset>
+                    <legend>Grouping</legend>
+                    {(['none', 'album', 'artist', 'path'] as Grouping[]).map(g =>
+                      <label key={g}>
+                        <input
+                          type='radio'
+                          name='grouping'
+                          value={g}
+                          checked={grouping === g}
+                          onChange={() => setGrouping(g)}
+                        />
+                        {g === 'none' ? 'None' : g === 'album' ? 'By Album' : g === 'artist' ? 'By Artist' : 'By Path'}
+                      </label>
+                    )}
+                  </fieldset>
+                </div>
+              </Popover>
+            }
+          </div>
         </header>
 
         <div className='tracks-container'>

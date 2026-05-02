@@ -1,48 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Model } from '../../src/app/models/Model'
-
-class TestModel extends Model {
-  private _name!: string
-
-  get name(): string { return this._name }
-  set name(v: string) {
-    if (this._name !== v) {
-      this._name = v
-      this.markDirty()
-    }
-  }
-}
+import { Track } from '../../src/app/models'
 
 describe('Model base class', () => {
   it('has id property', () => {
-    const model = new TestModel('test-id')
-    expect(model.id).toBe('test-id')
+    const model = new Track('/music/test.mp3')
+    model.title = 'Test'
+    expect(model.id).toBeTruthy()
   })
 
   it('starts not dirty', () => {
-    const model = new TestModel('test-id')
+    const model = new Track('/music/test.mp3')
     expect(model.dirty).toBe(false)
   })
 
   it('marks dirty on change', () => {
-    const model = new TestModel('test-id')
-    model.name = 'New Name'
+    const model = new Track('/music/test.mp3')
+    model.title = 'New Name'
     expect(model.dirty).toBe(true)
   })
 
   it('emits dirty event', () => {
-    const model = new TestModel('test-id')
+    const model = new Track('/music/test.mp3')
     const handler = vi.fn()
     model.addEventListener('dirty', handler)
 
-    model.name = 'New Name'
+    model.title = 'New Name'
 
     expect(handler).toHaveBeenCalledTimes(1)
   })
 
   it('schedules flush after dirty', () => {
-    const model = new TestModel('test-id')
-    model.name = 'New Name'
+    const model = new Track('/music/test.mp3')
+    model.title = 'New Name'
 
     // Flush should be scheduled (we can't easily test the timer, but we can test flush works)
     model.flush()
@@ -50,31 +40,31 @@ describe('Model base class', () => {
   })
 
   it('converts to JSON', () => {
-    const model = new TestModel('test-id')
-    // Set directly to private field
-    model['_name'] = 'Test Name'
+    const model = new Track('/music/test.mp3')
+    model.title = 'Test'
 
     const json = model.toJSON()
-    expect(json.id).toBe('test-id')
-    expect(json.name).toBeUndefined() // toJSON doesn't expose private fields
+    expect(json.id).toBeTruthy()
+    expect(json).toHaveProperty('title', 'Test')
   })
 
-  it('sets bridge and flushes', () => {
-    const model = new TestModel('test-id')
-    const mockBridge = {
-      upsertModel: vi.fn(),
+  it('sets dataSource and flushes', () => {
+    const model = new Track('/music/test.mp3')
+    model.title = 'Test'
+    const mockDataSource = {
+      upsertTrack: vi.fn().mockResolvedValue(undefined),
     } as any
 
-    model.setBridge(mockBridge)
-    model.name = 'New Name'
+    Model.dataSource = mockDataSource
+    model.title = 'New Name'
     model.flush()
 
-    expect(mockBridge.upsertModel).toHaveBeenCalledWith('testmodel', expect.any(Object))
+    expect(mockDataSource.upsertTrack).toHaveBeenCalledWith(expect.any(Object))
   })
 
   it('cleans up on destroy', () => {
-    const model = new TestModel('test-id')
-    model.name = 'New Name'
+    const model = new Track('/music/test.mp3')
+    model.title = 'New Name'
 
     model.destroy()
     // Can't access private #bridge directly, check dirty is reset
@@ -82,11 +72,15 @@ describe('Model base class', () => {
   })
 
   it('toJSON excludes private fields', () => {
-    const model = new TestModel('test-id')
-    model.name = 'Test'
+    const model = new Track('/music/test.mp3')
+    model.title = 'Test'
 
     const json = model.toJSON()
-    expect(json['_name']).toBeUndefined()
-    expect(json['#dirty']).toBeUndefined()
+    // toJSON should only include properties with getters, not private fields
+    expect(json).toHaveProperty('id')
+    expect(json).toHaveProperty('title')
+    // Private fields like _path should not be in JSON
+    expect(json).not.toHaveProperty('_path')
+    expect(json).not.toHaveProperty('_title')
   })
 })

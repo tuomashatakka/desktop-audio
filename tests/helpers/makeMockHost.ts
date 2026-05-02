@@ -1,16 +1,14 @@
 import type { HostBridge } from '../../src/app/data/HostBridge'
-import type { TrackDTO, SerializableMenuItem, MediaState } from '../../src/app/services/types'
+import type { SerializableMenuItem, MediaState } from '../../src/app/services/types'
 
-export function makeMockBridge(overrides: Partial<HostBridge> = {}): HostBridge {
-  const batchHandlers: ((t: TrackDTO[]) => void)[] = []
-  const doneHandlers: (() => void)[] = []
+export function makeMockHost(overrides: Partial<HostBridge> = {}): HostBridge {
   const contextMenuHandlers: ((i: number) => void)[] = []
   const mediaPlayPauseHandlers: (() => void)[] = []
   const mediaNextHandlers: (() => void)[] = []
   const mediaPrevHandlers: (() => void)[] = []
   const mediaSeekHandlers: ((delta: number) => void)[] = []
 
-  const bridge: HostBridge = {
+  const host: HostBridge = {
     minimizeWindow: vi.fn(),
     maximizeWindow: vi.fn(),
     closeWindow: vi.fn(),
@@ -46,5 +44,5 @@ export function makeMockBridge(overrides: Partial<HostBridge> = {}): HostBridge 
     _triggerSeek: (delta: number) => mediaSeekHandlers.forEach(cb => cb(delta)),
   }
 
-  return bridge
+  return { ...host, ...overrides }
 }

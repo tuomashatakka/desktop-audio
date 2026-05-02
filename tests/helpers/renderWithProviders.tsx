@@ -1,56 +1,46 @@
 import { render, RenderOptions } from '@testing-library/react'
-import { BridgeProvider } from '../../src/app/data/BridgeContext'
+import { HostProvider } from '../../src/app/data/HostContext'
+import { DataProvider } from '../../src/app/data'
 import { UIProvider } from '../../src/app/contexts'
 import { SettingsProvider } from '../../src/app/contexts'
 import { LibraryProvider } from '../../src/app/contexts'
 import { AudioProvider } from '../../src/app/contexts'
-import type { Bridge } from '../../src/app/data/Bridge'
+import type { HostBridge } from '../../src/app/data/HostBridge'
+import type { DataSource } from '../../src/app/data/DataSource'
+import { makeMockHost } from './makeMockHost'
+import { makeMockDataSource } from './makeMockData'
 
 interface WrapperProps {
   children: React.ReactNode
-  bridge?: Bridge
+  host?: HostBridge
+  data?: DataSource
 }
 
 export function renderWithProviders(
   ui: React.ReactElement,
-  { bridge, ...renderOptions }: { bridge?: Bridge } & Omit<RenderOptions, 'wrapper'> = {}
+  { host, data, ...renderOptions }: { host?: HostBridge; data?: DataSource } & Omit<RenderOptions, 'wrapper'> = {}
 ) {
+  const mockHost = host || makeMockHost()
+  const mockData = data || makeMockDataSource()
+  
   const AllProviders = ({ children }: WrapperProps) => (
-    <BridgeProvider value={bridge || { 
-      scanLibrary: () => {}, 
-      loadLibrary: async () => [], 
-      onLibraryBatch: () => () => {}, 
-      onLibraryDone: () => () => {},
-      selectDirectory: async () => null,
-      getMusicDir: async () => null,
-      readFile: async () => new ArrayBuffer(0),
-      getAudioMetadata: async () => ({ title: '', artist: '', album: '', isPlaying: false, position: 0, duration: 0 } as any),
-      minimizeWindow: () => {},
-      maximizeWindow: () => {},
-      closeWindow: () => {},
-      isMaximized: async () => false,
-      onMediaPlayPause: () => () => {},
-      onMediaNext: () => () => {},
-      onMediaPrev: () => () => {},
-      showContextMenu: () => {},
-      hideContextMenu: () => {},
-      onContextMenuAction: () => () => {},
-      updateMediaState: () => {},
-      onMediaSeek: () => () => {},
-      upsertModel: () => {},
-      deleteModel: () => {},
-    } as Bridge}>
-      <UIProvider>
-        <SettingsProvider>
-          <LibraryProvider>
-            <AudioProvider>
-              {children}
-            </AudioProvider>
-          </LibraryProvider>
-        </SettingsProvider>
-      </UIProvider>
-    </BridgeProvider>
+    <HostProvider value={mockHost}>
+      <DataProvider value={mockData}>
+        <UIProvider>
+          <SettingsProvider>
+            <LibraryProvider>
+              <AudioProvider>
+                {children}
+              </AudioProvider>
+            </LibraryProvider>
+          </SettingsProvider>
+        </UIProvider>
+      </DataProvider>
+    </HostProvider>
   )
 
   return render(ui, { wrapper: AllProviders as React.ComponentType<{}>, ...renderOptions })
 }
+
+// Re-export mock creators for convenience
+export { makeMockHost, makeMockDataSource }

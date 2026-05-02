@@ -6,7 +6,7 @@ import { SettingsView } from './views/SettingsView'
 import { TagEditorView } from './views/TagEditorView'
 import { PlayerBar } from './components/composite/PlayerBar'
 import { useKeyboardShortcuts } from './hooks'
-import { useBridge } from './data'
+import { useHost } from './data'
 import { AppLayout, Titlebar, LibrarySidebar, ExpandedPlayerPortal } from './layout'
 
 
@@ -14,7 +14,7 @@ function AppContent () {
   const { currentView, playerExpanded } = useUI()
   const { currentTrack } = useAudio()
   const { theme } = useSettings()
-  const bridge = useBridge()
+  const host = useHost()
 
   // All hooks must be called unconditionally before any early return
   useKeyboardShortcuts()
