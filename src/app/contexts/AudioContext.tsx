@@ -293,7 +293,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
       if (ctx) {
         blob.arrayBuffer()
           .then(ab =>
-            decodeWaveformBars(ab, 80, ctx))
+            decodeWaveformBars(ab, 400, ctx))
           .then(bars =>
             setState(s =>
               ({ ...s, waveformBars: bars })))

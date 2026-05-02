@@ -1,5 +1,7 @@
 .waveform-progress {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   align-items: center;
   gap: 1px;
   width: 100%;
@@ -21,8 +23,8 @@
 }
 
 .wf-bar {
-  width: 5px;
-  flex: none;
+  width: auto;
+  min-width: 0;
   border-radius: 1px;
   background: var(--wf-unplayed);
   transform-origin: center;

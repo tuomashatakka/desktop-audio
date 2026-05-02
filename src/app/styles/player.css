@@ -54,31 +54,43 @@
   }
 }
 
-/* ─── Container query: narrow → row layout ─────── */
+/* ─── Container query: narrow → vertical stack ─────── */
 
-@container (max-width: 300px) {
+@container (max-width: 480px) {
   .player-view {
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: var(--sp-3);
     padding: var(--sp-3);
   }
 
   .album-art-card {
-    width: clamp(40px, 20cqw, 100px);
+    width: clamp(60px, 25cqw, 120px);
   }
 
-  .player-info {
-    flex: 1;
-    text-align: left;
-    min-width: 0;
-  }
-
+  .player-info,
   .progress-section { width: 100%; }
+
+  .playback-controls { gap: var(--sp-3); }
+
+  .playback-controls .play-pause-btn {
+    width: 48px;
+    height: 48px;
+  }
 }
 
-/* ─── Container query: nano tier (≤ 80px) ─────── */
+@container (max-width: 320px) {
+  .playback-controls .play-pause-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+
+  .playback-controls > :not(.play-pause-btn) {
+    font-size: 14px;
+  }
+}
+
+/* ─── Container query: nano tier (≤ 80px tall) ─────── */
 
 @container (max-height: 80px) {
   .player-info,

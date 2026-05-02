@@ -49,38 +49,62 @@
 
 /* ─── Track table ─────────────────────────────── */
 
-/* Column width tokens — shared between header and virtualised rows */
-:root {
-  --col-index:    3ch;
-  --col-title:    1fr;
-  --col-artist:   0.55fr;
-  --col-album:    0.55fr;
-  --col-format:   6ch;
-  --col-duration: 6ch;
-  --col-gap:      var(--sp-1);
+.tracks-container {
+  padding: var(--sp-3) var(--sp-4);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .track-table-wrap {
+  --col-gap: var(--sp-1);
+  --row-h:        40px;
+  --row-pad-y:    var(--sp-2);
+  --row-pad-x:    var(--sp-3);
+  --row-clamp:    1;
+  --row-art-size: 28px;
+
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
 
-  /* Sticky div header row */
+  &[data-density='compact'] {
+    --row-h:        28px;
+    --row-pad-y:    var(--sp-1);
+    --row-clamp:    1;
+    --row-art-size: 20px;
+  }
+  &[data-density='normal'] {
+    --row-h:        40px;
+    --row-pad-y:    var(--sp-2);
+    --row-clamp:    1;
+    --row-art-size: 28px;
+  }
+  &[data-density='relaxed'] {
+    --row-h:        64px;
+    --row-pad-y:    var(--sp-3);
+    --row-clamp:    2;
+    --row-art-size: 44px;
+  }
+
+  /* Sticky header row */
   & .track-header {
     display: grid;
-    grid-template-columns: 36px 40px 1fr 22% 22% 52px 52px;
+    grid-template-columns: var(--track-grid);
     align-items: center;
     gap: var(--col-gap);
-    padding: 0;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     position: sticky;
     top: 0;
-    z-index: 1;
-    /* background: var(--bg-raised); */
+    z-index: 2;
+    background: var(--bg);
+    min-width: max-content;
 
     & [role="columnheader"] {
+      position: relative;
       padding: var(--sp-2) var(--sp-3);
       color: var(--text-muted);
       font-size: var(--text-sm);
@@ -89,44 +113,59 @@
       white-space: nowrap;
       overflow: hidden;
       transition: color var(--duration-fast) var(--ease);
+      display: flex;
+      align-items: center;
+      gap: var(--sp-1);
 
-      &[tabindex]       { cursor: pointer; }
-      &[tabindex]:hover { color: var(--text-dim); }
-      &.sorted          { color: var(--accent); }
-      &.col-duration    { text-align: right; }
-      &.col-art         { padding: 0 var(--sp-2); }
-      &:focus-visible   { outline: 1px solid var(--border-focus); }
+      &[draggable="true"]    { cursor: grab; }
+      &[tabindex]:hover      { color: var(--text-dim); }
+      &.sorted               { color: var(--accent); }
+      &.col-duration         { text-align: right; justify-content: flex-end; }
+      &.col-art              { padding: 0 var(--sp-2); }
+      &:focus-visible        { outline: 1px solid var(--border-focus); }
+      &.dragging             { opacity: 0.4; }
 
-      & .sort-indicator { font-size: var(--text-xs); opacity: 0.8; }
+      & .header-label   { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      & .sort-indicator { font-size: var(--text-xs); opacity: 0.8; flex: 0 0 auto; }
+    }
+
+    & .col-resize-handle {
+      position: absolute;
+      top: 0;
+      right: -3px;
+      bottom: 0;
+      width: 6px;
+      cursor: col-resize;
+      user-select: none;
+      z-index: 1;
     }
   }
 
-  /* Virtualised scroll container */
+  /* Scroll container — horizontally scrollable when columns overflow */
   & .track-table-scroll {
     flex: 1;
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
     position: relative;
+    min-width: 0;
 
     scrollbar-width: thin;
     scrollbar-color: var(--bg-hover) transparent;
 
-    &::-webkit-scrollbar       { width: 6px; }
-    &::-webkit-scrollbar-track { background: transparent; }
-    &::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: var(--radius-full); }
+    &::-webkit-scrollbar           { width: 6px; height: 6px; }
+    &::-webkit-scrollbar-track     { background: transparent; }
+    &::-webkit-scrollbar-thumb     { background: var(--bg-hover); border-radius: var(--radius-full); }
   }
 
-  /* Individual virtualised row */
+  /* Track row — grid driven by --track-grid */
   & .track-row {
     display: grid;
-    grid-template-columns: 36px 40px 1fr 22% 22% 52px 52px;
+    grid-template-columns: var(--track-grid);
     align-items: center;
     gap: var(--col-gap);
-    padding: 0;
-    position: absolute;
-    left: 0;
-    right: 0;
+    padding: var(--row-pad-y) var(--row-pad-x);
     cursor: pointer;
+    min-width: max-content;
     transition: background var(--duration-fast) var(--ease);
 
     &:hover         { background: var(--bg-hover); }
@@ -137,43 +176,39 @@
       &:hover { background: var(--accent-muted); }
     }
 
-    &.skeleton-row {
-      display: flex;
-      gap: var(--col-gap);
-      align-items: center;
-      pointer-events: none;
-    }
+    &.skeleton-row { pointer-events: none; }
 
-    & span {
-      white-space: nowrap;
+    & > span {
+      display: -webkit-box;
+      -webkit-line-clamp: var(--row-clamp);
+      -webkit-box-orient: vertical;
       overflow: hidden;
-      text-overflow: ellipsis;
       font-size: var(--text-sm);
-      line-height: 1;
+      line-height: 1.25;
+      min-width: 0;
     }
 
     & .col-art {
-      width: 24px;
-      height: 24px;
-      flex-shrink: 0;
+      width: var(--row-art-size);
+      height: var(--row-art-size);
       display: flex;
       align-items: center;
       justify-content: center;
 
       & img {
-        width: 24px;
-        height: 24px;
+        width: 100%;
+        height: 100%;
         object-fit: cover;
         border-radius: var(--radius-sm);
         display: block;
       }
 
       & .art-swatch {
-        width: 24px;
-        height: 24px;
+        width: 100%;
+        height: 100%;
         border-radius: var(--radius-sm);
         opacity: 0.75;
-        flex-shrink: 0;
+        display: block;
       }
     }
 
@@ -185,7 +220,9 @@
     }
 
     & .col-artist,
-    & .col-album { color: var(--text-dim); }
+    & .col-album,
+    & .col-genre,
+    & .col-path { color: var(--text-dim); }
 
     & .col-format {
       color: var(--text-muted);
@@ -194,7 +231,10 @@
       text-transform: uppercase;
     }
 
-    & .col-duration {
+    & .col-duration,
+    & .col-size,
+    & .col-trackNumber,
+    & .col-year {
       text-align: right;
       font-family: var(--font-mono);
       font-size: var(--text-xs);
@@ -202,6 +242,118 @@
       color: var(--text-muted);
     }
   }
+
+  /* Relaxed: title cell stacks title + subtitle */
+  &[data-density='relaxed'] .track-row .col-title {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    line-height: 1.25;
+    -webkit-line-clamp: unset;
+
+    & .row-title    { font-weight: var(--font-medium); color: var(--text); }
+    & .row-subtitle { font-size: var(--text-sm); color: var(--text-muted); }
+  }
+}
+
+/* ─── Group blocks ──────────────────────────────── */
+
+.track-groups { display: flex; flex-direction: column; gap: var(--sp-3); padding-top: var(--sp-2); }
+
+.track-album-group {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+
+  & .group-art {
+    grid-row: 1 / span 2;
+    align-self: start;
+    aspect-ratio: 1;
+    background: var(--bg-hover);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+
+    & img    { width: 100%; height: 100%; object-fit: cover; display: block; }
+    & .swatch { width: 100%; height: 100%; display: block; opacity: 0.75; }
+  }
+
+  & .group-meta {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding-bottom: var(--sp-2);
+
+    & .group-title    { font-weight: var(--font-semibold); color: var(--text); }
+    & .group-subtitle { font-size: var(--text-sm); color: var(--text-muted); }
+  }
+
+  & .group-tracks {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Album mode: hide per-row art column — the big art on the left replaces it */
+  & .track-row .col-art { display: none; }
+}
+
+.track-flat-group {
+  & .track-group-header {
+    position: sticky;
+    top: var(--row-h);
+    background: var(--bg-raised);
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+    border-radius: var(--radius);
+    z-index: 1;
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+
+    & .group-title    { font-weight: var(--font-semibold); color: var(--text); }
+    & .group-subtitle { color: var(--text-muted); font-size: var(--text-xs); }
+  }
+}
+
+/* ─── Column visibility menu ────────────────────── */
+
+.column-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  min-width: 200px;
+  border: none;
+
+  & legend {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0 0 var(--sp-2);
+  }
+
+  & label {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-1) var(--sp-2);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--text-sm);
+
+    &:hover { background: var(--bg-hover); }
+    &.fixed { opacity: 0.5; cursor: not-allowed; }
+  }
+
+  & button { margin-top: var(--sp-2); align-self: flex-start; }
 }
 
 /* ─── Sidebar sections ────────────────────────── */

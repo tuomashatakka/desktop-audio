@@ -168,14 +168,17 @@
 }
 
 .player-bar {
-  height: 72px;
+  container-type: inline-size;
+  container-name: player-bar;
   min-height: 72px;
   background: var(--bg-raised);
   border-top: 1px solid var(--border);
-  display: flex;
+  display: grid;
   align-items: center;
-  padding: 0 var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
   gap: var(--sp-4);
+  grid-template-columns: minmax(160px, 22%) auto 1fr auto;
+  /* track | controls | progress | volume */
   cursor: pointer;
   transition: opacity var(--duration) var(--ease), transform var(--duration) var(--ease);
 }
@@ -184,7 +187,7 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  width: clamp(180px, 25vw, 320px);
+  min-width: 0;
 }
 
 .player-bar-art {
@@ -210,7 +213,11 @@
 }
 
 .player-bar-info {
+  flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .player-bar-title {
@@ -220,11 +227,16 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: block;
 }
 
 .player-bar-artist {
   font-size: var(--text-xs);
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 
 .player-bar-controls {
@@ -234,10 +246,10 @@
 }
 
 .player-bar-progress {
-  width: clamp(240px, 40vw, 600px);
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+  min-width: 0;
 }
 
 .player-bar-time {
@@ -245,6 +257,7 @@
   font-family: var(--font-mono);
   color: var(--text-muted);
   min-width: 40px;
+  flex: 0 0 auto;
 }
 
 .player-bar-volume {
@@ -262,6 +275,32 @@
   opacity: 0;
   transform: translateY(10px);
   pointer-events: none;
+}
+
+/* ─── Player-bar responsive breakpoints ─────────────────── */
+
+@container player-bar (max-width: 720px) {
+  .player-bar-volume { display: none; }
+  .player-bar { grid-template-columns: minmax(140px, 28%) auto 1fr; }
+}
+
+@container player-bar (max-width: 520px) {
+  .player-bar { grid-template-columns: minmax(120px, 32%) auto 1fr; }
+  .player-bar-progress .player-bar-time { display: none; }
+}
+
+@container player-bar (max-width: 380px) {
+  .player-bar {
+    grid-template-columns: 1fr auto;
+    grid-auto-rows: auto;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .player-bar-track    { grid-column: 1; grid-row: 1; }
+  .player-bar-controls { grid-column: 2; grid-row: 1; gap: var(--sp-1); }
+  .player-bar-progress { grid-column: 1 / -1; grid-row: 2; }
+  .player-bar-controls > button { font-size: var(--text-base); }
 }
 
 .expanded-player {
