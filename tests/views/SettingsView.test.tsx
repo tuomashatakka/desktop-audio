@@ -6,7 +6,7 @@ import { renderWithProviders } from '../helpers/renderWithProviders'
 describe('SettingsView', () => {
   it('renders settings view', () => {
     renderWithProviders(<SettingsView />)
-
+    
     // Should have the Library section visible by default - check for the heading
     expect(screen.getByRole('heading', { name: /library/i })).toBeInTheDocument()
   })
@@ -14,7 +14,7 @@ describe('SettingsView', () => {
   it('renders without crashing', () => {
     renderWithProviders(<SettingsView />)
     
-    // Check that the component renders
-    expect(screen.getByText(/library/i)).toBeInTheDocument()
+    // Check that the component renders - use a more specific selector
+    expect(screen.getByText(/library folders to scan/i)).toBeInTheDocument()
   })
 })

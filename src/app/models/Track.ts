@@ -146,7 +146,7 @@ export class Track extends Model {
 
   set waveform (value: Float32Array | null) {
     this.#waveform = value
-    this.dispatchEvent(new Event('waveform'))
+    this.dispatchEvent('waveform')
   }
 
   get waveformLoading (): boolean {
@@ -155,7 +155,7 @@ export class Track extends Model {
 
   set waveformLoading (value: boolean) {
     this.#waveformLoading = value
-    this.dispatchEvent(new Event('waveform'))
+    this.dispatchEvent('waveform')
   }
 
   static fromDTO (dto: TrackDTO): Track {

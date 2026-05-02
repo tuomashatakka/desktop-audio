@@ -162,18 +162,6 @@ export function LibraryView () {
           >
             <span className={`section-chevron ${playlistsCollapsed ? '' : 'open'}`}>›</span>
             <span>Playlists</span>
-
-            <button
-              className='playlist-new-btn'
-              onClick={e => {
-                e.stopPropagation()
-                handleNewPlaylist()
-              }}
-              title='New playlist'
-              aria-label='New playlist'
-            >
-              +
-            </button>
           </button>
 
           {!playlistsCollapsed &&
@@ -194,6 +182,20 @@ export function LibraryView () {
                 )
               }
             </nav>
+          }
+
+          {!playlistsCollapsed &&
+            <button
+              className='playlist-new-btn'
+              onClick={e => {
+                e.stopPropagation()
+                handleNewPlaylist()
+              }}
+              title='New playlist'
+              aria-label='New playlist'
+            >
+              +
+            </button>
           }
         </div>
 

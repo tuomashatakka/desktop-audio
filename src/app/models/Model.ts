@@ -2,29 +2,46 @@ import type { DataSource } from '../data/DataSource'
 
 const DB_WRITE_DEBOUNCE_MS = 150
 
-export class Model extends EventTarget {
+type ModelEventListener = (eventType: string) => void
+
+export class Model {
   readonly id: string
   #dirty = false
   #flushTimer: ReturnType<typeof setTimeout> | null = null
   static dataSource: DataSource | null = null
+  #listeners = new Set<ModelEventListener>()
 
   constructor (id: string) {
-    super()
     this.id = id
   }
 
   static [Symbol.hasInstance] (instance: unknown): boolean {
-    return typeof instance === 'object' && instance !== null && 'id' in instance!
+    return typeof instance === 'object' && instance !== null && 'id' in (instance as object)
   }
 
   get dirty (): boolean {
     return this.#dirty
   }
 
+  addEventListener (_type: string, cb: ModelEventListener): void {
+    this.#listeners.add(cb)
+  }
+
+  removeEventListener (_type: string, cb: ModelEventListener): void {
+    this.#listeners.delete(cb)
+  }
+
+  // Protected: dispatch event to all listeners
+  dispatchEvent (type: string): void {
+    for (const listener of this.#listeners) {
+      try { listener(type) } catch {}
+    }
+  }
+
   markDirty (): void {
     if (!this.#dirty) {
       this.#dirty = true
-      this.dispatchEvent(new Event('dirty'))
+      this.dispatchEvent('dirty')
     }
     this.#scheduleFlush()
   }
@@ -92,7 +109,7 @@ export class Model extends EventTarget {
         Model.dataSource.upsertTrack(payload as never).catch(console.error)
       }
     }
-    this.dispatchEvent(new Event('flush'))
+    this.dispatchEvent('flush')
   }
 
   // Call this after constructing to enable persistence (kept for backward compatibility)
