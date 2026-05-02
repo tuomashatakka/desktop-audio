@@ -202,7 +202,197 @@ CSS for the menu reuses `Popover` styles. Toggling `visible` rewrites `--track-g
 
 **Files.** `src/app/views/SettingsView.tsx` (rewrite), `src/app/styles/settings.css` (rewrite), `src/app/contexts/SettingsContext.tsx` (add `customTheme`, `setCustomTheme`, `exportTheme`, `importTheme`; broaden `Theme` union), `src/app/hooks/useThemeApply.ts` (apply custom theme variables to `<html>`).
 
-## A.7. CSS-first principle
+## A.7. Row density button group (relaxed / normal / compact)
+
+**Where.** Two entry points, single source of truth:
+- **Library heading** (`src/app/views/LibraryView.tsx:198` `<header className='view-header'>`) — controls the current session's density.
+- **Settings → Library section** — sets the default density saved to localStorage.
+
+**Visual.** A three-button toggle group rendered with the existing `IconButton` primitive. Icons: `≡` (relaxed), `≢` (normal — shorter rows), `=` (compact). Active button gets `aria-pressed="true"` styled via CSS.
+
+```tsx
+// LibraryView header
+<div className='density-toggle' role='group' aria-label='Row density'>
+  <IconButton label='Relaxed' aria-pressed={density === 'relaxed'} onClick={() => setDensity('relaxed')}>≡</IconButton>
+  <IconButton label='Normal'  aria-pressed={density === 'normal'}  onClick={() => setDensity('normal')}>≢</IconButton>
+  <IconButton label='Compact' aria-pressed={density === 'compact'} onClick={() => setDensity('compact')}>=</IconButton>
+</div>
+```
+
+**State.** Density lives in `UIContext` (`density: 'relaxed' | 'normal' | 'compact'`), with the default seeded from `SettingsContext.defaultDensity`. The wrapper element gets `data-density={density}`; all behaviour follows from CSS attribute selectors.
+
+**CSS — single source of truth via custom properties.**
+
+```css
+.track-table-wrap {
+  --row-h: 36px;
+  --row-pad-y: var(--sp-2);
+  --row-pad-x: var(--sp-3);
+  --row-clamp: 1;             /* lines per cell */
+
+  &[data-density='compact'] { --row-h: 28px; --row-pad-y: var(--sp-1); --row-clamp: 1; }
+  &[data-density='normal']  { --row-h: 36px; --row-pad-y: var(--sp-2); --row-clamp: 1; }
+  &[data-density='relaxed'] { --row-h: 64px; --row-pad-y: var(--sp-3); --row-clamp: 2; }
+}
+
+.track-row { height: var(--row-h); padding: var(--row-pad-y) var(--row-pad-x); }
+.track-row > span {
+  /* Compact + normal: clamp overflow */
+  display: -webkit-box;
+  -webkit-line-clamp: var(--row-clamp);
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Relaxed: title cell wraps to two physical lines with title + secondary line */
+[data-density='relaxed'] .col-title {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.25;
+}
+[data-density='relaxed'] .col-title .row-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+[data-density='relaxed'] .col-artist,
+[data-density='relaxed'] .col-album { display: none; }   /* now lives inside title cell */
+```
+
+**JSX change in `TrackTable`** for the relaxed subtitle is one line:
+
+```tsx
+<span className='col-title'>
+  {track.title}
+  {density === 'relaxed' && <span className='row-subtitle'>{track.artist} — {track.album}</span>}
+</span>
+```
+
+**Virtualizer.** The current `useVirtualizer` call at `src/app/components/composite/TrackTable.tsx:61` hard-codes `estimateSize: () => ROW_HEIGHT`. Replace with:
+```ts
+const ROW_HEIGHT_BY_DENSITY = { compact: 28, normal: 36, relaxed: 64 } as const
+const virtualizer = useVirtualizer({
+  count: rowCount,
+  getScrollElement: () => scrollRef.current,
+  estimateSize: () => ROW_HEIGHT_BY_DENSITY[density],
+  overscan: 8,
+})
+```
+The numeric constants must match the CSS `--row-h` values. Keep them adjacent (a single export in `TrackTable.tsx` consumed by the CSS via `:root` custom properties is the only way to dedupe; for now, the duplicate is acceptable and tested).
+
+**Files.** `src/app/contexts/UIContext.tsx` (+ `density`, `setDensity`), `src/app/contexts/SettingsContext.tsx` (+ `defaultDensity`), `src/app/views/LibraryView.tsx` (header buttons), `src/app/views/SettingsView.tsx` (default-density selector inside the Library section), `src/app/components/composite/TrackTable.tsx` (subtitle render + virtualizer height), `src/app/styles/library.css`, `src/app/styles/settings.css`.
+
+## A.8. Config caret + dropdown (column toggles + grouping)
+
+**Where.** Rightmost item of the library heading: a single `<button>` showing a chevron `⌄` icon. Click opens a popover menu using the existing `Popover` atomic. The menu has two sections:
+
+1. **Columns** — checkbox list for every column from §A.5. Same source of truth (`useColumnConfig`), reachable from two entry points: right-click on a header cell or the config caret.
+2. **Grouping** — radio list: `None`, `By album`, `By artist`, `By path`.
+
+```tsx
+<Popover trigger={<IconButton label='Configure'>⌄</IconButton>} placement='bottom-end'>
+  <fieldset>
+    <legend>Columns</legend>
+    {columns.map(c => (
+      <label key={c.key}><input type='checkbox' checked={c.visible} onChange={() => toggleColumn(c.key)} /> {c.label}</label>
+    ))}
+  </fieldset>
+  <fieldset>
+    <legend>Group by</legend>
+    {(['none','album','artist','path'] as const).map(g => (
+      <label key={g}><input type='radio' name='group' checked={grouping === g} onChange={() => setGrouping(g)} /> {labelOf(g)}</label>
+    ))}
+  </fieldset>
+</Popover>
+```
+
+**Grouping state.** New `grouping: 'none' | 'album' | 'artist' | 'path'` on `UIContext`, persisted to localStorage. When `grouping !== 'none'`, the table renders grouped sections.
+
+**Group rendering.**
+
+For `'none'` — current flat virtualised behaviour, no change.
+
+For `'album' | 'artist' | 'path'` — rebuild the row list as a flat sequence with `{ kind: 'header', group } | { kind: 'track', track }` entries; the virtualizer keeps working with variable-size estimates (group headers are taller). Pseudo:
+
+```ts
+const grouped = useMemo(() => {
+  if (grouping === 'none') return sorted.map(t => ({ kind: 'track' as const, track: t }))
+  const buckets = new Map<string, Track[]>()
+  for (const t of sorted) {
+    const key = grouping === 'album'  ? `${t.artist}​${t.album}`
+              : grouping === 'artist' ? t.artist
+              : /* path */              t.path.replace(/[/\\][^/\\]*$/, '')
+    if (!buckets.has(key)) buckets.set(key, [])
+    buckets.get(key)!.push(t)
+  }
+  const out: ({ kind: 'header'; key: string; tracks: Track[] } | { kind: 'track'; track: Track })[] = []
+  for (const [key, tracks] of buckets) {
+    out.push({ kind: 'header', key, tracks })
+    for (const t of tracks) out.push({ kind: 'track', track: t })
+  }
+  return out
+}, [sorted, grouping])
+```
+
+**By-album special case — bigger album art spanning rows.** When grouped by album, render each group as a CSS Grid block with the art on the left spanning every row in the group. CSS Grid `grid-row: span N` handles the visual rowspan; no JS measurement.
+
+```css
+.track-album-group {
+  display: grid;
+  grid-template-columns: 96px 1fr;     /* big art | track stack */
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  margin-bottom: var(--sp-3);
+}
+.track-album-group .group-art {
+  grid-row: 1 / -1;
+  align-self: start;
+  aspect-ratio: 1;
+  background: var(--bg-hover);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.track-album-group .group-art img { width: 100%; height: 100%; object-fit: cover; }
+.track-album-group .group-art .swatch {
+  width: 100%; height: 100%; display: block;
+}
+.track-album-group .group-tracks { display: contents; }   /* keep grid flat */
+.track-album-group .track-row {
+  /* Inside a grouped block, hide the per-row art column — the big art on the left replaces it */
+  & .col-art { display: none; }
+}
+.track-album-group .group-title {
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--sp-1);
+}
+.track-album-group .group-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--sp-2);
+}
+```
+
+For `'artist'` and `'path'` groupings the renderer uses a simpler layout: a sticky group header row (no big art) followed by flat track rows. CSS:
+
+```css
+.track-group-header {
+  position: sticky;
+  top: var(--row-h);                 /* below the table header */
+  background: var(--bg-raised);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+  z-index: 1;
+}
+```
+
+**Virtualization.** The virtualizer accepts variable sizes via `getEstimatedSize` per index. For an album group, `estimateSize(index)` returns the group's estimated total height (`headerHeight + tracks.length * rowHeight`). Or, simpler, the virtualizer iterates over a flat list where each entry is a single row; the album-art "rowspan" is purely CSS. Recommended start: flat virtualized list with grouping markers; album-art rowspan via grid `grid-row: span N` only when the group is fully visible. If virtualization clipping cuts the art, fall back to a wrapper non-virtualized layout for `'album'` mode (the per-album DOM cost is small — maybe 100-300 albums).
+
+**Files.** `src/app/views/LibraryView.tsx` (heading caret + Popover), `src/app/components/composite/TrackTable.tsx` (grouped render), `src/app/contexts/UIContext.tsx` (+ `grouping`, `setGrouping`), `src/app/styles/library.css`, `src/app/hooks/useColumnConfig.ts` (already added in §A.4).
+
+## A.9. CSS-first principle
 
 For every fix above, the JS additions are limited to:
 - `useColumnConfig` localStorage persistence + setter (≈40 lines).
@@ -210,14 +400,18 @@ For every fix above, the JS additions are limited to:
 - Theme JSON parse/serialize and `setProperty` apply (≈40 lines, in `SettingsView.tsx` + new hook).
 - Optional `ResizeObserver` for the waveform (skipped in the recommended path; the 400-bar `1fr` grid handles it CSS-only).
 
-Total new JS across Part A: ~140 lines. All visual behaviour — stacking, ellipsis, sticky rail, scroll, sort indicator, dragging affordance, equal columns — is CSS.
+Total new JS across Part A: ~200 lines. All visual behaviour — stacking, ellipsis, sticky rail, scroll, sort indicator, dragging affordance, equal columns, density spacing, album-art rowspan — is CSS.
 
-## A.8. Test plan for Part A
+## A.10. Test plan for Part A
 
 - `tests/components/composite/TrackTable.test.tsx` — sort click toggles direction; column-config changes update `--track-grid` style; right-click header opens column menu; drag reorder updates config order; resize handle updates width.
 - `tests/components/composite/PlayerBar.test.tsx` — title cell uses ellipsis when title overflows (assert `text-overflow: ellipsis` via computed style or class membership); width of `.player-bar-track` does not change between two tracks of different title lengths (`getBoundingClientRect()` snapshot).
 - `tests/views/SettingsView.test.tsx` — theme colour picker change calls `setProperty` on `<html>`; export click triggers a Blob download (mock `URL.createObjectURL`); import with malformed JSON shows error and does not mutate state.
 - Visual smoke (manual): resize the window through 1200 / 720 / 520 / 380 px in `bun run dev:web` and confirm all four player layouts behave as expected.
+- `tests/components/composite/TrackTable.density.test.tsx` — switching density updates the wrapper `data-density` attribute; relaxed adds the subtitle DOM node; virtualizer `estimateSize` returns the matching numeric height.
+- `tests/components/composite/TrackTable.grouping.test.tsx` — `grouping='album'` renders one `.track-album-group` per unique album with a single `.group-art` element and the corresponding tracks; `'artist'` renders sticky group headers; `'path'` groups by parent directory. Sort order is preserved within groups.
+- `tests/views/LibraryView.test.tsx` — header density toggle calls `setDensity`; config caret button opens the Popover and toggling a checkbox calls `toggleColumn`; switching grouping updates the rendered structure.
+- `tests/views/SettingsView.test.tsx` — default-density selector writes to `SettingsContext.defaultDensity`.
 
 ---
 
