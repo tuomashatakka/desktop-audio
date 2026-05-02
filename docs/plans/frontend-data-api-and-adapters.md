@@ -1,4 +1,227 @@
-# Plan: Frontend Data API + IPC and Web FS Adapters
+# Plan: UI Fixes + Frontend Data API + IPC and Web FS Adapters
+
+This plan now covers two ship-able batches that can be done in either order: a set of focused UI fixes (Part A) and the data-source split (Part B). CSS-first throughout — JS only where the DOM model genuinely requires it (drag-reorder, column resize handles, theme JSON import).
+
+---
+
+# Part A — UI Fixes
+
+## A.1. Player vertical-stack layout at narrow widths
+
+**Problem.** The `PlayerView` (full-screen) and `PlayerBar` (bottom) don't respond well below ~640 px wide. The narrow container query at `src/app/styles/player.css:59` switches to `flex-direction: row` instead of stacking, and the bottom bar's grid (`src/app/components/composite/PlayerBar.tsx:27`) overflows because every region (`player-bar-track`, `player-bar-controls`, `player-bar-progress`, `player-bar-volume`) competes for width.
+
+**Approach (CSS-only).**
+
+1. `PlayerView`: rewrite the narrow `@container` query to stack instead of row-wrap. The order at narrow widths is: art (compact) → title/artist → waveform → prev/play/next.
+   ```css
+   @container (max-width: 480px) {
+     .player-view { flex-direction: column; gap: var(--sp-3); padding: var(--sp-3); }
+     .album-art-card { width: clamp(60px, 25cqw, 120px); }
+     .player-info, .progress-section { width: 100%; }
+     .playback-controls { gap: var(--sp-3); }
+     .playback-controls .play-pause-btn { width: 48px; height: 48px; }
+   }
+   @container (max-width: 320px) {
+     .playback-controls .play-pause-btn { width: 40px; height: 40px; font-size: 18px; }
+     .playback-controls > :not(.play-pause-btn) { font-size: 14px; }
+   }
+   ```
+2. `PlayerBar` (bottom strip): give it `container-type: inline-size`, then collapse the volume slider and the time labels at narrow widths but keep prev/play/next visible (smaller).
+   ```css
+   .player-bar { container-type: inline-size; display: grid;
+     grid-template-columns: minmax(160px, 22%) auto 1fr auto;
+     /* track    controls   progress  volume */
+   }
+   @container (max-width: 720px) { .player-bar-volume { display: none; } }
+   @container (max-width: 520px) {
+     .player-bar { grid-template-columns: minmax(120px, 30%) auto 1fr; }
+     .player-bar-progress .player-bar-time { display: none; }
+   }
+   @container (max-width: 380px) {
+     .player-bar { grid-template-columns: 1fr auto; grid-auto-rows: auto; }
+     .player-bar-track    { grid-column: 1; grid-row: 1; }
+     .player-bar-controls { grid-column: 2; grid-row: 1; }
+     .player-bar-progress { grid-column: 1 / -1; grid-row: 2; }
+     .player-bar-controls > button { width: 32px; height: 32px; font-size: 14px; }
+   }
+   ```
+   Prev/play/next are never `display:none`. They scale via `width`/`height`/`font-size`.
+
+**Files.** `src/app/styles/player.css`, `src/app/styles/components.css` (player-bar styles live there today; if so, edit there).
+
+## A.2. Stable bottom-player title container
+
+**Problem.** `.player-bar-track` flexes around the title length, so the controls and waveform jump horizontally on track change.
+
+**Approach (CSS-only).** Lock `player-bar-track` to a `minmax(160px, 22%)` grid track (already proposed in A.1), and force the title cell to be the flex source of truth, not the contents:
+
+```css
+.player-bar-track  { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.player-bar-info   { flex: 1 1 auto; min-width: 0; }      /* min-width:0 enables ellipsis */
+.player-bar-title  { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.player-bar-artist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+```
+
+The grid template (A.1) reserves the column width regardless of title contents; `min-width: 0` plus ellipsis prevents the inner text from blowing the grid track open. No JS measurement.
+
+## A.3. Waveform fills full width + higher resolution
+
+**Problem.** `WaveformProgress` uses `display: flex; gap: 1px` with fixed `width: 5px` bars (`src/app/styles/waveform-progress.css:23-26`). With 80 bars (current `decodeWaveformBars(ab, 80, ctx)` at `src/app/contexts/AudioContext.tsx:297`) at 5 px + 1 px gap each, that's a fixed 480 px regardless of container width.
+
+**Approach.** Make the bars elastic via CSS, and bump the bar count to a content-derived value.
+
+CSS:
+```css
+.waveform-progress {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;       /* every bar gets an equal share of available width */
+  gap: 1px;
+  width: 100%;
+  /* ... existing height/padding ... */
+}
+.wf-bar { width: auto; }         /* drop fixed 5px */
+```
+Switching to `grid-auto-columns: 1fr` is the whole fix — bars now stretch to fill any width.
+
+Bar-count bump (renderer-side, the only JS change in Part A):
+- Raise the default to `min(400, Math.floor(containerWidth / 4))` — measure with a `ResizeObserver` in `WaveformProgress`, recompute on resize, debounce to one frame. Re-decode bars from the cached `ArrayBuffer` only when the count crosses a threshold (e.g. ±64).
+- Or, simpler: precompute at 400 bars regardless; CSS `grid-auto-columns: 1fr` averages them. That avoids `ResizeObserver` entirely. Recommended start: 400 bars, no observer.
+
+**Files.** `src/app/styles/waveform-progress.css`, `src/app/contexts/AudioContext.tsx:297` (change `80` → `400`), `src/app/components/atomic/WaveformProgress.tsx` (drop any width math).
+
+## A.4. Library table: padded scroll container, draggable + resizable + sortable headers
+
+**Problem.** `.track-table-wrap` at `src/app/styles/library.css:63` uses `overflow: hidden`, no horizontal scroll, no padding. The header grid template `36px 40px 1fr 22% 22% 52px 52px` is hard-coded. `useSortableTable` already drives sort by header click but only seven columns are exposed.
+
+**Approach.** Convert column widths to CSS custom properties so JS can mutate them per column, drop a horizontal scroll container, add a thin column-resize handle, and HTML5-drag the header cells for reorder. CSS for everything except the drag/resize event listeners.
+
+CSS:
+```css
+.tracks-container { padding: var(--sp-3) var(--sp-4); }   /* fixes "no padding" */
+
+.track-table-wrap {
+  overflow-x: auto;                  /* horizontal scroll on narrow */
+  overflow-y: hidden;
+}
+.track-header,
+.track-row {
+  display: grid;
+  grid-template-columns: var(--track-grid, 36px 40px 1fr 0.55fr 0.55fr 6ch 6ch);
+  min-width: max-content;             /* respect intrinsic widths when scrolling */
+}
+
+.col-resize-handle {
+  position: absolute; top: 0; right: -3px; bottom: 0; width: 6px;
+  cursor: col-resize; user-select: none;
+}
+[role="columnheader"] { position: relative; }            /* anchor handle */
+[role="columnheader"][draggable="true"] { cursor: grab; }
+[role="columnheader"].dragging          { opacity: 0.4; }
+[role="columnheader"].drop-target       { box-shadow: inset 2px 0 0 var(--accent); }
+```
+
+JS (minimum):
+- Persist a column-config object `{ key, width, hidden, order }[]` in `UIContext` (or a new `useColumnConfig` hook persisted to localStorage). On every change, write `--track-grid` on the wrapper from the config.
+- Drag reorder: `onDragStart` on `<th role="columnheader">` stores `dataTransfer.setData('column-key', key)`; `onDragOver` adds `.drop-target`; `onDrop` reorders the config array.
+- Resize: `onMouseDown` on `.col-resize-handle` captures pointer, on `mousemove` updates the config's `width` for that column to `Math.max(48, startWidth + dx)` in `px`. CSS `var(--track-grid)` rebuilds.
+- Sort: already implemented in `useSortableTable` and `TrackTable.tsx:82` — keep as-is.
+
+**Files.** `src/app/styles/library.css`, `src/app/components/composite/TrackTable.tsx`, new `src/app/hooks/useColumnConfig.ts`.
+
+## A.5. Column visibility menu
+
+**Problem.** Only the seven hard-coded columns are shown. No way to reveal `year`, `genre`, `trackNumber`, `size`, `path`, `dateAdded`.
+
+**Approach.** Right-click any header cell shows a menu with checkboxes for every column. Reuse the existing `Popover` (`src/app/components/atomic/Popover.tsx`) and the `bridge.showContextMenu` IPC; or, simpler and decoupling-friendly, render an in-renderer `Popover` instead of going through Electron — that also makes it work in `bun run dev:web`.
+
+```tsx
+// inside TrackTable header onContextMenu
+const items: { key: string; label: string; visible: boolean }[] = [
+  { key: 'title',       label: 'Title',        visible: true /* always */ },
+  { key: 'artist',      label: 'Artist',       visible: cfg.artist.visible },
+  { key: 'album',       label: 'Album',        visible: cfg.album.visible },
+  { key: 'year',        label: 'Year',         visible: cfg.year.visible },
+  { key: 'genre',       label: 'Genre',        visible: cfg.genre.visible },
+  { key: 'duration',    label: 'Duration',     visible: cfg.duration.visible },
+  { key: 'format',      label: 'Format',       visible: cfg.format.visible },
+  { key: 'size',        label: 'Size',         visible: cfg.size.visible },
+  { key: 'trackNumber', label: 'Track #',      visible: cfg.trackNumber.visible },
+  { key: 'path',        label: 'Path',         visible: cfg.path.visible },
+]
+```
+
+CSS for the menu reuses `Popover` styles. Toggling `visible` rewrites `--track-grid` so hidden columns simply drop out of the grid template — no DOM removal needed.
+
+**Files.** `src/app/components/composite/TrackTable.tsx`, `src/app/hooks/useColumnConfig.ts` (shared with A.4), `src/app/styles/library.css`.
+
+## A.6. Settings page refactor + custom theme colours
+
+**Problem.** `src/app/views/SettingsView.tsx` is a flat list of sections styled by `settings.css`. No theme customisation.
+
+**Approach (CSS-led).**
+
+1. **Layout refactor.** Switch `.settings-view` to a two-column grid: a left rail of section titles, right pane of editable cards. Use existing `--sp-*` and `--radius-*` tokens; no new tokens needed.
+   ```css
+   .settings-view {
+     display: grid;
+     grid-template-columns: 200px 1fr;
+     gap: var(--sp-6);
+     padding: var(--sp-6) var(--sp-8);
+     max-width: 960px;
+     margin: 0 auto;
+   }
+   .settings-nav { position: sticky; top: var(--sp-4); align-self: start; }
+   .settings-nav button { display: block; width: 100%; text-align: left;
+     padding: var(--sp-2) var(--sp-3); border-radius: var(--radius); background: transparent;
+     color: var(--text-muted); }
+   .settings-nav button.active { background: var(--bg-raised); color: var(--text); }
+   .settings-pane > section { background: var(--bg-raised);
+     padding: var(--sp-6); border-radius: var(--radius-lg); margin-bottom: var(--sp-4); }
+   @container (max-width: 640px) { .settings-view { grid-template-columns: 1fr; } }
+   ```
+   Use scroll-spy or `IntersectionObserver` to highlight the active rail item — or skip it and have the rail items scroll-anchor to `<section id>`s with `:target` highlighting.
+
+2. **Theme colours section.** New `<section id="theme">` containing `<input type="color">` for each theme variable. The full token list: `--bg`, `--bg-raised`, `--bg-input`, `--bg-hover`, `--accent`, `--accent-hover`, `--accent-alt`, `--text`, `--text-dim`, `--text-muted`, `--border`, `--border-hover`, `--success`, `--warning`, `--danger`, `--info`, `--wf-unplayed`, `--wf-played`. (Source list: `src/app/styles/tokens.css:2-70`.)
+
+   Each picker writes to `document.documentElement.style.setProperty('--bg', value)` immediately for live preview. The full set of values is mirrored into a `customTheme` blob in `SettingsContext`.
+
+3. **Theme JSON shape.**
+   ```ts
+   interface CustomTheme {
+     readonly version: 1
+     readonly name:    string
+     readonly colors:  Readonly<Record<string, string>>  // keyed by CSS var name w/o leading --
+   }
+   ```
+
+4. **Save / Export / Import.**
+   - **Save**: write `customTheme` to localStorage via `SettingsContext`; switch `theme` enum from `'dark' | 'light'` to `'dark' | 'light' | 'custom'`. When `theme === 'custom'`, the renderer applies the custom variables on `<html>` once on mount and on every change.
+   - **Export**: serialize `CustomTheme` and trigger a download via `const url = URL.createObjectURL(new Blob([JSON.stringify(theme, null, 2)], { type: 'application/json' }))`. Plain DOM API, no IPC.
+   - **Import**: `<input type="file" accept="application/json">` → `file.text()` → `JSON.parse` → validate `version === 1` and `colors` is a flat string→string record → store + apply. Show inline error on validation failure.
+
+**Files.** `src/app/views/SettingsView.tsx` (rewrite), `src/app/styles/settings.css` (rewrite), `src/app/contexts/SettingsContext.tsx` (add `customTheme`, `setCustomTheme`, `exportTheme`, `importTheme`; broaden `Theme` union), `src/app/hooks/useThemeApply.ts` (apply custom theme variables to `<html>`).
+
+## A.7. CSS-first principle
+
+For every fix above, the JS additions are limited to:
+- `useColumnConfig` localStorage persistence + setter (≈40 lines).
+- Drag/reorder + column-resize event listeners on header cells (≈60 lines, in `TrackTable.tsx`).
+- Theme JSON parse/serialize and `setProperty` apply (≈40 lines, in `SettingsView.tsx` + new hook).
+- Optional `ResizeObserver` for the waveform (skipped in the recommended path; the 400-bar `1fr` grid handles it CSS-only).
+
+Total new JS across Part A: ~140 lines. All visual behaviour — stacking, ellipsis, sticky rail, scroll, sort indicator, dragging affordance, equal columns — is CSS.
+
+## A.8. Test plan for Part A
+
+- `tests/components/composite/TrackTable.test.tsx` — sort click toggles direction; column-config changes update `--track-grid` style; right-click header opens column menu; drag reorder updates config order; resize handle updates width.
+- `tests/components/composite/PlayerBar.test.tsx` — title cell uses ellipsis when title overflows (assert `text-overflow: ellipsis` via computed style or class membership); width of `.player-bar-track` does not change between two tracks of different title lengths (`getBoundingClientRect()` snapshot).
+- `tests/views/SettingsView.test.tsx` — theme colour picker change calls `setProperty` on `<html>`; export click triggers a Blob download (mock `URL.createObjectURL`); import with malformed JSON shows error and does not mutate state.
+- Visual smoke (manual): resize the window through 1200 / 720 / 520 / 380 px in `bun run dev:web` and confirm all four player layouts behave as expected.
+
+---
+
+# Part B — Frontend Data API
 
 ## Context
 
