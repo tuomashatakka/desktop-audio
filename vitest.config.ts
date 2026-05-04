@@ -11,7 +11,7 @@ export default defineConfig({
   },
   coverage: {
     provider: 'v8',
-    reporter: ['lcov', 'text', 'html', ['lcov', { file: 'lcov.info' }]],
+    reporter: ['text', 'html', ['lcov', { file: 'lcov.info' }], ['clover', { file: 'clover.xml' }]],
     reportsDirectory: './coverage',
   },
 })

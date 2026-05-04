@@ -179,13 +179,17 @@
 }
 
 .typing-cursor {
-  display: inline-block;
+  display: none;
   width: 2px;
   height: 1.1em;
   background: var(--clr-accent);
   margin-left: 2px;
   vertical-align: text-bottom;
   animation: cursorBlink 0.6s step-end infinite;
+}
+
+.typing-cursor.active {
+  display: inline-block;
 }
 
 @keyframes cursorBlink {

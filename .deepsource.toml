@@ -14,6 +14,6 @@ enabled = true
 
   [analyzers.meta]
   # DeepSource will auto-detect the format from the file extension
-  # clover.xml = Cobertura XML format (supported by Vitest + v8)
+  # clover.xml = Clover XML format (supported by Vitest + v8)
   # lcov.info = LCOV format
   coverage_file = "./coverage/clover.xml"
