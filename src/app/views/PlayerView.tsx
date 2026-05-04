@@ -31,64 +31,71 @@ export function PlayerView () {
   return (
     <div className='player-view'>
 
-      {/* Album art */}
-      <figure className='album-art-card'>
-        {currentTrack.albumArt
-          ? <img src={currentTrack.albumArt} alt='Album art' />
-          : <span className='art-fallback'>♫</span>
-        }
-      </figure>
-
-      {/* Track info */}
-      <div className='player-info'>
-        <h2 className='track-title'>{currentTrack.title}</h2>
-        <p className='track-artist'>{currentTrack.artist}</p>
-        <p className='track-album'>{currentTrack.album}</p>
-      </div>
-
-      {/* Waveform progress */}
-      <section className='progress-section'>
-        <WaveformProgress
-          currentTime={currentTime}
-          duration={duration}
-          onSeek={seek}
-          bars={waveformBars}
-        />
-
-        <div className='time-row'>
-          <span className='time-label'>{formatTime(currentTime)}</span>
-          <span className='time-label'>{formatTime(duration)}</span>
+      {currentTrack?.albumArt &&
+        <div className='album-art-bg' aria-hidden='true'>
+          <img src={currentTrack.albumArt} alt='' />
         </div>
-      </section>
+      }
 
-      {/* Playback controls */}
-      <div className='playback-controls'>
-        <IconButton
-          label='Previous'
-          onClick={() =>
-            playPrevious(filteredTracks)}
-        >
-          ⏮
-        </IconButton>
+      <div className='player-content'>
+        {/* Album art */}
+        <figure className='album-art-card'>
+          {currentTrack.albumArt
+            ? <img src={currentTrack.albumArt} alt='Album art' />
+            : <span className='art-fallback'>♫</span>
+          }
+        </figure>
 
-        <Button
-          variant='primary'
-          className='play-pause-btn'
-          icon
-          onClick={isPlaying ? pause : resume}
-        >
-          {isPlaying ? '⏸' : '▶'}
-        </Button>
+        {/* Track info */}
+        <div className='player-info'>
+          <h2 className='track-title'>{currentTrack.title}</h2>
+          <p className='track-artist'>{currentTrack.artist}</p>
+          <p className='track-album'>{currentTrack.album}</p>
+        </div>
 
-        <IconButton
-          label='Next'
-          onClick={() =>
-            playNext(filteredTracks)}
-        >
-          ⏭
-        </IconButton>
+        {/* Waveform progress */}
+        <section className='progress-section'>
+          <WaveformProgress
+            currentTime={currentTime}
+            duration={duration}
+            onSeek={seek}
+            bars={waveformBars}
+          />
+
+          <div className='time-row'>
+            <span className='time-label'>{formatTime(currentTime)}</span>
+            <span className='time-label'>{formatTime(duration)}</span>
+          </div>
+        </section>
+
+        {/* Playback controls */}
+        <div className='playback-controls'>
+          <IconButton
+            label='Previous'
+            onClick={() =>
+              playPrevious(filteredTracks)}
+          >
+            ⏮
+          </IconButton>
+
+          <Button
+            variant='primary'
+            className='play-pause-btn'
+            icon
+            onClick={isPlaying ? pause : resume}
+          >
+            {isPlaying ? '⏸' : '▶'}
+          </Button>
+
+          <IconButton
+            label='Next'
+            onClick={() =>
+              playNext(filteredTracks)}
+          >
+            ⏭
+          </IconButton>
+        </div>
       </div>
-
     </div>
   )
 }

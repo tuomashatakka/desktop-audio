@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect } from 'react'
 import type { DataSource } from './DataSource'
 import { Model } from '../models'
 
+
 const DataContext = createContext<DataSource | null>(null)
 
 export function DataProvider ({ value, children }: { value: DataSource; children: React.ReactNode }) {
@@ -11,7 +12,7 @@ export function DataProvider ({ value, children }: { value: DataSource; children
     return () => {
       Model.dataSource = null
     }
-  }, [value])
+  }, [ value ])
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }

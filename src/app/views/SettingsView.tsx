@@ -5,6 +5,7 @@ import { useData } from '../data'
 import { useThemeApply } from '../hooks'
 import { Button } from '../components/atomic'
 
+
 const THEME_COLORS = [
   { key: '--bg', label: 'Background' },
   { key: '--bg-raised', label: 'Raised Background' },
@@ -53,6 +54,7 @@ export function SettingsView () {
     if (theme !== 'custom') {
       setTheme('custom')
     }
+
     const updated = exportTheme()
     updated.colors[key] = value
     setCustomTheme(updated)
@@ -62,7 +64,7 @@ export function SettingsView () {
 
   const handleExportTheme = () => {
     const themeData = exportTheme()
-    const blob = new Blob([JSON.stringify(themeData, null, 2)], { type: 'application/json' })
+    const blob = new Blob([ JSON.stringify(themeData, null, 2) ], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -75,9 +77,11 @@ export function SettingsView () {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.json'
-    input.onchange = (e) => {
+    input.onchange = e => {
       const file = (e.target as HTMLInputElement).files?.[0]
-      if (!file) return
+      if (!file)
+        return
+
       const reader = new FileReader()
       reader.onload = () => {
         try {
@@ -85,7 +89,8 @@ export function SettingsView () {
           if (data.version === 1 && data.colors) {
             importTheme(data)
           }
-        } catch {
+        }
+        catch {
           // Invalid theme file
         }
       }
@@ -107,25 +112,32 @@ export function SettingsView () {
       <nav className='settings-nav'>
         <button
           className={activeSection === 'library' ? 'active' : ''}
-          onClick={() => setActiveSection('library')}
+          onClick={() =>
+            setActiveSection('library')}
         >
           Library
         </button>
+
         <button
           className={activeSection === 'appearance' ? 'active' : ''}
-          onClick={() => setActiveSection('appearance')}
+          onClick={() =>
+            setActiveSection('appearance')}
         >
           Appearance
         </button>
+
         <button
           className={activeSection === 'playback' ? 'active' : ''}
-          onClick={() => setActiveSection('playback')}
+          onClick={() =>
+            setActiveSection('playback')}
         >
           Playback
         </button>
+
         <button
           className={activeSection === 'about' ? 'active' : ''}
-          onClick={() => setActiveSection('about')}
+          onClick={() =>
+            setActiveSection('about')}
         >
           About
         </button>
@@ -136,6 +148,7 @@ export function SettingsView () {
         {activeSection === 'library' &&
           <section id='library'>
             <h4>Library</h4>
+
             <div className='stack sm'>
               <p className='section-description'>Library folders to scan for audio files</p>
 
@@ -145,10 +158,12 @@ export function SettingsView () {
                   {libraryPaths.map(path =>
                     <div key={path} className='path-item'>
                       <span>{path}</span>
+
                       <Button
                         variant='ghost'
                         size='sm'
-                        onClick={() => removeLibraryPath(path)}
+                        onClick={() =>
+                          removeLibraryPath(path)}
                       >
                         ×
                       </Button>
@@ -161,10 +176,12 @@ export function SettingsView () {
 
               <div className='field' style={{ marginTop: 'var(--sp-4)' }}>
                 <span>Default Row Density</span>
+
                 <select
                   className='select'
                   value={defaultDensity}
-                  onChange={e => setDefaultDensity(e.target.value as typeof defaultDensity)}
+                  onChange={e =>
+                    setDefaultDensity(e.target.value as typeof defaultDensity)}
                 >
                   <option value='compact'>Compact</option>
                   <option value='normal'>Normal</option>
@@ -178,13 +195,16 @@ export function SettingsView () {
         {activeSection === 'appearance' &&
           <section id='theme'>
             <h4>Appearance</h4>
+
             <div className='stack sm'>
               <label className='field'>
                 <span>Theme</span>
+
                 <select
                   className='select'
                   value={theme}
-                  onChange={e => setTheme(e.target.value as Theme)}
+                  onChange={e =>
+                    setTheme(e.target.value as Theme)}
                 >
                   <option value='dark'>Dark</option>
                   <option value='light'>Light</option>
@@ -195,21 +215,26 @@ export function SettingsView () {
               {theme === 'custom' &&
                 <div className='theme-editor'>
                   <h5>Custom Theme Colors</h5>
+
                   <div className='color-grid'>
                     {THEME_COLORS.map(({ key, label }) =>
                       <div key={key} className='color-field'>
                         <label>
                           <span>{label}</span>
+
                           <input
                             type='color'
                             value={currentColors[key] || '#000000'}
-                            onChange={e => handleColorChange(key, e.target.value)}
+                            onChange={e =>
+                              handleColorChange(key, e.target.value)}
                           />
+
                           <span className='color-value'>{currentColors[key] || ''}</span>
                         </label>
                       </div>
                     )}
                   </div>
+
                   <div className='theme-actions cluster'>
                     <Button variant='secondary' size='sm' onClick={handleSaveTheme}>Save</Button>
                     <Button variant='secondary' size='sm' onClick={handleExportTheme}>Export</Button>
@@ -224,9 +249,11 @@ export function SettingsView () {
         {activeSection === 'playback' &&
           <section id='playback'>
             <h4>Playback</h4>
+
             <div className='stack sm'>
               <label className='field'>
                 <span>Default Volume</span>
+
                 <div className='volume-control cluster'>
                   <input
                     type='range'
@@ -235,20 +262,25 @@ export function SettingsView () {
                     max={1}
                     step={0.01}
                     value={volume}
-                    onChange={e => setVolume(Number(e.target.value))}
+                    onChange={e =>
+                      setVolume(Number(e.target.value))}
                   />
+
                   <span className='volume-value mono text-sm'>
-                    {Math.round(volume * 100)}%
+                    {Math.round(volume * 100)}
+                    %
                   </span>
                 </div>
               </label>
 
               <label className='field'>
                 <span>Repeat Mode</span>
+
                 <select
                   className='select'
                   value={repeatMode}
-                  onChange={e => setRepeatMode(e.target.value as RepeatMode)}
+                  onChange={e =>
+                    setRepeatMode(e.target.value as RepeatMode)}
                 >
                   <option value='none'>No Repeat</option>
                   <option value='one'>Repeat One</option>
@@ -262,6 +294,7 @@ export function SettingsView () {
         {activeSection === 'about' &&
           <section id='about'>
             <h4>About</h4>
+
             <div className='about-content'>
               <p>Desktop Audio Player v1.0.0</p>
               <p>Built with Electron + React</p>

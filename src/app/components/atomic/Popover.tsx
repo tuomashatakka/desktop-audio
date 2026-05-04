@@ -38,7 +38,8 @@ export function Popover ({ open, anchorRect, onClose, children, placement = 'bot
     return null
 
   const top  = placement === 'bottom' ? anchorRect.bottom + 4 : anchorRect.top - 4
-  const left = anchorRect.left
+  // Anchor to the right side of the button, subtract popup width to keep it on screen
+  const left = Math.max(0, anchorRect.right - 200) // 200px is approximate popup width
 
   return createPortal(
     <div

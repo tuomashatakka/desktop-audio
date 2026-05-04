@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { Model } from './Model'
 
+
 export function useObservable<K extends string, V> (model: Model | null, key: K): V | undefined {
   return useSyncExternalStore(
     (onStoreChange: () => void) => {
@@ -34,7 +35,9 @@ export function useModelDirty (model: Model | null): boolean {
         model.removeEventListener('flush', onStoreChange)
       }
     },
-    () => model?.dirty ?? false,
-    () => false,
+    () =>
+      model?.dirty ?? false,
+    () =>
+      false,
   )
 }

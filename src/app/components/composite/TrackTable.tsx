@@ -301,6 +301,19 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
   const wrapStyle = useMemo(() =>
     ({ '--track-grid': gridTemplate } as React.CSSProperties), [ gridTemplate ])
 
+  // Auto-scroll to current track when it changes
+  useEffect(() => {
+    if (!currentTrack || !scrollRef.current || !virtualizer)
+      return
+
+    const trackIndex = sorted.findIndex(t =>
+      t.id === currentTrack.id)
+    if (trackIndex < 0)
+      return
+
+    virtualizer.scrollToIndex(trackIndex, { align: 'center' })
+  }, [ currentTrack?.id, virtualizer, sorted ])
+
   const renderRow = useCallback((track: Track, index: number) => {
     const active = currentTrack?.id === track.id
     return (

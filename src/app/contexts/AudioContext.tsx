@@ -15,15 +15,16 @@ interface AudioState {
 }
 
 interface AudioContextValue extends AudioState {
-  readonly play:         (track: Track) => void
-  readonly pause:        () => void
-  readonly resume:       () => void
-  readonly stop:         () => void
-  readonly seek:         (time: number) => void
-  readonly setVolume:    (volume: number) => void
-  readonly playNext:     (tracks: readonly Track[]) => void
-  readonly playPrevious: (tracks: readonly Track[]) => void
-  readonly analyzer:     AnalyserNode | null
+  readonly play:            (track: Track) => void
+  readonly pause:           () => void
+  readonly resume:          () => void
+  readonly stop:            () => void
+  readonly seek:            (time: number) => void
+  readonly setVolume:       (volume: number) => void
+  readonly playNext:        (tracks: readonly Track[]) => void
+  readonly playPrevious:    (tracks: readonly Track[]) => void
+  readonly analyzer:        AnalyserNode | null
+  readonly setCurrentQueue: (tracks: Track[]) => void
 }
 
 /** Decode an audio file and compute per-bar RMS amplitudes for the waveform. */
@@ -85,6 +86,12 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   const playNextRef = useRef<(tracks: readonly Track[]) => void>(() => {})
   const playPreviousRef = useRef<(tracks: readonly Track[]) => void>(() => {})
 
+  // Track the current playlist being played
+  const currentQueueRef = useRef<Track[]>([])
+  const setCurrentQueue = useCallback((tracks: Track[]) => {
+    currentQueueRef.current = tracks
+  }, [])
+
   // MediaSession: set up metadata & handlers when track changes
   useEffect(() => {
     if (!navigator.mediaSession || !state.currentTrack)
@@ -108,10 +115,10 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
       pauseRef.current()
     })
     navigator.mediaSession.setActionHandler('previoustrack', () => {
-      playPreviousRef.current([])
+      playPreviousRef.current(currentQueueRef.current)
     })
     navigator.mediaSession.setActionHandler('nexttrack', () => {
-      playNextRef.current([])
+      playNextRef.current(currentQueueRef.current)
     })
     navigator.mediaSession.setActionHandler('seekto', details => {
       if (details.seekTime !== undefined) {
@@ -206,7 +213,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     if (mediaStateDebounceRef.current)
       clearTimeout(mediaStateDebounceRef.current)
 
-     mediaStateDebounceRef.current = setTimeout(() => {
+    mediaStateDebounceRef.current = setTimeout(() => {
       if (!state.currentTrack)
         return
       host.updateMediaState({
@@ -219,7 +226,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
         duration:  state.duration,
       })
     }, 500)
- 
+
     return () => {
       if (mediaStateDebounceRef.current)
         clearTimeout(mediaStateDebounceRef.current)
@@ -427,6 +434,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
         playNext,
         playPrevious,
         analyzer,
+        setCurrentQueue,
       }}
     >
       {children}

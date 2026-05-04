@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { HostBridge } from './HostBridge'
 
+
 const HostContext = createContext<HostBridge | null>(null)
 
 export function HostProvider ({ value, children }: { value: HostBridge; children: React.ReactNode }) {

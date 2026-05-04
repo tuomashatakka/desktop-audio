@@ -1,13 +1,14 @@
 import type { DataSource } from '../data/DataSource'
 
+
 const DB_WRITE_DEBOUNCE_MS = 150
 
 type ModelEventListener = (eventType: string) => void
 
 export class Model {
-  readonly id: string
+  readonly id:       string
   #dirty = false
-  #flushTimer: ReturnType<typeof setTimeout> | null = null
+  #flushTimer:       ReturnType<typeof setTimeout> | null = null
   static dataSource: DataSource | null = null
   #listeners = new Set<ModelEventListener>()
 
@@ -34,7 +35,10 @@ export class Model {
   // Protected: dispatch event to all listeners
   dispatchEvent (type: string): void {
     for (const listener of this.#listeners) {
-      try { listener(type) } catch {}
+      try {
+        listener(type)
+      }
+      catch {}
     }
   }
 
@@ -66,7 +70,8 @@ export class Model {
       const keys = Object.getOwnPropertyNames(proto)
       for (const key of keys) {
         // Skip constructor and other non-property methods
-        if (key === 'constructor') continue
+        if (key === 'constructor')
+          continue
 
         const descriptor = Object.getOwnPropertyDescriptor(proto, key)
         // Only include properties with getters (not methods)
@@ -77,7 +82,7 @@ export class Model {
       proto = Object.getPrototypeOf(proto)
     }
 
-    const allKeys = [...new Set([...instanceKeys, ...protoKeys])]
+    const allKeys = [ ...new Set([ ...instanceKeys, ...protoKeys ]) ]
 
     for (const key of allKeys) {
       if (key.startsWith('_') || key.startsWith('#') || key === 'id')
@@ -89,7 +94,8 @@ export class Model {
       if (descriptor && typeof descriptor.get === 'function') {
         try {
           result[key] = descriptor.get.call(this)
-        } catch {
+        }
+        catch {
           // Skip properties that throw when accessed
         }
       }

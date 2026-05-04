@@ -3,6 +3,7 @@
 
 import type { SerializableMenuItem, MediaState } from '../services/types'
 
+
 export interface HostBridge {
   // Window
   minimizeWindow(): void

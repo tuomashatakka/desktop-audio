@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useUI } from '../contexts'
 
 
 interface AppLayoutProps {
@@ -9,12 +10,14 @@ interface AppLayoutProps {
 }
 
 export function AppLayout ({ titlebar, sidebar, main, player }: AppLayoutProps) {
+  const { sidebarOpen } = useUI()
+
   return (
     <div className='app-shell'>
       {titlebar && <header className='titlebar'>{titlebar}</header>}
 
       <div className='app-body'>
-        {sidebar && <aside className='app-sidebar'>{sidebar}</aside>}
+        {sidebar && sidebarOpen && <aside className='app-sidebar'>{sidebar}</aside>}
         <main className='app-main'>{main}</main>
       </div>
 

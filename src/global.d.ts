@@ -1,5 +1,6 @@
 import type { AudioMetadata, MediaState } from './app/services/types'
 
+
 interface ElectronAPI {
   // Library
   scanLibrary:    (dirPaths: string[]) => void

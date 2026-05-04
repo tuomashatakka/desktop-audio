@@ -8,6 +8,34 @@
   gap: var(--sp-6);
   padding: var(--sp-6) var(--sp-8) var(--sp-8);
   background: var(--bg);
+  position: relative;
+
+  & .album-art-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+
+    & img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: blur(60px) brightness(0.2);
+      transform: scale(1.2);
+    }
+  }
+
+  & .player-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-6);
+    width:100%;
+    height:100%;
+  }
 
   & .empty-player {
     flex: 1;
@@ -79,6 +107,15 @@
 }
 
 @container (max-width: 320px) {
+  .player-view {
+    gap: var(--sp-2);
+    padding: var(--sp-2);
+  }
+
+  .album-art-card {
+    width: clamp(48px, 20cqw, 80px);
+  }
+
   .playback-controls .play-pause-btn {
     width: 40px;
     height: 40px;
@@ -87,6 +124,10 @@
 
   .playback-controls > :not(.play-pause-btn) {
     font-size: 14px;
+  }
+
+  .player-info .track-title {
+    font-size: var(--text-base);
   }
 }
 

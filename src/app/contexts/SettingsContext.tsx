@@ -9,17 +9,17 @@ export type Theme = 'dark' | 'light' | 'custom'
 
 export interface CustomTheme {
   version: 1,
-  name: string,
-  colors: Record<string, string>,
+  name:    string,
+  colors:  Record<string, string>,
 }
 
 interface Settings {
-  readonly libraryPaths: readonly string[]
-  readonly theme:        Theme
-  readonly customTheme:  CustomTheme | null
+  readonly libraryPaths:   readonly string[]
+  readonly theme:          Theme
+  readonly customTheme:    CustomTheme | null
   readonly defaultDensity: 'compact' | 'normal' | 'relaxed'
-  readonly volume:       number
-  readonly repeatMode:   RepeatMode
+  readonly volume:         number
+  readonly repeatMode:     RepeatMode
 }
 
 interface SettingsContextValue extends Settings {
@@ -35,38 +35,38 @@ interface SettingsContextValue extends Settings {
 }
 
 const defaultSettings: Settings = {
-  libraryPaths: [],
-  theme: 'dark',
-  customTheme: null,
+  libraryPaths:   [],
+  theme:          'dark',
+  customTheme:    null,
   defaultDensity: 'normal',
-  volume: 0.8,
-  repeatMode: 'none',
+  volume:         0.8,
+  repeatMode:     'none',
 }
 
 const STORAGE_KEY = 'desktop-audio-settings'
 
 const DEFAULT_CUSTOM_THEME: CustomTheme = {
   version: 1,
-  name: 'Custom Theme',
-  colors: {
-    '--bg': '#1a1a2e',
-    '--bg-raised': '#16213e',
-    '--bg-input': '#0f3460',
-    '--bg-hover': '#1a1a3e',
-    '--accent': '#e94560',
+  name:    'Custom Theme',
+  colors:  {
+    '--bg':           '#1a1a2e',
+    '--bg-raised':    '#16213e',
+    '--bg-input':     '#0f3460',
+    '--bg-hover':     '#1a1a3e',
+    '--accent':       '#e94560',
     '--accent-hover': '#ff6b81',
-    '--accent-alt': '#533483',
-    '--text': '#eee',
-    '--text-dim': '#ccc',
-    '--text-muted': '#999',
-    '--border': '#333',
+    '--accent-alt':   '#533483',
+    '--text':         '#eee',
+    '--text-dim':     '#ccc',
+    '--text-muted':   '#999',
+    '--border':       '#333',
     '--border-hover': '#555',
-    '--success': '#28a745',
-    '--warning': '#ffc107',
-    '--danger': '#dc3545',
-    '--info': '#17a2b8',
-    '--wf-unplayed': '#444',
-    '--wf-played': '#e94560',
+    '--success':      '#28a745',
+    '--warning':      '#ffc107',
+    '--danger':       '#dc3545',
+    '--info':         '#17a2b8',
+    '--wf-unplayed':  '#444',
+    '--wf-played':    '#e94560',
   },
 }
 
@@ -124,9 +124,8 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
       ({ ...s, customTheme }))
   }, [])
 
-  const exportTheme = useCallback(() => {
-    return settings.customTheme || { ...DEFAULT_CUSTOM_THEME, name: 'My Custom Theme' }
-  }, [settings.customTheme])
+  const exportTheme = useCallback(() =>
+    settings.customTheme || { ...DEFAULT_CUSTOM_THEME, name: 'My Custom Theme' }, [ settings.customTheme ])
 
   const importTheme = useCallback((theme: CustomTheme) => {
     setSettings(s =>

@@ -27,7 +27,7 @@ const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(i =>
                          i.separator).length * SEPARATOR_HEIGHT +
                        PADDING * 2
 
-// eslint-disable-next-line complexity
+
 export function LibraryView () {
   const { sidebarOpen, toggleSidebar, setEditingTrack, selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist, density, setDensity, grouping, setGrouping } = useUI()
   const { registry, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, isLoading, toggleFolder } = useLibrary()
@@ -124,82 +124,18 @@ export function LibraryView () {
     return filteredTracks
   }, [ selectedPlaylistId, selectedFolderPath, playlists, filteredTracks ])
 
+  const noTracksFound = <div className='status-message'>
+    <p>No tracks found</p>
+
+    <small>
+      {selectedPlaylistId
+        ? 'This playlist is empty'
+        : 'Select a folder or add library paths in Settings'}
+    </small>
+  </div>
+
   return (
     <div className='library-view'>
-      <aside className={`library-sidebar ${sidebarOpen ? '' : 'sidebar-collapsed'}`}>
-
-        {/* ─── Folders section ───────────────────── */}
-        <div className='sidebar-section'>
-          <button
-            className='sidebar-section-header'
-            onClick={() =>
-              setFoldersCollapsed(c =>
-                !c)}
-            aria-expanded={!foldersCollapsed}
-          >
-            <span className={`section-chevron ${foldersCollapsed ? '' : 'open'}`}>›</span>
-            <span>Folders</span>
-          </button>
-
-          {!foldersCollapsed &&
-            <FolderTree
-              folders={Array.from(registry.folders.values())}
-              selectedPath={selectedFolderPath}
-              onSelect={handleFolderSelect}
-              onToggle={handleFolderToggle}
-            />
-          }
-        </div>
-
-        {/* ─── Playlists section ─────────────────── */}
-        <div className='sidebar-section'>
-          <button
-            className='sidebar-section-header'
-            onClick={() =>
-              setPlaylistsCollapsed(c =>
-                !c)}
-            aria-expanded={!playlistsCollapsed}
-          >
-            <span className={`section-chevron ${playlistsCollapsed ? '' : 'open'}`}>›</span>
-            <span>Playlists</span>
-          </button>
-
-          {!playlistsCollapsed &&
-            <nav className='playlist-list'>
-              {playlists.length === 0
-                ? <span className='playlist-empty'>No playlists yet</span>
-                : playlists.map(playlist =>
-                  <button
-                    key={playlist.id}
-                    className={`playlist-item ${selectedPlaylistId === playlist.id ? 'active' : ''}`}
-                    onClick={() =>
-                      selectPlaylist(playlist.id)}
-                  >
-                    <span className='playlist-icon' aria-hidden='true'>♩</span>
-                    <span className='playlist-name'>{playlist.name}</span>
-                    <span className='playlist-count'>{playlist.tracks.length}</span>
-                  </button>
-                )
-              }
-            </nav>
-          }
-
-          {!playlistsCollapsed &&
-            <button
-              className='playlist-new-btn'
-              onClick={e => {
-                e.stopPropagation()
-                handleNewPlaylist()
-              }}
-              title='New playlist'
-              aria-label='New playlist'
-            >
-              +
-            </button>
-          }
-        </div>
-
-      </aside>
 
       <section className='library-main'>
         <header className={`view-header ${headerVisible ? '' : 'header-hidden'}`}>
@@ -226,13 +162,14 @@ export function LibraryView () {
 
             {/* Density toggle buttons */}
             <div className='density-toggle' role='radiogroup' aria-label='Row density'>
-              {(['compact', 'normal', 'relaxed'] as Density[]).map(d =>
+              {([ 'compact', 'normal', 'relaxed' ] as Density[]).map(d =>
                 <button
                   key={d}
                   role='radio'
                   aria-checked={density === d}
                   className={density === d ? 'active' : ''}
-                  onClick={() => setDensity(d)}
+                  onClick={() =>
+                    setDensity(d)}
                   title={`${d} density`}
                 >
                   {d === 'compact' ? '≡' : d === 'normal' ? '≢' : '='}
@@ -244,7 +181,9 @@ export function LibraryView () {
             <button
               ref={configBtnRef}
               className='config-caret-btn'
-              onClick={() => setConfigOpen(o => !o)}
+              onClick={() =>
+                setConfigOpen(o =>
+                  !o)}
               aria-label='View options'
               title='View options'
             >
@@ -255,21 +194,25 @@ export function LibraryView () {
               <Popover
                 open={configOpen}
                 anchorRect={configBtnRef.current.getBoundingClientRect()}
-                onClose={() => setConfigOpen(false)}
+                onClose={() =>
+                  setConfigOpen(false)}
                 placement='bottom'
               >
                 <div className='config-dropdown'>
                   <fieldset>
                     <legend>Grouping</legend>
-                    {(['none', 'album', 'artist', 'path'] as Grouping[]).map(g =>
+
+                    {([ 'none', 'album', 'artist', 'path' ] as Grouping[]).map(g =>
                       <label key={g}>
                         <input
                           type='radio'
                           name='grouping'
                           value={g}
                           checked={grouping === g}
-                          onChange={() => setGrouping(g)}
+                          onChange={() =>
+                            setGrouping(g)}
                         />
+
                         {g === 'none' ? 'None' : g === 'album' ? 'By Album' : g === 'artist' ? 'By Artist' : 'By Path'}
                       </label>
                     )}
@@ -282,16 +225,7 @@ export function LibraryView () {
 
         <div className='tracks-container'>
           {displayTracks.length === 0 && !isLoading
-            ? <div className='status-message'>
-              <p>No tracks found</p>
-
-              <small>
-                {selectedPlaylistId
-                  ? 'This playlist is empty'
-                  : 'Select a folder or add library paths in Settings'
-                }
-              </small>
-            </div>
+            ? noTracksFound
             : <TrackTable
               tracks={displayTracks}
               isLoading={isLoading}

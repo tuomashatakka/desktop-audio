@@ -98,14 +98,16 @@ export function useLibraryScanner () {
         setTracks([ ...trackMap.current.values() ].sort((a, b) =>
           a.title.localeCompare(b.title)))
         setLoading(true)
-      } else if (event.type === 'done') {
+      }
+      else if (event.type === 'done') {
         const allTracks = [ ...trackMap.current.values() ]
         const folderData = buildFolderTree(libraryPathsRef.current as string[], allTracks.map(t =>
           t.path))
         log.info(`✓ scan done — ${allTracks.length} tracks · ${folderData.length} root(s) · ◴ ${Date.now() - t0}ms`)
         setFolders(folderData)
         setLoading(false)
-      } else if (event.type === 'error') {
+      }
+      else if (event.type === 'error') {
         console.error('[useLibraryScanner] scan error:', (event as { message: string }).message)
         setLoading(false)
       }

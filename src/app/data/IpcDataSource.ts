@@ -3,36 +3,38 @@
 
 import type { DataSource, DataEvent, DataListener, LibraryRoot, AudioMetadata, TrackDTO } from './DataSource'
 
+
 export class IpcDataSource implements DataSource {
   private readonly _ipc = window.electronAPI
   private trackIdToPath = new Map<string, string>()
 
-  async addRoot(): Promise<string | null> {
+  async addRoot (): Promise<string | null> {
     const path = await (this._ipc?.selectDirectory() as Promise<string | null> ?? Promise.resolve(null))
-    if (!path) return null
+    if (!path)
+      return null
     return path
   }
 
-  async removeRoot(rootId: string): Promise<void> {
+  async removeRoot (rootId: string): Promise<void> {
     // IPC doesn't have a removeRoot method yet - this would need to be added
     console.log('IpcDataSource: removeRoot called with', rootId)
   }
 
-  async listRoots(): Promise<readonly LibraryRoot[]> {
+  async listRoots (): Promise<readonly LibraryRoot[]> {
     // For now, return empty - this would need IPC method to list roots
     return []
   }
 
-  scan(rootIds: readonly string[]): void {
+  scan (rootIds: readonly string[]): void {
     // Fire and forget - results come via subscribe()
-    this._ipc?.scanLibrary([...rootIds])
+    this._ipc?.scanLibrary([ ...rootIds ])
   }
 
-  async load(): Promise<readonly TrackDTO[]> {
+  async load (): Promise<readonly TrackDTO[]> {
     return (this._ipc?.loadLibrary() as Promise<readonly TrackDTO[]>) ?? Promise.resolve([])
   }
 
-  subscribe(l: DataListener): () => void {
+  subscribe (l: DataListener): () => void {
     const unsubBatch = this._ipc?.onLibraryBatch((batch: unknown[]) => {
       const tracks = batch as TrackDTO[]
       // Store path mappings for readBytes
@@ -52,7 +54,7 @@ export class IpcDataSource implements DataSource {
     }
   }
 
-  async readBytes(trackId: string): Promise<ArrayBuffer> {
+  async readBytes (trackId: string): Promise<ArrayBuffer> {
     const path = this.trackIdToPath.get(trackId)
     if (!path) {
       throw new Error(`No path found for trackId: ${trackId}`)
@@ -60,7 +62,7 @@ export class IpcDataSource implements DataSource {
     return (this._ipc?.readFile(path) as Promise<ArrayBuffer>) ?? Promise.resolve(new ArrayBuffer(0))
   }
 
-  async readMetadata(trackId: string): Promise<AudioMetadata> {
+  async readMetadata (trackId: string): Promise<AudioMetadata> {
     const path = this.trackIdToPath.get(trackId)
     if (!path) {
       throw new Error(`No path found for trackId: ${trackId}`)
@@ -69,11 +71,11 @@ export class IpcDataSource implements DataSource {
       Promise.resolve({ duration: 0 })
   }
 
-  async upsertTrack(track: TrackDTO): Promise<void> {
+  async upsertTrack (track: TrackDTO): Promise<void> {
     this._ipc?.upsertModel?.('track', track as unknown as Record<string, unknown>)
   }
 
-  async deleteTrack(trackId: string): Promise<void> {
+  async deleteTrack (trackId: string): Promise<void> {
     this._ipc?.deleteModel?.('track', trackId)
   }
 }
