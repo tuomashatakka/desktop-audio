@@ -5,7 +5,6 @@ name = "javascript"
 enabled = true
 
   [analyzers.meta]
-    plugins = ["react"]
     environment = ["nodejs", "browser"]
 
 [[analyzers]]
