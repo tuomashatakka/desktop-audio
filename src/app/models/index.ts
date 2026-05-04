@@ -6,6 +6,8 @@ export { useObservable, useModelDirty } from './useObservable'
 
 export { Track } from './Track'
 
+export type { TrackDTO } from '../services/types'
+
 export { FolderEntry } from './FolderEntry'
 
 export { WaveformCache } from './WaveformCache'

@@ -2,9 +2,52 @@ import { expect, afterEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
+// Ensure Event constructor is available in jsdom environment
+if (typeof Event === 'undefined') {
+  globalThis.Event = class Event {
+    constructor(type: string) { this.type = type }
+    type: string
+    target: EventTarget | null = null
+    currentTarget: EventTarget | null = null
+    bubbles = false
+    cancelable = false
+    composed = false
+    defaultPrevented = false
+    eventPhase = 0
+    isTrusted = false
+    timeStamp = Date.now()
+    preventDefault() { this.defaultPrevented = true }
+    stopPropagation() {}
+    stopImmediatePropagation() {}
+    initEvent() {}
+  } as unknown as typeof Event
+}
+
+// Mock localStorage
+const localStorageMock = (() => {
+  let store: Record<string, string> = {}
+  return {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key]
+    }),
+    clear: vi.fn(() => {
+      store = {}
+    }),
+  }
+})()
+
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+})
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  localStorage.clear()
 })
 
 global.AudioContext = vi.fn().mockImplementation(() => ({

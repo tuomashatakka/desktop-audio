@@ -31,32 +31,74 @@ export function WaveformProgress ({
   barCount: barCountProp,
   compact = false,
 }: WaveformProgressProps) {
-  const [ derivedBarCount, setDerivedBarCount ] = useState(barCountProp ?? 70)
-  const barCount = barCountProp ?? derivedBarCount
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [ containerWidth, setContainerWidth ] = useState(0)
+  const [ animatedBars, setAnimatedBars ] = useState<Float32Array | null>(null)
+
+  // Calculate bar count based on container width for responsive display
+  const computedBarCount = barCountProp ?? (containerWidth > 0
+    ? Math.min(400, Math.max(50, Math.floor(containerWidth / 3)))
+    : 400)
 
   const fallbackBars = useMemo(() =>
-    generateFallbackBars(barCount), [ barCount ])
-  const bars = externalBars ?? fallbackBars
-  const containerRef = useRef<HTMLDivElement>(null)
+    new Float32Array(generateFallbackBars(computedBarCount)), [ computedBarCount ])
 
+  const bars = animatedBars ?? externalBars ?? fallbackBars
+
+  // Animate bars in when data loads
   useEffect(() => {
-    if (barCountProp !== undefined)
-      return // external override — skip ResizeObserver
-
-    const el = containerRef.current
-    if (!el)
+    if (!externalBars || animatedBars)
       return
 
-    const ro = new ResizeObserver(([ entry ]) => {
-      const w = entry.contentRect.width
-      setDerivedBarCount(Math.max(1, Math.floor(w / 6)))
-    })
-    ro.observe(el)
-    return () =>
-      ro.disconnect()
-  }, [ barCountProp ])
+    // Start with zero height and animate to full amplitude
+    const zeroBars = new Float32Array(externalBars.length).fill(0)
+    setAnimatedBars(zeroBars)
+
+    const animationDuration = 300
+    const startTime = performance.now()
+    const startBars = zeroBars
+    const targetBars = externalBars
+
+    const animate = (time: number) => {
+      const elapsed = time - startTime
+      const progress = Math.min(1, elapsed / animationDuration)
+
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3)
+
+      const newBars = new Float32Array(startBars.length)
+      for (let i = 0; i < startBars.length; i++) {
+        newBars[i] = startBars[i] + (targetBars[i] - startBars[i]) * eased
+      }
+
+      setAnimatedBars(newBars)
+
+      if (progress < 1) {
+        requestAnimationFrame(animate)
+      } else {
+        setAnimatedBars(null) // Use the real bars directly
+      }
+    }
+
+    requestAnimationFrame(animate)
+  }, [ externalBars ])
 
   const progress = duration > 0 ? currentTime / duration : 0
+
+  // Measure container width for responsive bar count
+  useEffect(() => {
+    if (!containerRef.current)
+      return
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width)
+      }
+    })
+
+    observer.observe(containerRef.current)
+    return () => observer.disconnect()
+  }, [])
 
   const seekFromEvent = useCallback((clientX: number) => {
     if (!containerRef.current || !duration)
@@ -86,6 +128,7 @@ export function WaveformProgress ({
     <div
       ref={containerRef}
       className={`waveform-progress ${compact ? 'compact' : ''}`}
+      style={{ '--bar-count': computedBarCount } as React.CSSProperties}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       role='slider'

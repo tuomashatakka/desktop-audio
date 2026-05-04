@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useLibrary, useSettings, useAudio } from '../contexts'
 import { Track } from '../models'
 import type { TrackDTO, FolderNode } from '../services/types'
-import { useBridge } from '../data'
+import type { DataEvent } from '../data/DataSource'
+import { useData } from '../data'
 
 // Track is already imported from '../models'
 import { FolderEntry } from '../models'
@@ -70,7 +71,7 @@ export function useLibraryScanner () {
   const { setFolders, setTracks, setLoading } = useLibrary()
   const { libraryPaths } = useSettings()
   const { play } = useAudio()
-  const bridge = useBridge()
+  const data = useData()
 
   const trackMap = useRef(new Map<string, Track>())
   const libraryPathsRef = useRef(libraryPaths)
@@ -87,34 +88,40 @@ export function useLibraryScanner () {
     let batchCount = 0
     const t0 = Date.now()
 
-    const unsubBatch = bridge.onLibraryBatch((batch: unknown[]) => {
-      batchCount++
+    const unsubscribe = data.subscribe((event: DataEvent) => {
+      if (event.type === 'batch') {
+        batchCount++
 
-      for (const t of batch as TrackDTO[])
-        trackMap.current.set(t.id, Track.fromDTO(t))
-      log.debug(`⇘ batch #${batchCount} — ${batch.length} tracks (map size: ${trackMap.current.size})`)
-      setTracks([ ...trackMap.current.values() ].sort((a, b) =>
-        a.title.localeCompare(b.title)))
-      setLoading(true)
+        for (const t of event.tracks as TrackDTO[])
+          trackMap.current.set(t.id, Track.fromDTO(t))
+        log.debug(`⇘ batch #${batchCount} — ${event.tracks.length} tracks (map size: ${trackMap.current.size})`)
+        setTracks([ ...trackMap.current.values() ].sort((a, b) =>
+          a.title.localeCompare(b.title)))
+        setLoading(true)
+      }
+      else if (event.type === 'done') {
+        const allTracks = [ ...trackMap.current.values() ]
+        const folderData = buildFolderTree(libraryPathsRef.current as string[], allTracks.map(t =>
+          t.path))
+        log.info(`✓ scan done — ${allTracks.length} tracks · ${folderData.length} root(s) · ◴ ${Date.now() - t0}ms`)
+        setFolders(folderData)
+        setLoading(false)
+      }
+      else if (event.type === 'error') {
+        console.error('[useLibraryScanner] scan error:', (event as { message: string }).message)
+        setLoading(false)
+      }
     })
-    const unsubDone = bridge.onLibraryDone(() => {
-      const allTracks = [ ...trackMap.current.values() ]
-      const folderData = buildFolderTree(libraryPathsRef.current as string[], allTracks.map(t =>
-        t.path))
-      log.info(`✓ scan done — ${allTracks.length} tracks · ${folderData.length} root(s) · ◴ ${Date.now() - t0}ms`)
-      setFolders(folderData)
-      setLoading(false)
-    })
+
     return () => {
       log.info('⊖ unsubscribing from library events')
-      unsubBatch()
-      unsubDone()
+      unsubscribe()
     }
-  }, [ bridge ])
+  }, [ data ])
 
   // DB hydration — runs once on mount for instant startup
   useEffect(() => {
-    bridge.loadLibrary().then((tracks: readonly TrackDTO[]) => {
+    data.load().then((tracks: readonly TrackDTO[]) => {
       if (tracks.length > 0) {
         log.info(`▤ DB hydrated — ${tracks.length} tracks`)
         for (const t of tracks)
@@ -125,9 +132,9 @@ export function useLibraryScanner () {
         log.info('▤ DB empty (first run)')
       }
     })
-      .catch(err =>
+      .catch((err: unknown) =>
         console.error('[useLibraryScanner] DB load failed:', err))
-  }, [ bridge ])
+  }, [ data ])
 
   const scanLibrary = useCallback(() => {
     if (libraryPaths.length === 0)
@@ -135,11 +142,11 @@ export function useLibraryScanner () {
     log.info(`⟲ scan triggered — paths: ${libraryPaths.join(', ')}`)
     trackMap.current.clear()
     setLoading(true)
-    bridge.scanLibrary([ ...libraryPaths ])
-  }, [ libraryPaths, setLoading, bridge ])
+    data.scan([ ...libraryPaths ])
+  }, [ libraryPaths, setLoading, data ])
 
   const addAndScan = useCallback(async () =>
-    await bridge.selectDirectory() ?? null, [])
+    await data.addRoot() ?? null, [])
 
   const playTrack = useCallback((track: Track) => {
     play(track)

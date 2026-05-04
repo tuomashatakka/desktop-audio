@@ -16,13 +16,14 @@
   &.compact {
     height: 28px;
     padding: 4px 0;
-    gap: 1.5px;
+    gap: 1px;
   }
 }
 
 .wf-bar {
-  width: 5px;
-  flex: none;
+  flex: 1;
+  min-width: 1px;
+  max-width: 4px;
   border-radius: 1px;
   background: var(--wf-unplayed);
   transform-origin: center;

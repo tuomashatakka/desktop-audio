@@ -1,3 +1,6 @@
+import type { AudioMetadata, MediaState } from './app/services/types'
+
+
 interface ElectronAPI {
   // Library
   scanLibrary:    (dirPaths: string[]) => void
@@ -9,7 +12,7 @@ interface ElectronAPI {
   selectDirectory:  () => Promise<string | null>
   getMusicDir:      () => Promise<string | null>
   readFile:         (path: string) => Promise<ArrayBuffer>
-  getAudioMetadata: (path: string) => Promise<unknown>
+  getAudioMetadata: (path: string) => Promise<AudioMetadata>
 
   // Window
   minimizeWindow: () => void
@@ -28,7 +31,7 @@ interface ElectronAPI {
   onContextMenuAction: (cb: (index: number) => void) => () => void
 
   // Media state
-  updateMediaState: (state: unknown) => void
+  updateMediaState: (state: MediaState) => void
   onMediaSeek:      (cb: (delta: number) => void) => () => void
 
   // Model write operations

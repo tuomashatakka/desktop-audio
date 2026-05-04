@@ -1,8 +1,12 @@
 import type { ReactNode } from 'react'
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 
 
 export type ViewType = 'library' | 'player' | 'settings' | 'tag-editor'
+
+export type Density = 'compact' | 'normal' | 'relaxed'
+
+export type Grouping = 'none' | 'album' | 'artist' | 'path'
 
 interface UIState {
   readonly currentView:        ViewType
@@ -11,6 +15,8 @@ interface UIState {
   readonly selectedPlaylistId: string | null
   readonly editingTrackId:     string | null
   readonly playerExpanded:     boolean
+  readonly density:            Density
+  readonly grouping:           Grouping
 }
 
 interface UIContextValue extends UIState {
@@ -20,19 +26,37 @@ interface UIContextValue extends UIState {
   readonly selectPlaylist:       (id: string | null) => void
   readonly setEditingTrack:      (id: string | null) => void
   readonly togglePlayerExpanded: () => void
+  readonly setDensity:           (d: Density) => void
+  readonly setGrouping:          (g: Grouping) => void
 }
 
 const UIContext = createContext<UIContextValue | null>(null)
 
-export function UIProvider ({ children }: { readonly children: ReactNode }) {
-  const [ state, setState ] = useState<UIState>({
-    currentView:        'library',
-    sidebarOpen:        false,
-    selectedFolderPath: null,
-    selectedPlaylistId: null,
-    editingTrackId:     null,
-    playerExpanded:     false,
-  })
+const DENSITY_KEY  = 'desktop-audio-density'
+const GROUPING_KEY = 'desktop-audio-grouping'
+
+function loadDensity (): Density {
+  const v = typeof localStorage === 'undefined' ? null : localStorage.getItem(DENSITY_KEY)
+  return v === 'compact' || v === 'relaxed' ? v : 'normal'
+}
+
+function loadGrouping (): Grouping {
+  const v = typeof localStorage === 'undefined' ? null : localStorage.getItem(GROUPING_KEY)
+  return v === 'album' || v === 'artist' || v === 'path' ? v : 'none'
+}
+
+export function UIProvider ({ children, value }: { readonly children: ReactNode; value?: UIContextValue }) {
+  const [ state, setState ] = useState<UIState>(() =>
+    ({
+      currentView:        'library',
+      sidebarOpen:        false,
+      selectedFolderPath: null,
+      selectedPlaylistId: null,
+      editingTrackId:     null,
+      playerExpanded:     false,
+      density:            loadDensity(),
+      grouping:           loadGrouping(),
+    }))
 
   const setView = useCallback((view: ViewType) => {
     setState(s =>
@@ -68,9 +92,27 @@ export function UIProvider ({ children }: { readonly children: ReactNode }) {
       ({ ...s, playerExpanded: !s.playerExpanded }))
   }, [])
 
+  const setDensity = useCallback((d: Density) => {
+    setState(s =>
+      ({ ...s, density: d }))
+  }, [])
+
+  const setGrouping = useCallback((g: Grouping) => {
+    setState(s =>
+      ({ ...s, grouping: g }))
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(DENSITY_KEY, state.density)
+  }, [ state.density ])
+
+  useEffect(() => {
+    localStorage.setItem(GROUPING_KEY, state.grouping)
+  }, [ state.grouping ])
+
   return (
     <UIContext.Provider
-      value={{
+      value={value || {
         ...state,
         setView,
         toggleSidebar,
@@ -78,6 +120,8 @@ export function UIProvider ({ children }: { readonly children: ReactNode }) {
         selectPlaylist,
         setEditingTrack,
         togglePlayerExpanded,
+        setDensity,
+        setGrouping,
       }}
     >
       {children}

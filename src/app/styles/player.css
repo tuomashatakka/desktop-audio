@@ -8,6 +8,34 @@
   gap: var(--sp-6);
   padding: var(--sp-6) var(--sp-8) var(--sp-8);
   background: var(--bg);
+  position: relative;
+
+  & .album-art-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+
+    & img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: blur(60px) brightness(0.2);
+      transform: scale(1.2);
+    }
+  }
+
+  & .player-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-6);
+    width:100%;
+    height:100%;
+  }
 
   & .empty-player {
     flex: 1;
@@ -54,31 +82,56 @@
   }
 }
 
-/* ─── Container query: narrow → row layout ─────── */
+/* ─── Container query: narrow → vertical stack ─────── */
 
-@container (max-width: 300px) {
+@container (max-width: 480px) {
   .player-view {
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: var(--sp-3);
     padding: var(--sp-3);
   }
 
   .album-art-card {
-    width: clamp(40px, 20cqw, 100px);
+    width: clamp(60px, 25cqw, 120px);
   }
 
-  .player-info {
-    flex: 1;
-    text-align: left;
-    min-width: 0;
-  }
-
+  .player-info,
   .progress-section { width: 100%; }
+
+  .playback-controls { gap: var(--sp-3); }
+
+  .playback-controls .play-pause-btn {
+    width: 48px;
+    height: 48px;
+  }
 }
 
-/* ─── Container query: nano tier (≤ 80px) ─────── */
+@container (max-width: 320px) {
+  .player-view {
+    gap: var(--sp-2);
+    padding: var(--sp-2);
+  }
+
+  .album-art-card {
+    width: clamp(48px, 20cqw, 80px);
+  }
+
+  .playback-controls .play-pause-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+
+  .playback-controls > :not(.play-pause-btn) {
+    font-size: 14px;
+  }
+
+  .player-info .track-title {
+    font-size: var(--text-base);
+  }
+}
+
+/* ─── Container query: nano tier (≤ 80px tall) ─────── */
 
 @container (max-height: 80px) {
   .player-info,

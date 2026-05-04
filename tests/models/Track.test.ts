@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Track } from '../../src/app/models/Track'
 import type { TrackDTO } from '../../src/app/services/types'
 
@@ -72,5 +72,23 @@ describe('Track model', () => {
 
     track.waveform = new Float32Array([0.1])
     expect(handler).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks dirty when property changes', () => {
+    const track = new Track('track-1')
+    const dirtyHandler = vi.fn()
+    track.addEventListener('dirty', dirtyHandler)
+
+    track.title = 'Initial'
+
+    expect(track.dirty).toBe(true)
+    expect(dirtyHandler).toHaveBeenCalledWith('dirty')
+
+    track.flush()
+
+    expect(track.dirty).toBe(false)
+
+    track.title = 'Changed'
+    expect(track.dirty).toBe(true)
   })
 })

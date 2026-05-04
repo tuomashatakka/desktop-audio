@@ -32,7 +32,9 @@
       <canvas id="hero-canvas" aria-hidden="true"></canvas>
 
       <div class="fade-blur hero-logo" aria-hidden="true">♫</div>
-      <h1 class="fade-blur hero-title">Desktop Audio</h1>
+       <h1 class="fade-blur hero-title" data-html="Desktop Audio">
+          <span class="typed-text"></span><span class="typing-cursor"></span>
+        </h1>
 
       <div class="hero-text-block">
         <p class="typewriter-line" data-html='You&#39;ve ever tried finding a <strong>stable</strong>, <strong>regular</strong> music player for any linux?'>
@@ -193,7 +195,7 @@
       { threshold: 0.15 }
     )
 
-    document.querySelectorAll('#features .fade-blur, #download .fade-blur, #player .fade-blur, #library .fade-blur').forEach(el => {
+    document.querySelectorAll('#features .fade-blur, #features .feature-card, #download .fade-blur, #player .fade-blur, #library .fade-blur').forEach(el => {
       observer.observe(el)
     })
 
@@ -215,11 +217,12 @@
 
     sections.forEach(s => dotObserver.observe(s))
 
-    // ── Typewriter engine for hero paragraphs ──
+    // ── Typewriter engine for hero title + paragraphs ──
     function typeText () {
       const lines = document.querySelectorAll('.typewriter-line')
+      const title = document.querySelector('.hero-title')
       const SPEED = 35
-      const START_DELAY = 1200
+      const START_DELAY = 600
 
       const extractPlainText = (html) => {
         const tmp = document.createElement('div')
@@ -235,6 +238,7 @@
           const cursor = line.querySelector('.typing-cursor')
           if (!textSpan || !cursor || !plain) return
 
+          cursor.classList.add('active')
           let i = 0
           const tick = () => {
             if (i < plain.length) {
@@ -251,7 +255,7 @@
               cursor.style.animationDelay = '0.8s'
               cursor.style.animationDuration = '0.4s'
               cursor.style.animationIterationCount = '3'
-              setTimeout(() => { cursor.style.display = 'none' }, 2000)
+              setTimeout(() => { cursor.classList.remove('active') }, 2000)
             }
           }
           tick()
@@ -259,6 +263,34 @@
       }
 
       let totalDelay = START_DELAY
+
+      // Type the title first
+      if (title) {
+        const titleText = title.getAttribute('data-html')
+        const plainTitle = extractPlainText(titleText)
+        const titleTextSpan = title.querySelector('.typed-text')
+        const titleCursor = title.querySelector('.typing-cursor')
+        if (titleTextSpan && titleCursor && plainTitle) {
+          setTimeout(() => {
+            titleCursor.classList.add('active')
+            let i = 0
+            const tick = () => {
+              if (i < plainTitle.length) {
+                titleTextSpan.textContent += plainTitle[i]
+                i++
+                setTimeout(tick, SPEED + Math.random() * 25)
+              } else {
+                titleTextSpan.innerHTML = titleText
+                titleCursor.classList.remove('active')
+              }
+            }
+            tick()
+          }, totalDelay)
+          totalDelay += plainTitle.length * (SPEED + 12) + 400
+        }
+      }
+
+      // Then type the paragraphs
       lines.forEach((line) => {
         typeLine(line, totalDelay)
         const plain = extractPlainText(line.getAttribute('data-html'))
@@ -942,16 +974,16 @@
 
         const waveY = H * 0.55
         drawSineWave(
-          waveTime, waveY, 25, 0.012, 1.2,
-          0.3,
-          'rgba(255, 120, 180, 0.5)',
+          waveTime, waveY, 40, 0.012, 1.2,
+          0.5,
+          'rgba(255, 120, 180, 0.7)',
           'rgba(255, 180, 220, 1.0)',
           null
         )
         drawSineWave(
-          waveTime + 1.5, waveY + 15, 18, 0.009, 0.5,
-          0.2,
-          'rgba(180, 140, 255, 0.4)',
+          waveTime + 1.5, waveY + 15, 30, 0.009, 0.5,
+          0.4,
+          'rgba(180, 140, 255, 0.6)',
           'rgba(200, 170, 255, 1.0)',
           cachedBars
         )

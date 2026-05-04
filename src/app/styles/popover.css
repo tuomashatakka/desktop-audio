@@ -6,7 +6,9 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   min-width: 160px;
-  overflow: hidden;
+  max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 20px);
+  overflow: auto;
   animation: popover-in var(--duration-fast) var(--ease);
 }
 
