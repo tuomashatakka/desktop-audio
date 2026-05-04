@@ -45,7 +45,7 @@ function loadGrouping (): Grouping {
   return v === 'album' || v === 'artist' || v === 'path' ? v : 'none'
 }
 
-export function UIProvider ({ children }: { readonly children: ReactNode }) {
+export function UIProvider ({ children, value }: { readonly children: ReactNode; value?: UIContextValue }) {
   const [ state, setState ] = useState<UIState>(() =>
     ({
       currentView:        'library',
@@ -112,7 +112,7 @@ export function UIProvider ({ children }: { readonly children: ReactNode }) {
 
   return (
     <UIContext.Provider
-      value={{
+      value={value || {
         ...state,
         setView,
         toggleSidebar,
