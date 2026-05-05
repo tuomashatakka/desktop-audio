@@ -953,6 +953,191 @@ if (flareAlpha > 0.05) {
   requestAnimationFrame(draw)
 }
 
+// ── Horizontal phase flash + chromatic halo on touch/pointer ──
+//
+// On pointerdown a horizontal "phase" beam converges to the pointer and a
+// bright halo blooms around it. While the halo is held the area near the
+// pointer visually glitches: large semi-transparent squares get offset and
+// cyan / magenta channel layers separate horizontally. On release the halo
+// dissolves by flashing two horizontal beams outward to both sides.
+function applyPhaseFlash() {
+  const canvas = document.getElementById('phase-flash')
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  let dpr = 1
+  let W = 0, H = 0
+  const points = new Map() // pointerId -> phase point
+  const ghosts = []        // released beams in their dissolve animation
+
+  const ATTACK_MS  = 140   // beam-converge duration
+  const RELEASE_MS = 320   // dual-direction dissolve duration
+
+  const resize = () => {
+    dpr = Math.min(window.devicePixelRatio || 1, 2)
+    W = innerWidth
+    H = innerHeight
+    canvas.width = Math.floor(W * dpr)
+    canvas.height = Math.floor(H * dpr)
+    canvas.style.width = W + 'px'
+    canvas.style.height = H + 'px'
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  }
+
+  const press = (id, x, y) => {
+    points.set(id, { x, y, born: performance.now(), released: false })
+  }
+
+  const move = (id, x, y) => {
+    const p = points.get(id)
+    if (p) { p.x = x; p.y = y }
+  }
+
+  const release = (id) => {
+    const p = points.get(id)
+    if (!p) return
+    ghosts.push({ x: p.x, y: p.y, born: performance.now() })
+    points.delete(id)
+  }
+
+  // Convergence beam: thin horizontal line peaking at pointer X, fading to edges.
+  const drawConvergeBeam = (x, y, t /* 0..1 */) => {
+    const reach = W * (0.5 + t * 0.5)
+    const thickness = 1 + (1 - t) * 6
+    const alpha = (1 - t) * 0.85
+    const grad = ctx.createLinearGradient(x - reach, 0, x + reach, 0)
+    grad.addColorStop(0,    'rgba(255, 80, 200, 0)')
+    grad.addColorStop(0.45, `rgba(255, 80, 200, ${alpha * 0.4})`)
+    grad.addColorStop(0.5,  `rgba(255, 255, 255, ${alpha})`)
+    grad.addColorStop(0.55, `rgba(120, 220, 255, ${alpha * 0.4})`)
+    grad.addColorStop(1,    'rgba(120, 220, 255, 0)')
+    ctx.fillStyle = grad
+    ctx.fillRect(x - reach, y - thickness / 2, reach * 2, thickness)
+  }
+
+  // Bright halo bloom around the pointer.
+  const drawHalo = (x, y, scale, alpha) => {
+    const r = 60 + scale * 90
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+    g.addColorStop(0,    `rgba(255, 255, 255, ${alpha * 0.85})`)
+    g.addColorStop(0.25, `rgba(255, 120, 220, ${alpha * 0.55})`)
+    g.addColorStop(0.6,  `rgba(120, 200, 255, ${alpha * 0.25})`)
+    g.addColorStop(1,    'rgba(120, 200, 255, 0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // Digital deform: large offset squares + cyan/magenta channel separation.
+  const drawDeform = (x, y, alpha) => {
+    if (alpha <= 0.01) return
+    const radius = 180
+    const blocks = 7
+    for (let i = 0; i < blocks; i++) {
+      const size = 28 + Math.random() * 90
+      const ox = (Math.random() - 0.5) * radius * 1.6
+      const oy = (Math.random() - 0.5) * radius * 1.0
+      const shift = (12 + Math.random() * 28) * (Math.random() < 0.5 ? -1 : 1)
+      const bx = x + ox - size / 2
+      const by = y + oy - size / 2
+      ctx.fillStyle = `rgba(0, 220, 255, ${alpha * 0.32})`
+      ctx.fillRect(bx + shift, by, size, size)
+      ctx.fillStyle = `rgba(255, 0, 200, ${alpha * 0.32})`
+      ctx.fillRect(bx - shift, by, size, size)
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.06})`
+      ctx.fillRect(bx, by, size, size)
+    }
+    // Two horizontal RGB-shift slices that ride through the pointer row.
+    const slices = 2
+    for (let i = 0; i < slices; i++) {
+      const sliceY = y + (Math.random() - 0.5) * 80
+      const h = 3 + Math.random() * 6
+      const shift = (8 + Math.random() * 22) * (Math.random() < 0.5 ? -1 : 1)
+      ctx.fillStyle = `rgba(0, 220, 255, ${alpha * 0.45})`
+      ctx.fillRect(shift, sliceY, W, h)
+      ctx.fillStyle = `rgba(255, 0, 200, ${alpha * 0.45})`
+      ctx.fillRect(-shift, sliceY + 2, W, h)
+    }
+  }
+
+  // Dissolve flash: two horizontal beams shooting left and right from the halo.
+  const drawDissolve = (x, y, t /* 0..1 */) => {
+    const reach = W * t
+    const thickness = 2 + (1 - t) * 10
+    const alpha = (1 - t) * 0.95
+    // Left beam
+    const gL = ctx.createLinearGradient(x - reach, 0, x, 0)
+    gL.addColorStop(0,   'rgba(120, 220, 255, 0)')
+    gL.addColorStop(0.8, `rgba(120, 220, 255, ${alpha * 0.5})`)
+    gL.addColorStop(1,   `rgba(255, 255, 255, ${alpha})`)
+    ctx.fillStyle = gL
+    ctx.fillRect(x - reach, y - thickness / 2, reach, thickness)
+    // Right beam
+    const gR = ctx.createLinearGradient(x, 0, x + reach, 0)
+    gR.addColorStop(0,   `rgba(255, 255, 255, ${alpha})`)
+    gR.addColorStop(0.2, `rgba(255, 120, 220, ${alpha * 0.5})`)
+    gR.addColorStop(1,   'rgba(255, 120, 220, 0)')
+    ctx.fillStyle = gR
+    ctx.fillRect(x, y - thickness / 2, reach, thickness)
+    // Shrinking residual halo
+    drawHalo(x, y, 1 - t, (1 - t) * 0.4)
+  }
+
+  const draw = (now) => {
+    requestAnimationFrame(draw)
+    ctx.clearRect(0, 0, W, H)
+    ctx.globalCompositeOperation = 'lighter'
+
+    // Active (held) phase points: attack ramp → sustain (held halo + deform).
+    for (const p of points.values()) {
+      const age = now - p.born
+      const attack = Math.min(1, age / ATTACK_MS)
+      // Beam converges during attack only.
+      if (attack < 1) drawConvergeBeam(p.x, p.y, attack)
+      const sustain = reduced ? attack : attack * (0.85 + 0.15 * Math.sin(now / 90))
+      drawHalo(p.x, p.y, sustain, sustain * 0.95)
+      drawDeform(p.x, p.y, sustain)
+    }
+
+    // Released phase points: dissolve outward, then drop.
+    for (let i = ghosts.length - 1; i >= 0; i--) {
+      const g = ghosts[i]
+      const t = Math.min(1, (now - g.born) / RELEASE_MS)
+      drawDissolve(g.x, g.y, t)
+      if (t >= 1) ghosts.splice(i, 1)
+    }
+  }
+
+  resize()
+  addEventListener('resize', resize, { passive: true })
+
+  // Pointer + touch lifecycle. Use the pointer events for unified handling
+  // and fall back to touch events on environments that don't dispatch
+  // PointerEvents on touch (older iOS Safari).
+  addEventListener('pointerdown',   (e) => press(e.pointerId, e.clientX, e.clientY), { passive: true })
+  addEventListener('pointermove',   (e) => move(e.pointerId, e.clientX, e.clientY),  { passive: true })
+  addEventListener('pointerup',     (e) => release(e.pointerId), { passive: true })
+  addEventListener('pointercancel', (e) => release(e.pointerId), { passive: true })
+  addEventListener('pointerleave',  (e) => release(e.pointerId), { passive: true })
+
+  addEventListener('touchstart', (e) => {
+    for (const t of e.changedTouches) press(`t${t.identifier}`, t.clientX, t.clientY)
+  }, { passive: true })
+  addEventListener('touchmove', (e) => {
+    for (const t of e.changedTouches) move(`t${t.identifier}`, t.clientX, t.clientY)
+  }, { passive: true })
+  addEventListener('touchend', (e) => {
+    for (const t of e.changedTouches) release(`t${t.identifier}`)
+  }, { passive: true })
+  addEventListener('touchcancel', (e) => {
+    for (const t of e.changedTouches) release(`t${t.identifier}`)
+  }, { passive: true })
+
+  requestAnimationFrame(draw)
+}
+
 // ── Full-page glitch overlay ──
 function applyGlitchEffect() {
   const canvas = document.getElementById('glitch-overlay')
@@ -1126,6 +1311,7 @@ function main () {
   applyLighting()
   drawEffects()
   applyGlitchEffect()
+  applyPhaseFlash()
 
   // ── Parallax scroll for hero background elements ──
   const heroSection = document.getElementById('hero')
