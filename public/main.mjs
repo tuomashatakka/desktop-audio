@@ -560,28 +560,28 @@ function drawEffects() {
     ctx.globalAlpha = alpha
 
     const outerGrad = ctx.createRadialGradient(x, y, radius * 0.3, x, y, radius * 2)
-    outerGrad.addColorStop(0, `rgba(255, 220, 240, ${alpha * 0.15})`)
-    outerGrad.addColorStop(1, 'rgba(255, 180, 210, 0)')
+    outerGrad.addColorStop(0, `rgba(80, 200, 255, ${alpha * 0.2})`)
+    outerGrad.addColorStop(1, 'rgba(150, 80, 255, 0)')
     ctx.fillStyle = outerGrad
     ctx.beginPath()
     ctx.arc(x, y, radius * 2, 0, Math.PI * 2)
     ctx.fill()
 
     const hGrad = ctx.createLinearGradient(x - len, y, x + len, y)
-    hGrad.addColorStop(0, 'rgba(255, 200, 220, 0)')
-    hGrad.addColorStop(0.35, `rgba(255, 220, 240, ${alpha * 0.6})`)
-    hGrad.addColorStop(0.5, `rgba(255, 250, 255, ${alpha})`)
-    hGrad.addColorStop(0.65, `rgba(255, 220, 240, ${alpha * 0.6})`)
-    hGrad.addColorStop(1, 'rgba(255, 200, 220, 0)')
+    hGrad.addColorStop(0, 'rgba(80, 200, 255, 0)')
+    hGrad.addColorStop(0.35, `rgba(120, 220, 255, ${alpha * 0.6})`)
+    hGrad.addColorStop(0.5, `rgba(180, 240, 255, ${alpha})`)
+    hGrad.addColorStop(0.65, `rgba(120, 220, 255, ${alpha * 0.6})`)
+    hGrad.addColorStop(1, 'rgba(80, 200, 255, 0)')
     ctx.fillStyle = hGrad
     ctx.fillRect(x - len, y - thin, len * 2, thin * 2)
 
     const vGrad = ctx.createLinearGradient(x, y - len * 0.7, x, y + len * 0.7)
-    vGrad.addColorStop(0, 'rgba(255, 200, 220, 0)')
-    vGrad.addColorStop(0.35, `rgba(255, 220, 240, ${alpha * 0.5})`)
-    vGrad.addColorStop(0.5, `rgba(255, 250, 255, ${alpha * 0.9})`)
-    vGrad.addColorStop(0.65, `rgba(255, 220, 240, ${alpha * 0.5})`)
-    vGrad.addColorStop(1, 'rgba(255, 200, 220, 0)')
+    vGrad.addColorStop(0, 'rgba(80, 200, 255, 0)')
+    vGrad.addColorStop(0.35, `rgba(120, 220, 255, ${alpha * 0.5})`)
+    vGrad.addColorStop(0.5, `rgba(180, 240, 255, ${alpha * 0.9})`)
+    vGrad.addColorStop(0.65, `rgba(120, 220, 255, ${alpha * 0.5})`)
+    vGrad.addColorStop(1, 'rgba(80, 200, 255, 0)')
     ctx.fillStyle = vGrad
     ctx.fillRect(x - thin, y - len * 0.7, thin * 2, len * 1.4)
 
@@ -589,16 +589,16 @@ function drawEffects() {
     const diagThin = thin * 0.6
     ctx.rotate(Math.PI / 4)
     const dGrad1 = ctx.createLinearGradient(x - diagLen, y, x + diagLen, y)
-    dGrad1.addColorStop(0, 'rgba(255, 200, 220, 0)')
-    dGrad1.addColorStop(0.5, `rgba(255, 230, 245, ${alpha * 0.4})`)
-    dGrad1.addColorStop(1, 'rgba(255, 200, 220, 0)')
+    dGrad1.addColorStop(0, 'rgba(80, 200, 255, 0)')
+    dGrad1.addColorStop(0.5, `rgba(120, 220, 255, ${alpha * 0.4})`)
+    dGrad1.addColorStop(1, 'rgba(80, 200, 255, 0)')
     ctx.fillStyle = dGrad1
     ctx.fillRect(x - diagLen, y - diagThin, diagLen * 2, diagThin * 2)
     ctx.rotate(-Math.PI / 2)
     const dGrad2 = ctx.createLinearGradient(x - diagLen, y, x + diagLen, y)
-    dGrad2.addColorStop(0, 'rgba(255, 200, 220, 0)')
-    dGrad2.addColorStop(0.5, `rgba(255, 230, 245, ${alpha * 0.4})`)
-    dGrad2.addColorStop(1, 'rgba(255, 200, 220, 0)')
+    dGrad2.addColorStop(0, 'rgba(80, 200, 255, 0)')
+    dGrad2.addColorStop(0.5, `rgba(120, 220, 255, ${alpha * 0.4})`)
+    dGrad2.addColorStop(1, 'rgba(80, 200, 255, 0)')
     ctx.fillStyle = dGrad2
     ctx.fillRect(x - diagLen, y - diagThin, diagLen * 2, diagThin * 2)
     ctx.rotate(Math.PI / 4)
@@ -735,7 +735,7 @@ function drawEffects() {
       ctx.strokeStyle = color
       ctx.lineWidth = lineWidth
       ctx.globalAlpha = alpha
-      ctx.globalCompositeOperation = 'lighter'
+ctx.globalCompositeOperation = 'screen'
       ctx.moveTo(x, y1)
       ctx.lineTo(xEnd, y2)
       ctx.stroke()
@@ -843,9 +843,13 @@ function drawEffects() {
         ctx.fill()
       }
 
-      if (flareAlpha > 0.05) {
-        drawFlare(px, py, flareAlpha, stars[i].size * 6)
-      }
+if (flareAlpha > 0.05) {
+          drawFlare(px, py, flareAlpha, stars[i].size * 6)
+        }
+    }
+    // Emit a horizontal lens flare from the cursor radial gradient
+    if (hasPointer) {
+      drawFlare(gradX, gradY, 0.25, 30)
     }
 
     // Draw wireframe edges — each star connects to its NEAREST_K closest neighbors
