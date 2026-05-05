@@ -1,13 +1,27 @@
+/**
+ * UIContext — ephemeral, view-layer state only.
+ *
+ * Tracks which view is active, sidebar visibility, the currently-selected
+ * folder/playlist, and presentation preferences (density, grouping). Density
+ * and grouping are persisted to localStorage; the rest is session-only.
+ *
+ * Does NOT own library data, audio playback, or user settings — see
+ * {@link LibraryContext}, {@link AudioContext}, {@link SettingsContext}.
+ */
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 
 
+/** Top-level routes the shell can render. */
 export type ViewType = 'library' | 'player' | 'settings' | 'tag-editor'
 
+/** Row spacing preset for the track table. */
 export type Density = 'compact' | 'normal' | 'relaxed'
 
+/** How tracks are grouped in the track table (`none` = flat list). */
 export type Grouping = 'none' | 'album' | 'artist' | 'path'
 
+/** Read-only snapshot of UI state. */
 interface UIState {
   readonly currentView:        ViewType
   readonly sidebarOpen:        boolean
@@ -19,6 +33,7 @@ interface UIState {
   readonly grouping:           Grouping
 }
 
+/** UI state plus the actions that mutate it. */
 interface UIContextValue extends UIState {
   readonly setView:              (view: ViewType) => void
   readonly toggleSidebar:        () => void
@@ -45,6 +60,10 @@ function loadGrouping (): Grouping {
   return v === 'album' || v === 'artist' || v === 'path' ? v : 'none'
 }
 
+/**
+ * Wraps the app and provides {@link UIContextValue}. Pass `value` to inject
+ * pre-built state for tests; otherwise local state is used.
+ */
 export function UIProvider ({ children, value }: { readonly children: ReactNode; value?: UIContextValue }) {
   const [ state, setState ] = useState<UIState>(() =>
     ({
@@ -129,6 +148,7 @@ export function UIProvider ({ children, value }: { readonly children: ReactNode;
   )
 }
 
+/** Access {@link UIContextValue}. Throws if used outside {@link UIProvider}. */
 export function useUI () {
   const context = useContext(UIContext)
   if (!context) {

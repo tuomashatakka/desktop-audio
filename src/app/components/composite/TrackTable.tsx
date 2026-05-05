@@ -1,3 +1,12 @@
+/**
+ * TrackTable — the main music list.
+ *
+ * Renders a sortable, reorderable, resizable column table with three
+ * grouping modes (`none` / `album` / `artist|path`) and three densities.
+ * Column layout, sort state, and grouping are persisted via context hooks;
+ * scrolling uses `@tanstack/react-virtual` for the flat view and native
+ * scrolling for grouped views.
+ */
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useSortableTable } from '../../hooks/useSortableTable'
@@ -372,25 +381,13 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
       <div ref={scrollRef} className='track-table-scroll'>
 
         {grouping === 'none' || isLoading
-          ? <div
-            style={{
-              height:   virtualizer.getTotalSize(),
-              position: 'relative',
-            }}
-          >
+          ? <div>
             {isLoading
               ? virtualizer.getVirtualItems().map(vrow =>
                 <div
                   key={vrow.key}
                   className='track-row skeleton-row'
-                  style={{
-                    position:  'absolute',
-                    top:       0,
-                    left:      0,
-                    right:     0,
-                    transform: `translateY(${vrow.start}px)`,
-                    height:    rowHeight,
-                  }}
+                  style={{ height: rowHeight }}
                   aria-hidden='true'
                 >
                   {visible.map(col =>
@@ -400,24 +397,12 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
                   )}
                 </div>
               )
-              : virtualizer.getVirtualItems().map(vrow => {
-                const track = sorted[vrow.index]
+              : sorted.map((track, idx) => {
                 if (!track)
                   return null
-
                 return (
-                  <div
-                    key={track.id}
-                    style={{
-                      position:  'absolute',
-                      top:       0,
-                      left:      0,
-                      right:     0,
-                      transform: `translateY(${vrow.start}px)`,
-                      height:    rowHeight,
-                    }}
-                  >
-                    {renderRow(track, vrow.index)}
+                  <div key={track.id} style={{ height: rowHeight }}>
+                    {renderRow(track, idx)}
                   </div>
                 )
               })
@@ -454,18 +439,18 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
             </div>
             : <div className='track-groups flat-groups'>
               {groups.map(g =>
-                <div key={g.key} className='track-flat-group'>
-                  <div className='track-group-header'>
+                <details key={g.key} className='track-flat-group' open>
+                  <summary className='track-group-header'>
                     <span className='group-title'>{g.label}</span>
                     <span className='group-subtitle'>{g.subtitle}</span>
-                  </div>
+                  </summary>
 
                   {g.tracks.map(t => {
                     const idx = sorted.findIndex(x =>
                       x.id === t.id)
                     return renderRow(t, idx)
                   })}
-                </div>
+                </details>
               )}
             </div>
         }

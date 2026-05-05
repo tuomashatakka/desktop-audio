@@ -1,3 +1,11 @@
+/**
+ * LibraryContext — owns the in-memory music library.
+ *
+ * Holds the {@link ModelRegistry} (folders, tracks, albums, artists),
+ * playlists, the active search query, the selected track index in the
+ * filtered list, and a loading flag while a scan is in progress. The
+ * scanner pumps results into this context via `setFolders` / `setTracks`.
+ */
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useMemo } from 'react'
 import { ModelRegistry, Track, FolderEntry } from '../models'
@@ -6,6 +14,7 @@ import type { Playlist } from '../services/types'
 
 export type { Track, Playlist } from '../services/types'
 
+/** UI-friendly view of a folder for the sidebar tree. */
 export interface FolderNode {
   readonly id:       string
   readonly name:     string
@@ -14,6 +23,7 @@ export interface FolderNode {
   readonly expanded: boolean
 }
 
+/** Read-only library state snapshot. */
 interface LibraryState {
   readonly registry:           ModelRegistry
   readonly playlists:          readonly Playlist[]
@@ -22,6 +32,7 @@ interface LibraryState {
   readonly isLoading:          boolean
 }
 
+/** Library state plus mutators and derived data. */
 interface LibraryContextValue extends LibraryState {
   readonly setFolders:          (folders: FolderEntry[]) => void
   readonly setTracks:           (tracks: Track[]) => void
@@ -37,6 +48,7 @@ interface LibraryContextValue extends LibraryState {
 
 const LibraryContext = createContext<LibraryContextValue | null>(null)
 
+/** Provides {@link LibraryContextValue}; pair with {@link useLibraryScanner} to populate. */
 export function LibraryProvider ({ children }: { readonly children: ReactNode }) {
   const [ state, setState ] = useState<LibraryState>({
     registry:           new ModelRegistry(),
@@ -177,6 +189,7 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
   )
 }
 
+/** Access the library. Throws if used outside {@link LibraryProvider}. */
 export function useLibrary () {
   const context = useContext(LibraryContext)
   if (!context) {

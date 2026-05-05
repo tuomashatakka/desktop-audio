@@ -1,3 +1,11 @@
+/**
+ * Electron main process — app lifecycle, BrowserWindow setup, IPC handlers,
+ * scanner-worker supervision, and OS media-session integration.
+ *
+ * IPC channels follow the `namespace:action` convention (see `CLAUDE.md`):
+ * `library:*` for scanning/track CRUD, `file:*` for filesystem reads,
+ * `window:*` for chrome controls, `media:*` for transport state.
+ */
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'

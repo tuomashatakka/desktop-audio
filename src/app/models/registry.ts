@@ -5,6 +5,11 @@ import { AlbumIndex, Album } from './Album'
 import { ArtistIndex, Artist } from './Artist'
 
 
+/**
+ * In-memory store for the active library — tracks, folders, albums and
+ * artists. Adding/removing a track keeps the album and artist indexes
+ * consistent. Owned by {@link LibraryContext}.
+ */
 export class ModelRegistry {
   readonly tracks = new Map<string, Track>()
   readonly folders = new Map<string, FolderEntry>()

@@ -1,18 +1,33 @@
+/**
+ * SettingsContext — persisted user preferences.
+ *
+ * Owns the library paths the scanner is told to walk, the active theme
+ * (and any custom theme overrides), playback defaults (volume, repeat
+ * mode), and the default row density. Settings are persisted via the
+ * data host (localStorage in the browser, IPC + disk in Electron).
+ */
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { useData } from '../data'
+import { useHost, useData } from '../data'
 
 
+/** Playback repeat behavior at end of queue. */
 export type RepeatMode = 'none' | 'one' | 'all'
 
+/** Built-in theme name; `custom` activates {@link CustomTheme} overrides. */
 export type Theme = 'dark' | 'light' | 'custom'
 
+/**
+ * User-defined CSS variable overrides applied at runtime when the
+ * active theme is `custom`. Importable/exportable as JSON.
+ */
 export interface CustomTheme {
   version: 1,
   name:    string,
   colors:  Record<string, string>,
 }
 
+/** Persisted settings shape. */
 interface Settings {
   readonly libraryPaths:   readonly string[]
   readonly theme:          Theme
@@ -22,6 +37,7 @@ interface Settings {
   readonly repeatMode:     RepeatMode
 }
 
+/** Settings plus the action handlers exposed to consumers. */
 interface SettingsContextValue extends Settings {
   readonly addLibraryPath:    (path: string) => void
   readonly removeLibraryPath: (path: string) => void
@@ -34,16 +50,19 @@ interface SettingsContextValue extends Settings {
   readonly setRepeatMode:     (mode: RepeatMode) => void
 }
 
+const STORAGE_KEY = 'desktop-audio-settings'
+
+/** Platform-specific default music directory name (used as hint in settings) */
+const DEFAULT_MUSIC_DIR = 'Music'
+
 const defaultSettings: Settings = {
-  libraryPaths:   [],
+  libraryPaths:   [ DEFAULT_MUSIC_DIR ],
   theme:          'dark',
   customTheme:    null,
   defaultDensity: 'normal',
   volume:         0.8,
   repeatMode:     'none',
 }
-
-const STORAGE_KEY = 'desktop-audio-settings'
 
 const DEFAULT_CUSTOM_THEME: CustomTheme = {
   version: 1,
@@ -62,8 +81,8 @@ const DEFAULT_CUSTOM_THEME: CustomTheme = {
     '--border':       '#333',
     '--border-hover': '#555',
     '--success':      '#28a745',
-    '--warning':      '#ffc107',
-    '--danger':       '#dc3545',
+    '--warning':     '#ffc107',
+    '--danger':      '#dc3545',
     '--info':         '#17a2b8',
     '--wf-unplayed':  '#444',
     '--wf-played':    '#e94560',
@@ -72,19 +91,36 @@ const DEFAULT_CUSTOM_THEME: CustomTheme = {
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
 
+/**
+ * Loads settings from the data host on mount, exposes them via context,
+ * and writes back on change. Renders children only after initial load.
+ */
 export function SettingsProvider ({ children }: { readonly children: ReactNode }) {
   const [ settings, setSettings ] = useState<Settings>(defaultSettings)
   const [ initialized, setInitialized ] = useState(false)
-  const data = useData()
+  const host = useHost()
 
   useEffect(() => {
     const init = async () => {
       const loaded = await loadSettings()
+
+      // If we're on a fresh install or using the default 'Music' placeholder,
+      // try to resolve the actual system music directory.
+      if (loaded.libraryPaths.length === 1 && loaded.libraryPaths[0] === 'Music') {
+        const musicDir = await host.getMusicDir()
+        if (musicDir) {
+          setSettings(s =>
+            ({ ...s, ...loaded, libraryPaths: [ musicDir ]}))
+          setInitialized(true)
+          return
+        }
+      }
+
       setSettings(loaded)
       setInitialized(true)
     }
     init()
-  }, [])
+  }, [ host ])
 
   useEffect(() => {
     if (!initialized)
@@ -181,6 +217,7 @@ async function loadSettings (): Promise<Settings> {
   return { ...defaultSettings, libraryPaths: []}
 }
 
+/** Access settings + actions. Throws if used outside {@link SettingsProvider}. */
 export function useSettings () {
   const context = useContext(SettingsContext)
   if (!context) {

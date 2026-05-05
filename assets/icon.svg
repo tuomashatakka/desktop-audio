@@ -1,31 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!-- Background -->
   <rect width="1024" height="1024" rx="220" fill="#0f0f0f"/>
-
-  <!-- Waveform bars — centered vertically, varying heights -->
-  <!-- Each bar: width=44, gap=14, 13 bars total, starting at x=106 -->
-  <!-- Bar heights (symmetric waveform shape): 160 260 380 500 620 740 800 740 620 500 380 260 160 -->
-  <g fill="#ff4d79">
-    <!-- bar 1 -->  <rect x="106"  y="432" width="44" height="160" rx="22"/>
-    <!-- bar 2 -->  <rect x="164"  y="382" width="44" height="260" rx="22"/>
-    <!-- bar 3 -->  <rect x="222"  y="322" width="44" height="380" rx="22"/>
-    <!-- bar 4 -->  <rect x="280"  y="262" width="44" height="500" rx="22"/>
-    <!-- bar 5 -->  <rect x="338"  y="202" width="44" height="620" rx="22"/>
-    <!-- bar 6 -->  <rect x="396"  y="142" width="44" height="740" rx="22"/>
-    <!-- bar 7 -->  <rect x="454"  y="112" width="44" height="800" rx="22"/>
-    <!-- bar 8 -->  <rect x="512"  y="142" width="44" height="740" rx="22"/>
-    <!-- bar 9 -->  <rect x="570"  y="202" width="44" height="620" rx="22"/>
-    <!-- bar 10 --> <rect x="628"  y="262" width="44" height="500" rx="22"/>
-    <!-- bar 11 --> <rect x="686"  y="322" width="44" height="380" rx="22"/>
-    <!-- bar 12 --> <rect x="744"  y="382" width="44" height="260" rx="22"/>
-    <!-- bar 13 --> <rect x="802"  y="432" width="44" height="160" rx="22"/>
-    <!-- bar 14 --> <rect x="860"  y="452" width="44" height="120" rx="22"/>
-  </g>
-
-  <!-- Subtle accent glow on center bars -->
-  <g fill="#ff7aaa" opacity="0.35">
-    <rect x="396"  y="142" width="44" height="740" rx="22"/>
-    <rect x="454"  y="112" width="44" height="800" rx="22"/>
-    <rect x="512"  y="142" width="44" height="740" rx="22"/>
-  </g>
+  <polyline
+    points="120,512 320,512 432,232 624,792 736,512 904,512"
+    fill="none"
+    stroke="#ff4d79"
+    stroke-width="56"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
 </svg>

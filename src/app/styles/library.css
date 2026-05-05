@@ -233,9 +233,8 @@
 /* Scroll container */
 .track-table-wrap .track-table-scroll {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: auto;
-  position: relative;
+  display: block;
+  overflow: hidden;
   min-width: 0;
 }
 
@@ -394,6 +393,47 @@
 .track-album-group .group-tracks {
   display: flex;
   flex-direction: column;
+}
+
+.track-flat-group {
+  display: block;
+}
+
+.track-flat-group > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--text-dim);
+  user-select: none;
+}
+
+.track-flat-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.track-flat-group > summary::before {
+  content: "▸";
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  transition: transform var(--duration-fast) var(--ease);
+  display: inline-block;
+}
+
+.track-flat-group[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.track-flat-group > summary .group-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.track-flat-group > summary .group-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
 }
 
 /* ─── Config Dropdown ──────────────────────────── */

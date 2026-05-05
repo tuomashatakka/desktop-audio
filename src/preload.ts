@@ -1,3 +1,11 @@
+/**
+ * Renderer preload — bridges main-process IPC into the browser context.
+ *
+ * Exposes a single `electronAPI` object on `window` via `contextBridge`,
+ * keeping `nodeIntegration` off and locking the surface to a curated set
+ * of `library:*`, `file:*`, `window:*`, and `media:*` channels. The
+ * matching TypeScript type lives in `src/global.d.ts`.
+ */
 import { contextBridge, ipcRenderer } from 'electron'
 import type { SerializableMenuItem, MediaState } from './app/services/types'
 
