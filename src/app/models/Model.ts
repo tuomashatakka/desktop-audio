@@ -1,3 +1,12 @@
+/**
+ * Base class for persistent domain models (Track, Album, Artist, FolderEntry).
+ *
+ * Subclasses set fields via setters, call {@link Model#markDirty}, and the
+ * change is debounced and flushed to the shared {@link DataSource}. Includes
+ * a tiny event-emitter for observing dirty/flush transitions and a
+ * reflection-based {@link Model#toJSON} that walks getters on the prototype
+ * chain so persisted payloads stay in sync with declared fields.
+ */
 import type { DataSource } from '../data/DataSource'
 
 
@@ -5,6 +14,7 @@ const DB_WRITE_DEBOUNCE_MS = 150
 
 type ModelEventListener = (eventType: string) => void
 
+/** Persistable, observable base class. See module docstring. */
 export class Model {
   readonly id:       string
   #dirty = false

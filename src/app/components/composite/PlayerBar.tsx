@@ -3,6 +3,11 @@ import { IconButton } from '../atomic'
 import { WaveformProgress } from '../atomic/WaveformProgress'
 
 
+/**
+ * Persistent transport bar at the bottom of the shell. Shows current track
+ * art/title, playback controls, a clickable waveform progress strip, and a
+ * volume slider. Click anywhere on the bar to expand into the full player.
+ */
 export function PlayerBar () {
   const { playerExpanded, togglePlayerExpanded } = useUI()
   const { isPlaying, currentTrack, currentTime, duration, volume, waveformBars, pause, resume, seek, setVolume, playNext, playPrevious } = useAudio()

@@ -1,3 +1,11 @@
+/**
+ * Standalone Web Audio playback engine (lazy singleton).
+ *
+ * Mostly superseded by the in-context graph in {@link AudioContext} but kept
+ * for places that need a non-React handle to the analyzer or audio element
+ * (e.g. legacy waveform routines). Constructs the AudioContext + AnalyserNode
+ * on first use to avoid autoplay-policy issues.
+ */
 export class AudioEngine {
   private static instance: AudioEngine | null = null
   private audioContext:    AudioContext | null = null

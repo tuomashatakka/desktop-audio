@@ -1,9 +1,18 @@
+/**
+ * AudioContext — Web Audio playback engine wired into React.
+ *
+ * Drives a single `<audio>` element through an {@link AudioContext} graph
+ * (gain → analyzer → destination), exposes transport controls, and decodes
+ * waveform-bar amplitudes for visualizers. Queue navigation (next/previous)
+ * is delegated by callers passing the current track list.
+ */
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import type { Track } from './LibraryContext'
 import { useHost, useData } from '../data'
 
 
+/** Read-only playback state. */
 interface AudioState {
   readonly isPlaying:    boolean
   readonly currentTime:  number
@@ -14,6 +23,7 @@ interface AudioState {
   readonly waveformBars: Float32Array | null
 }
 
+/** Playback state plus the transport actions exposed to the UI. */
 interface AudioContextValue extends AudioState {
   readonly play:            (track: Track) => void
   readonly pause:           () => void
@@ -25,6 +35,8 @@ interface AudioContextValue extends AudioState {
   readonly playPrevious:    (tracks: readonly Track[]) => void
   readonly analyzer:        AnalyserNode | null
   readonly setCurrentQueue: (tracks: Track[]) => void
+  /** Ensure audio context is ready (resumes if suspended). Call after user gesture. */
+  readonly ensureReady:    () => Promise<void>
 }
 
 /** Decode an audio file and compute per-bar RMS amplitudes for the waveform. */
@@ -60,6 +72,21 @@ async function decodeWaveformBars (
 
 const AudioContext = createContext<AudioContextValue | null>(null)
 
+/** Global reference to ensureReady function, set by AudioProvider on mount */
+let globalEnsureReady: (() => Promise<void>) | null = null
+
+export function setGlobalEnsureReady (fn: (() => Promise<void>) | null) {
+  globalEnsureReady = fn
+}
+
+export function getGlobalEnsureReady (): (() => Promise<void>) | null {
+  return globalEnsureReady
+}
+
+/**
+ * Hosts the lazily-initialized Web Audio graph and exposes transport actions
+ * via {@link useAudio}. Resumes the audio context on first user gesture.
+ */
 export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   const [ state, setState ] = useState<AudioState>({
     isPlaying:    false,
@@ -414,12 +441,28 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     [ state.currentTrack, play ]
   )
 
+  // Ensure audio context is ready (resume if suspended due to autoplay policy)
+  const ensureReady = useCallback(async () => {
+    const ctx = audioContextRef.current
+    if (ctx && ctx.state === 'suspended') {
+      await ctx.resume()
+    }
+  }, [])
+
   // Sync refs after all callbacks are defined
   pauseRef.current = pause
   resumeRef.current = resume
   seekRef.current = seek
   playNextRef.current = playNext
   playPreviousRef.current = playPrevious
+
+  // Register global ensureReady for first-pointer-event handler
+  useEffect(() => {
+    setGlobalEnsureReady(ensureReady)
+    return () => {
+      setGlobalEnsureReady(null)
+    }
+  }, [ ensureReady ])
 
   return (
     <AudioContext.Provider
@@ -435,6 +478,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
         playPrevious,
         analyzer,
         setCurrentQueue,
+        ensureReady,
       }}
     >
       {children}
@@ -442,6 +486,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   )
 }
 
+/** Access playback state + transport. Throws if used outside {@link AudioProvider}. */
 export function useAudio () {
   const context = useContext(AudioContext)
   if (!context) {

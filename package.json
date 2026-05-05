@@ -72,6 +72,7 @@
     "music-metadata": "11.12.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "typescript-eslint": "8.58.0"
+    "typescript-eslint": "8.58.0",
+    "vite-plugin-mkcert": "^2.0.0"
   }
 }

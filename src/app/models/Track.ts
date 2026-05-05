@@ -2,6 +2,14 @@ import { Model } from './Model'
 import type { TrackDTO } from '../services/types'
 
 
+/**
+ * A single audio file in the library.
+ *
+ * Wraps the metadata stored in the DB (title, artist, album, duration,
+ * format, etc.) with dirty-tracking setters and a lazy-loaded waveform
+ * cache. Convert to/from the DTO used over IPC via {@link Track.fromDTO}
+ * and {@link Track#toDTO}.
+ */
 export class Track extends Model {
   private _title!:       string
   private _artist!:      string

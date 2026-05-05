@@ -12,11 +12,11 @@ describe('LibraryView', () => {
     expect(screen.getByText('Library')).toBeInTheDocument()
   })
 
-  it('shows empty state when no tracks', () => {
-    renderWithProviders(<LibraryView />)
+  it('shows empty state when no tracks', async () => {
+    const { findByText } = renderWithProviders(<LibraryView />)
 
-    // When no tracks, should show empty state
-    expect(screen.getByText('No tracks found')).toBeInTheDocument()
+    // Scan runs on mount; wait for it to settle to the empty state.
+    expect(await findByText('No tracks found')).toBeInTheDocument()
   })
 
   it('has scan functionality', () => {

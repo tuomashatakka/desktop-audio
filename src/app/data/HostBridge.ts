@@ -1,9 +1,16 @@
-// HostBridge.ts - Window/media-keys/context-menu/MPRIS methods only
-// Data methods moved to DataSource interface
-
+/**
+ * Platform/host integration surface.
+ *
+ * Covers everything that depends on the embedding shell rather than data:
+ * window chrome (minimize/maximize/close), system media keys, native
+ * context menus, and OS media-session updates (MPRIS / SMTC / NowPlaying).
+ * Each implementation lives next to its host: {@link ElectronHost},
+ * {@link BrowserHost}. Data access lives on {@link DataSource}.
+ */
 import type { SerializableMenuItem, MediaState } from '../services/types'
 
 
+/** See module docstring. */
 export interface HostBridge {
   // Window
   minimizeWindow(): void

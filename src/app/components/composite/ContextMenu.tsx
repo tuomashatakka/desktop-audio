@@ -1,6 +1,11 @@
 import { Popover } from '../atomic/Popover'
 
 
+/**
+ * In-renderer context menu item. Native menus go through the host bridge
+ * with {@link SerializableMenuItem}; this is the function-carrying variant
+ * used when rendering an HTML popover.
+ */
 export interface ContextMenuItem {
   readonly label?:     string
   readonly icon?:      string

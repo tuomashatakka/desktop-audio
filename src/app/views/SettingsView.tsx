@@ -44,9 +44,14 @@ export function SettingsView () {
   useThemeApply(theme, theme === 'custom' ? customTheme : null)
 
   const handleAddPath = async () => {
-    const path = await data.addRoot()
-    if (path) {
-      addLibraryPath(path)
+    try {
+      const path = await data.addRoot()
+      if (path) {
+        addLibraryPath(path)
+      }
+    }
+    catch (error) {
+      console.error('Failed to add path:', error)
     }
   }
 

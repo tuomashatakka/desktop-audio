@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { SettingsProvider, useSettings } from '../../src/app/contexts/SettingsContext'
 import { DataProvider } from '../../src/app/data/DataContext'
+import { HostProvider } from '../../src/app/data/HostContext'
 import type { DataSource } from '../../src/app/data/DataSource'
+import type { HostBridge } from '../../src/app/data/HostBridge'
 
 const mockDataSource: DataSource = {
   addRoot: vi.fn().mockResolvedValue(null),
@@ -18,8 +20,31 @@ const mockDataSource: DataSource = {
   deleteTrack: vi.fn().mockResolvedValue(undefined),
 }
 
-function wrapWithData(ui: React.ReactNode) {
-  return <DataProvider value={mockDataSource}>{ui}</DataProvider>
+const mockHost: HostBridge = {
+  minimizeWindow:      vi.fn(),
+  maximizeWindow:      vi.fn(),
+  closeWindow:         vi.fn(),
+  isMaximized:         vi.fn().mockResolvedValue(false),
+  onMediaPlayPause:    vi.fn().mockReturnValue(() => {}),
+  onMediaNext:         vi.fn().mockReturnValue(() => {}),
+  onMediaPrev:         vi.fn().mockReturnValue(() => {}),
+  showContextMenu:     vi.fn(),
+  hideContextMenu:     vi.fn(),
+  onContextMenuAction: vi.fn().mockReturnValue(() => {}),
+  updateMediaState:    vi.fn(),
+  onMediaSeek:         vi.fn().mockReturnValue(() => {}),
+  selectDirectory:     vi.fn().mockResolvedValue(null),
+  getMusicDir:         vi.fn().mockResolvedValue(null),
+}
+
+function wrapWithData (ui: React.ReactNode) {
+  return (
+    <HostProvider value={mockHost}>
+      <DataProvider value={mockDataSource}>
+        {ui}
+      </DataProvider>
+    </HostProvider>
+  )
 }
 
 const localStorageMock = {
@@ -80,7 +105,7 @@ describe('SettingsContext', () => {
       )
     )
 
-    expect(screen.getByTestId('paths')).toHaveTextContent('')
+    expect(screen.getByTestId('paths')).toHaveTextContent('Music')
     expect(screen.getByTestId('theme')).toHaveTextContent('dark')
     expect(screen.getByTestId('volume')).toHaveTextContent('0.8')
     expect(screen.getByTestId('repeat')).toHaveTextContent('none')

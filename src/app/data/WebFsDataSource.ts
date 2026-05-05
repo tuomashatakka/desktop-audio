@@ -4,6 +4,25 @@ import { idbGet, idbSet, idbDelete, idbGetAll } from './idb'
 
 const AUDIO_EXTENSIONS = new Set([ '.mp3', '.flac', '.ogg', '.wav', '.m4a', '.opus' ])
 
+type TrackSource =
+  | { readonly kind: 'handle'; readonly handle: FileSystemFileHandle } |
+  { readonly kind: 'file'; readonly file: File }
+
+interface HandleRootEntry {
+  readonly id:     string
+  readonly label:  string
+  readonly handle: FileSystemDirectoryHandle
+  readonly kind?:  undefined
+}
+
+interface FilesRootEntry {
+  readonly id:    string
+  readonly label: string
+  readonly kind:  'files'
+}
+
+type RootEntry = HandleRootEntry | FilesRootEntry
+
 // Simple hash function for browser environment (Web Crypto API)
 async function hashString (text: string): Promise<string> {
   const encoder = new TextEncoder()
@@ -26,11 +45,8 @@ function generateUUID (): string {
   )
 }
 
-// Async generator to walk directory tree
-async function* walkDir (
-  handle: FileSystemDirectoryHandle,
-  path = ''
-): AsyncGenerator<[string, FileSystemFileHandle]> {
+// Async generator to walk directory tree (Chromium handle path)
+async function* walkDir (handle: FileSystemDirectoryHandle, path = ''): AsyncGenerator<[string, FileSystemFileHandle]> {
   for await (const [ name, child ] of handle.entries()) {
     const childPath = path ? `${path}/${name}` : name
     if (child.kind === 'file') {
@@ -42,34 +58,97 @@ async function* walkDir (
   }
 }
 
+// Firefox / Safari fallback: <input type="file" webkitdirectory>
+function pickDirectoryFallback (): Promise<{ label: string; files: File[] } | null> {
+  return new Promise(resolve => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = true
+    // webkitdirectory is non-standard but supported in Firefox, Safari, Chromium
+    ;(input as HTMLInputElement & { webkitdirectory: boolean }).webkitdirectory = true
+    input.style.display = 'none'
+
+    let settled = false
+    const settle = (value: { label: string; files: File[] } | null) => {
+      if (settled)
+        return
+      settled = true
+      input.remove()
+      resolve(value)
+    }
+
+    input.addEventListener('change', () => {
+      const fileList = input.files
+      if (!fileList || fileList.length === 0) {
+        settle(null)
+        return
+      }
+
+      const files = Array.from(fileList)
+      // First path segment of webkitRelativePath is the picked folder name
+      const firstPath = files[0]?.webkitRelativePath ?? ''
+      const label = firstPath.split('/')[0] || 'Library'
+      settle({ label, files })
+    })
+
+    // Browser fires `cancel` (Chromium 113+, Firefox 91+) when picker is dismissed
+    input.addEventListener('cancel', () => {
+      settle(null)
+    })
+
+    document.body.append(input)
+    input.click()
+  })
+}
+
 export class WebFsDataSource implements DataSource {
   private readonly listeners = new Set<DataListener>()
-  private readonly trackHandleMap = new Map<string, FileSystemFileHandle>()
+  private readonly trackSourceMap = new Map<string, TrackSource>()
+  // Firefox path: File[] per rootId, kept in-memory only (handles aren't durable)
+  private readonly rootFiles = new Map<string, File[]>()
 
-  // Store mapping from trackId to file handle for quick access
-  private setTrackHandle (trackId: string, handle: FileSystemFileHandle): void {
-    this.trackHandleMap.set(trackId, handle)
+  private setTrackSource (trackId: string, source: TrackSource): void {
+    this.trackSourceMap.set(trackId, source)
   }
 
-  private getTrackHandle (trackId: string): FileSystemFileHandle | undefined {
-    return this.trackHandleMap.get(trackId)
+  private getTrackSource (trackId: string): TrackSource | undefined {
+    return this.trackSourceMap.get(trackId)
+  }
+
+  static isPickerSupported (): boolean {
+    if (typeof window === 'undefined')
+      return false
+    if ('showDirectoryPicker' in window)
+      return true
+
+    // webkitdirectory probe
+    const probe = document.createElement('input')
+    return 'webkitdirectory' in probe
   }
 
   async addRoot (): Promise<string | null> {
     try {
-      // Type assertion for File System Access API (Chromium 86+)
-      const handle = await (window as Window & typeof globalThis & { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker()
+      if ('showDirectoryPicker' in window) {
+        const handle = await (window as Window & typeof globalThis & { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker()
+        const rootId = generateUUID()
+        const label = handle.name
+        await idbSet('roots', rootId, { id: rootId, label, handle } satisfies HandleRootEntry)
+        return rootId
+      }
+
+      // Fallback for Firefox / Safari
+      const picked = await pickDirectoryFallback()
+      if (!picked)
+        return null
+
       const rootId = generateUUID()
-      const label = handle.name
-
-      // Store the handle in IndexedDB
-      await idbSet('roots', rootId, { id: rootId, label, handle })
-
+      const entry: FilesRootEntry = { id: rootId, label: picked.label, kind: 'files' }
+      await idbSet('roots', rootId, entry)
+      this.rootFiles.set(rootId, picked.files)
       return rootId
     }
     catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        // User cancelled the picker
         return null
       }
       if (error instanceof DOMException && error.name === 'PermissionDeniedError') {
@@ -81,13 +160,14 @@ export class WebFsDataSource implements DataSource {
 
   async removeRoot (rootId: string): Promise<void> {
     await idbDelete('roots', rootId)
+    this.rootFiles.delete(rootId)
   }
 
   async listRoots (): Promise<readonly LibraryRoot[]> {
     const roots = await idbGetAll('roots')
     return roots.map(
       (entry: unknown) => {
-        const value = (entry as { value: { id: string; label: string }}).value
+        const value = (entry as { value: RootEntry }).value
         return {
           id:    value.id,
           label: value.label
@@ -97,13 +177,10 @@ export class WebFsDataSource implements DataSource {
   }
 
   async getMusicDir (): Promise<string | null> {
-    // Browser doesn't have access to default music dir
-    // Could potentially check IndexedDB for a saved preference
     return null
   }
 
   scan (rootIds: readonly string[]): void {
-    // Fire and forget - results stream via subscribe()
     this.performScan(rootIds).catch(
       error => {
         this.emit({ type: 'error', message: error.message })
@@ -116,30 +193,72 @@ export class WebFsDataSource implements DataSource {
     let batch: TrackDTO[] = []
     let totalCount = 0
 
+    const pushTrack = async (track: TrackDTO): Promise<void> => {
+      batch.push(track)
+      if (batch.length >= batchSize) {
+        this.emit({ type: 'batch', tracks: [ ...batch ]})
+        totalCount += batch.length
+        batch = []
+      }
+    }
+
     for (const rootId of rootIds) {
       const rootEntry = await idbGet('roots', rootId)
       if (!rootEntry)
         continue
 
-      const { handle: rootHandle, label } = (rootEntry as { value: { handle: FileSystemDirectoryHandle; label: string }}).value
+      const value = (rootEntry as { value: RootEntry }).value
 
+      if (value.kind === 'files') {
+        const files = this.rootFiles.get(rootId)
+        if (!files || files.length === 0)
+          continue
+
+        const rootPrefix = `${value.label}/`
+        for (const file of files) {
+          const ext = `.${(file.name.split('.').pop() ?? '').toLowerCase()}`
+          if (!AUDIO_EXTENSIONS.has(ext))
+            continue
+
+          // webkitRelativePath: "<rootLabel>/sub/dir/file.mp3" — strip leading root
+          const fullPath = file.webkitRelativePath || file.name
+          const relativePath = fullPath.startsWith(rootPrefix)
+            ? fullPath.slice(rootPrefix.length)
+            : fullPath
+
+          const trackId = await hashString(rootId + relativePath)
+          this.setTrackSource(trackId, { kind: 'file', file })
+
+          await pushTrack({
+            id:         trackId,
+            path:       `${value.label}/${relativePath}`,
+            title:      file.name.replace(/\.[^/.]+$/, ''),
+            artist:     'Unknown Artist',
+            album:      'Unknown Album',
+            duration:   0,
+            format:     ext.slice(1),
+            size:       file.size,
+            coverColor: `#${Math.floor(Math.random() * 16777215).toString(16)
+              .padStart(6, '0')}`
+          })
+        }
+        continue
+      }
+
+      // Handle path (Chromium)
+      const { handle: rootHandle, label } = value
       for await (const [ relativePath, fileHandle ] of walkDir(rootHandle)) {
-        // Check if file has audio extension
         const ext = `.${(fileHandle.name.split('.').pop() ?? '').toLowerCase()}`
         if (!AUDIO_EXTENSIONS.has(ext))
           continue
 
-        // Generate track ID from rootId + relativePath
         const trackId = await hashString(rootId + relativePath)
+        this.setTrackSource(trackId, { kind: 'handle', handle: fileHandle })
 
-        // Store file handle for later access
-        this.setTrackHandle(trackId, fileHandle)
-
-        // Create TrackDTO
-        const track: TrackDTO = {
+        await pushTrack({
           id:         trackId,
           path:       `${label}/${relativePath}`,
-          title:      fileHandle.name.replace(/\.[^/.]+$/, ''), // Remove extension
+          title:      fileHandle.name.replace(/\.[^/.]+$/, ''),
           artist:     'Unknown Artist',
           album:      'Unknown Album',
           duration:   0,
@@ -147,20 +266,10 @@ export class WebFsDataSource implements DataSource {
           size:       0,
           coverColor: `#${Math.floor(Math.random() * 16777215).toString(16)
             .padStart(6, '0')}`
-        }
-
-        batch.push(track)
-
-        // Emit batch when we have 20 tracks
-        if (batch.length >= batchSize) {
-          this.emit({ type: 'batch', tracks: [ ...batch ]})
-          totalCount += batch.length
-          batch = []
-        }
+        })
       }
     }
 
-    // Emit remaining tracks
     if (batch.length > 0) {
       this.emit({ type: 'batch', tracks: [ ...batch ]})
       totalCount += batch.length
@@ -190,25 +299,30 @@ export class WebFsDataSource implements DataSource {
     }
   }
 
+  private async sourceToFile (source: TrackSource): Promise<File> {
+    if (source.kind === 'file')
+      return source.file
+    return await source.handle.getFile()
+  }
+
   async readBytes (trackId: string): Promise<ArrayBuffer> {
-    const handle = this.getTrackHandle(trackId)
-    if (!handle) {
-      throw new Error(`No file handle found for trackId: ${trackId}`)
+    const source = this.getTrackSource(trackId)
+    if (!source) {
+      throw new Error(`No file source found for trackId: ${trackId}`)
     }
 
-    const file = await handle.getFile()
+    const file = await this.sourceToFile(source)
     return await file.arrayBuffer()
   }
 
   async readMetadata (trackId: string): Promise<AudioMetadata> {
-    const handle = this.getTrackHandle(trackId)
-    if (!handle) {
-      throw new Error(`No file handle found for trackId: ${trackId}`)
+    const source = this.getTrackSource(trackId)
+    if (!source) {
+      throw new Error(`No file source found for trackId: ${trackId}`)
     }
 
-    const file = await handle.getFile()
+    const file = await this.sourceToFile(source)
 
-    // Use music-metadata to parse the blob
     const mm = await import('music-metadata')
     const metadata = await mm.parseBlob(file)
 
@@ -233,6 +347,73 @@ export class WebFsDataSource implements DataSource {
 
   async deleteTrack (trackId: string): Promise<void> {
     await idbDelete('tracks', trackId)
-    this.trackHandleMap.delete(trackId)
+    this.trackSourceMap.delete(trackId)
+  }
+
+  /**
+   * Re-request permissions for stored handle-based roots and prune Firefox
+   * (file-list) roots that cannot survive a reload. Called on first user gesture.
+   */
+  async init (): Promise<readonly string[]> {
+    const rootEntries = await idbGetAll('roots')
+    const verifiedRootIds: string[] = []
+    let firefoxRootsPruned = 0
+
+    for (const entry of rootEntries) {
+      const value = (entry as { value: RootEntry }).value
+
+      if (value.kind === 'files') {
+        // No durable handle — must be re-picked. Drop silently.
+        await this.removeRoot(value.id)
+        firefoxRootsPruned += 1
+        continue
+      }
+
+      if (!('showDirectoryPicker' in window)) {
+        // Stored a handle in a previous session, but this browser can't use it.
+        await this.removeRoot(value.id)
+        continue
+      }
+
+      const { id, label, handle } = value
+      try {
+        const fh = handle as FileSystemDirectoryHandle & { queryPermission?: (options: { mode: string }) => Promise<PermissionState> }
+
+        let permission: PermissionState = 'prompt'
+        if (fh.queryPermission) {
+          const currentPerm = await fh.queryPermission({ mode: 'read' })
+          if (currentPerm) {
+            permission = currentPerm
+          }
+        }
+
+        const fr = handle as FileSystemDirectoryHandle & { requestPermission?: (options: { mode: string }) => Promise<PermissionState> }
+        if (permission !== 'granted' && fr.requestPermission) {
+          permission = await fr.requestPermission({ mode: 'read' })
+        }
+
+        if (permission === 'granted') {
+          verifiedRootIds.push(id)
+        }
+        else {
+          console.log(`WebFsDataSource: root "${label}" permission denied, removing`)
+          await this.removeRoot(id)
+        }
+      }
+      catch (error) {
+        console.warn(`WebFsDataSource: failed to verify root "${label}":`, error)
+        await this.removeRoot(id)
+      }
+    }
+
+    if (firefoxRootsPruned > 0) {
+      console.info(`WebFsDataSource: pruned ${firefoxRootsPruned} folder(s) that need to be re-added (browser does not persist directory access).`)
+    }
+
+    if (verifiedRootIds.length > 0) {
+      this.scan(verifiedRootIds)
+    }
+
+    return verifiedRootIds
   }
 }
