@@ -75,10 +75,13 @@ const AudioContext = createContext<AudioContextValue | null>(null)
 /** Global reference to ensureReady function, set by AudioProvider on mount */
 let globalEnsureReady: (() => Promise<void>) | null = null
 
+/** Register the renderer-wide `ensureReady` so non-React code (e.g. the
+ *  first-pointer-event handler) can resume the audio context on demand. */
 export function setGlobalEnsureReady (fn: (() => Promise<void>) | null) {
   globalEnsureReady = fn
 }
 
+/** Retrieve the currently-registered `ensureReady` if {@link AudioProvider} is mounted. */
 export function getGlobalEnsureReady (): (() => Promise<void>) | null {
   return globalEnsureReady
 }
