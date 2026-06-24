@@ -1,4 +1,13 @@
+/**
+ * Renderer preload — bridges main-process IPC into the browser context.
+ *
+ * Exposes a single `electronAPI` object on `window` via `contextBridge`,
+ * keeping `nodeIntegration` off and locking the surface to a curated set
+ * of `library:*`, `file:*`, `window:*`, and `media:*` channels. The
+ * matching TypeScript type lives in `src/global.d.ts`.
+ */
 import { contextBridge, ipcRenderer } from 'electron'
+import type { SerializableMenuItem, MediaState } from './app/services/types'
 
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -61,5 +70,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('media:prev', h)
     return () =>
       ipcRenderer.removeListener('media:prev', h)
+  },
+
+  // Context menu
+  showContextMenu: (items: SerializableMenuItem[], x: number, y: number, width: number, height: number) =>
+    ipcRenderer.send('contextmenu:show', { items, x, y, width, height }),
+  hideContextMenu: () =>
+    ipcRenderer.send('contextmenu:hide'),
+  onContextMenuAction: (cb: (index: number) => void) => {
+    const h = (_: unknown, { index }: { index: number }) =>
+      cb(index)
+    ipcRenderer.on('contextmenu:action', h)
+    return () =>
+      ipcRenderer.removeListener('contextmenu:action', h)
+  },
+
+  // Media state
+  updateMediaState: (state: MediaState) =>
+    ipcRenderer.send('media:state-update', state),
+  onMediaSeek: (cb: (delta: number) => void) => {
+    const h = (_: unknown, delta: number) =>
+      cb(delta)
+    ipcRenderer.on('media:seek', h)
+    return () =>
+      ipcRenderer.removeListener('media:seek', h)
+  },
+
+  // Write IPC
+  upsertModel: (kind: string, payload: Record<string, unknown>) => {
+    ipcRenderer.send('models:upsert', kind, payload)
+  },
+  deleteModel: (kind: string, id: string) => {
+    ipcRenderer.send('models:delete', kind, id)
   },
 })

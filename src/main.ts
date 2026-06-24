@@ -1,9 +1,19 @@
-import { app, BrowserWindow, ipcMain, dialog, globalShortcut } from 'electron'
+/**
+ * Electron main process — app lifecycle, BrowserWindow setup, IPC handlers,
+ * scanner-worker supervision, and OS media-session integration.
+ *
+ * IPC channels follow the `namespace:action` convention (see `CLAUDE.md`):
+ * `library:*` for scanning/track CRUD, `file:*` for filesystem reads,
+ * `window:*` for chrome controls, `media:*` for transport state.
+ */
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { Worker } from 'node:worker_threads'
 import started from 'electron-squirrel-startup'
 import * as mm from 'music-metadata'
+import * as mediaControls from './media-controls'
+import type { MediaState, SerializableMenuItem } from './app/services/types'
 
 
 if (started) {
@@ -12,6 +22,8 @@ if (started) {
 
 // eslint-disable-next-line functional/no-let
 let mainWindow: BrowserWindow | null = null
+// eslint-disable-next-line functional/no-let
+let popoverWindow: BrowserWindow | null = null
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
@@ -45,27 +57,61 @@ const createWindow = () => {
   })
 }
 
+const createPopoverWindow = () => {
+  popoverWindow = new BrowserWindow({
+    width:           240,
+    height:          160,
+    show:            false,
+    frame:           false,
+    transparent:     true,
+    backgroundColor: '#00000000',
+    alwaysOnTop:     true,
+    skipTaskbar:     true,
+    resizable:       false,
+    webPreferences:  {
+      preload:          path.join(__dirname, 'context-menu-preload.js'),
+      contextIsolation: true,
+      nodeIntegration:  false,
+    },
+  })
+
+  if (CONTEXT_MENU_WINDOW_VITE_DEV_SERVER_URL) {
+    popoverWindow.loadURL(CONTEXT_MENU_WINDOW_VITE_DEV_SERVER_URL)
+  }
+  else {
+    popoverWindow.loadFile(
+      path.join(__dirname, `../renderer/${CONTEXT_MENU_WINDOW_VITE_NAME}/index.html`),
+    )
+  }
+
+  popoverWindow.on('blur', () =>
+    popoverWindow?.hide())
+  popoverWindow.on('closed', () => {
+    popoverWindow = null
+  })
+}
+
 app.on('ready', () => {
   createWindow()
-  globalShortcut.register('MediaPlayPause', () =>
-    mainWindow?.webContents.send('media:play-pause'))
-  globalShortcut.register('MediaNextTrack', () =>
-    mainWindow?.webContents.send('media:next'))
-  globalShortcut.register('MediaPreviousTrack', () =>
-    mainWindow?.webContents.send('media:prev'))
+  createPopoverWindow()
+  if (mainWindow)
+    mediaControls.init(mainWindow)
 })
 
 app.on('will-quit', () =>
-  globalShortcut.unregisterAll())
+  mediaControls.teardown())
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  const userWindows = BrowserWindow.getAllWindows().filter(w =>
+    w !== popoverWindow)
+  if (process.platform !== 'darwin' && userWindows.length === 0) {
     app.quit()
   }
 })
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
+  if (BrowserWindow.getAllWindows().filter(w =>
+    w !== popoverWindow).length === 0) {
     createWindow()
   }
 })
@@ -251,3 +297,102 @@ ipcMain.on('window:close', () => {
 
 ipcMain.handle('window:is-maximized', () =>
   BrowserWindow.getFocusedWindow()?.isMaximized() ?? false)
+
+// ─── Context menu handlers ────────────────────────────────────────────────────
+
+ipcMain.on('contextmenu:show', (_event, payload: {
+  items:  SerializableMenuItem[]
+  x:      number
+  y:      number
+  width:  number
+  height: number
+}) => {
+  if (!popoverWindow)
+    return
+  popoverWindow.setBounds({
+    x:      Math.round(payload.x),
+    y:      Math.round(payload.y),
+    width:  payload.width,
+    height: payload.height,
+  })
+  popoverWindow.webContents.send('contextmenu:items', payload.items)
+  popoverWindow.show()
+  popoverWindow.focus()
+})
+
+ipcMain.on('contextmenu:hide', () =>
+  popoverWindow?.hide())
+
+ipcMain.on('contextmenu:action', (_event, { index }: { index: number }) => {
+  mainWindow?.webContents.send('contextmenu:action', { index })
+  popoverWindow?.hide()
+})
+
+// ─── Media state handler ──────────────────────────────────────────────────────
+
+ipcMain.on('media:state-update', (_event, state: MediaState) =>
+  mediaControls.updateState(state))
+
+// ─── DB Writer worker ───────────────────────────────────────────────────────
+
+type WriterMessage =
+  { type: 'ready' } |
+  { type: 'done' } |
+  { type: 'error'; message: string }
+
+// eslint-disable-next-line functional/no-let
+let dbWriter: Worker | null = null
+
+function getDbWriter (): Worker {
+  if (dbWriter)
+    return dbWriter
+
+  const dbPath = path.join(app.getPath('appData'), 'library.db')
+  dbWriter = new Worker(
+    path.join(__dirname, 'db-writer.js'),
+    { workerData: { dbPath }}
+  )
+  dbWriter.on('error', err =>
+    console.error('[db-writer]', err))
+  dbWriter.on('exit', code => {
+    if (code !== 0)
+      console.error('[db-writer] exited with code', code)
+    dbWriter = null
+  })
+  return dbWriter
+}
+
+app.on('before-quit', () =>
+  dbWriter?.terminate())
+
+// ─── Model write handlers ───────────────────────────────────────────────────
+
+ipcMain.handle('models:upsert', (_event, kind: string, payload: Record<string, unknown>) => {
+  const worker = getDbWriter()
+  return new Promise<void>((resolve, reject) => {
+    const handler = (msg: WorkerMessage) => {
+      worker.off('message', handler)
+      if (msg.type === 'error')
+        reject(new Error(msg.message))
+      else
+        resolve()
+    }
+    worker.on('message', handler)
+    worker.postMessage({ type: 'upsert', kind, payload })
+  })
+})
+
+ipcMain.handle('models:delete', (_event, kind: string, id: string) => {
+  const worker = getDbWriter()
+  return new Promise<void>((resolve, reject) => {
+    const handler = (msg: WorkerMessage) => {
+      worker.off('message', handler)
+      if (msg.type === 'error')
+        reject(new Error(msg.message))
+      else
+        resolve()
+    }
+    worker.on('message', handler)
+    worker.postMessage({ type: 'delete', kind, id })
+  })
+})

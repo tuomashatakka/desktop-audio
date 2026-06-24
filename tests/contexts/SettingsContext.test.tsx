@@ -1,6 +1,51 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { SettingsProvider, useSettings } from '../../src/app/contexts/SettingsContext'
+import { DataProvider } from '../../src/app/data/DataContext'
+import { HostProvider } from '../../src/app/data/HostContext'
+import type { DataSource } from '../../src/app/data/DataSource'
+import type { HostBridge } from '../../src/app/data/HostBridge'
+
+const mockDataSource: DataSource = {
+  addRoot: vi.fn().mockResolvedValue(null),
+  removeRoot: vi.fn().mockResolvedValue(undefined),
+  listRoots: vi.fn().mockResolvedValue([]),
+  getMusicDir: vi.fn().mockResolvedValue(null),
+  scan: vi.fn(),
+  load: vi.fn().mockResolvedValue([]),
+  subscribe: vi.fn().mockReturnValue(() => {}),
+  readBytes: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
+  readMetadata: vi.fn().mockResolvedValue({ duration: 0 }),
+  upsertTrack: vi.fn().mockResolvedValue(undefined),
+  deleteTrack: vi.fn().mockResolvedValue(undefined),
+}
+
+const mockHost: HostBridge = {
+  minimizeWindow:      vi.fn(),
+  maximizeWindow:      vi.fn(),
+  closeWindow:         vi.fn(),
+  isMaximized:         vi.fn().mockResolvedValue(false),
+  onMediaPlayPause:    vi.fn().mockReturnValue(() => {}),
+  onMediaNext:         vi.fn().mockReturnValue(() => {}),
+  onMediaPrev:         vi.fn().mockReturnValue(() => {}),
+  showContextMenu:     vi.fn(),
+  hideContextMenu:     vi.fn(),
+  onContextMenuAction: vi.fn().mockReturnValue(() => {}),
+  updateMediaState:    vi.fn(),
+  onMediaSeek:         vi.fn().mockReturnValue(() => {}),
+  selectDirectory:     vi.fn().mockResolvedValue(null),
+  getMusicDir:         vi.fn().mockResolvedValue(null),
+}
+
+function wrapWithData (ui: React.ReactNode) {
+  return (
+    <HostProvider value={mockHost}>
+      <DataProvider value={mockDataSource}>
+        {ui}
+      </DataProvider>
+    </HostProvider>
+  )
+}
 
 const localStorageMock = {
   getItem: vi.fn(),
@@ -53,12 +98,14 @@ describe('SettingsContext', () => {
 
   it('provides default values', () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithData(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
-    expect(screen.getByTestId('paths')).toHaveTextContent('')
+    expect(screen.getByTestId('paths')).toHaveTextContent('Music')
     expect(screen.getByTestId('theme')).toHaveTextContent('dark')
     expect(screen.getByTestId('volume')).toHaveTextContent('0.8')
     expect(screen.getByTestId('repeat')).toHaveTextContent('none')
@@ -66,9 +113,11 @@ describe('SettingsContext', () => {
 
   it('addLibraryPath adds path to list', async () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithData(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     await act(async () => {
@@ -81,9 +130,11 @@ describe('SettingsContext', () => {
 
   it('addLibraryPath does not duplicate paths', async () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithData(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     await act(async () => {
@@ -97,9 +148,11 @@ describe('SettingsContext', () => {
 
   it('removeLibraryPath removes path from list', async () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithData(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     await act(async () => {
@@ -113,9 +166,11 @@ describe('SettingsContext', () => {
 
   it('setTheme updates theme', async () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithData(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     await act(async () => {
@@ -128,9 +183,11 @@ describe('SettingsContext', () => {
 
   it('setVolume clamps volume between 0 and 1', async () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithData(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     await act(async () => {
@@ -143,9 +200,11 @@ describe('SettingsContext', () => {
 
   it('setRepeatMode updates repeat mode', async () => {
     render(
-      <SettingsProvider>
-        <TestConsumer />
-      </SettingsProvider>
+      wrapWithData(
+        <SettingsProvider>
+          <TestConsumer />
+        </SettingsProvider>
+      )
     )
 
     await act(async () => {

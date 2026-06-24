@@ -36,6 +36,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
@@ -45,8 +47,17 @@ jobs:
       - name: Install dependencies
         run: bun install --legacy-peer-deps
 
-      - name: Run tests
-        run: bun run test
+      - name: Run tests with coverage
+        run: bun run test --coverage
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+      - name: Report coverage to DeepSource
+        run: |
+          curl -fsSL https://cli.deepsource.com/install | BINDIR=./bin sh
+          ./bin/deepsource report --analyzer test-coverage --key javascript --value-file ./coverage/clover.xml
+        env:
+          DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
 
   build:
     runs-on: ubuntu-latest

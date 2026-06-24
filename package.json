@@ -15,8 +15,10 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "rebuild": "electron-rebuild -f -w better-sqlite3"
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "dev:web": "VITE_BRIDGE=browser vite --config vite.renderer.config.ts"
   },
   "keywords": [],
   "author": {
@@ -47,26 +49,30 @@
     "@typescript-eslint/eslint-plugin": "5.62.0",
     "@typescript-eslint/parser": "5.62.0",
     "@vitejs/plugin-react": "6.0.1",
+    "@vitest/coverage-v8": "^4.1.5",
     "electron": "41.0.1",
     "electron-rebuild": "^3.2.9",
     "eslint": "10.1.0",
     "eslint-plugin-import": "2.32.0",
     "jsdom": "28.1.0",
     "playwright": "1.58.2",
-    "typescript": "5.9.3",
+    "typescript": "^6.0.3",
     "vite": "8.0.3",
     "vitest": "4.1.2"
   },
   "dependencies": {
     "@stylistic/eslint-plugin": "5.10.0",
     "@tanstack/react-virtual": "3.13.23",
+    "@tuomashatakka/eslint-config": "^3.1.0",
     "better-sqlite3": "^12.8.0",
     "electron-squirrel-startup": "1.0.1",
     "eslint-plugin-functional": "9.0.4",
     "eslint-plugin-unicorn": "63.0.0",
+    "mpris-service": "^2.1.2",
     "music-metadata": "11.12.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "typescript-eslint": "8.58.0"
+    "typescript-eslint": "8.58.0",
+    "vite-plugin-mkcert": "^2.0.0"
   }
 }

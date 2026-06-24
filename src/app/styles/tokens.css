@@ -4,7 +4,7 @@
     --bg-raised: #1a1a1a;
     --bg-input: #2a2a2a;
     --bg-hover: #333333;
-    --bg-window: rgba(18, 18, 18, 0.85);
+    --bg-window: #121212;
 
     --accent: hsl(337, 100%, 50%);
     --accent-hover: hsl(337, 100%, 60%);
@@ -74,7 +74,7 @@
     --bg-raised: #ffffff;
     --bg-input: #e8e8e8;
     --bg-hover: #dedede;
-    --bg-window: rgba(240, 240, 240, 0.9);
+    --bg-window: #f0f0f0;
 
     --text: #111111;
     --text-dim: #444444;

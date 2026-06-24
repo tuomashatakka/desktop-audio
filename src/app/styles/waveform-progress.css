@@ -1,11 +1,13 @@
 .waveform-progress {
   display: flex;
   align-items: center;
-  gap: 1px;
+  gap: 0;
   width: 100%;
+  min-width: 60px;
   height: 52px;
   cursor: pointer;
   padding: 6px 0;
+  overflow: hidden;
 
   &:focus-visible {
     outline: none;
@@ -16,13 +18,14 @@
   &.compact {
     height: 28px;
     padding: 4px 0;
-    gap: 1.5px;
+    gap: 0;
   }
 }
 
 .wf-bar {
-  width: 5px;
-  flex: none;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 4px;
   border-radius: 1px;
   background: var(--wf-unplayed);
   transform-origin: center;

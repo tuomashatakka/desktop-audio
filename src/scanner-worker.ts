@@ -1,3 +1,11 @@
+/**
+ * Library scanner — runs on a Node.js Worker thread.
+ *
+ * Walks every configured library root, extracts audio metadata, writes
+ * tracks into the shared SQLite database, and posts batched results back
+ * to the main process. Kept off the main thread so scanning a large
+ * library never blocks the UI.
+ */
 import { workerData, parentPort } from 'node:worker_threads'
 import path from 'node:path'
 import { readdir, stat } from 'node:fs/promises'

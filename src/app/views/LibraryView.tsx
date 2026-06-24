@@ -2,28 +2,50 @@ import { useUI, useLibrary, useAudio, useSettings } from '../contexts'
 import type { Track } from '../contexts'
 import { useMemo, useEffect, useState, useCallback, useRef } from 'react'
 import { useLibraryScanner } from '../hooks'
-import { Input, PromptDialog } from '../components/atomic'
+import { Input, PromptDialog, Popover } from '../components/atomic'
 import { FolderTree } from '../components/composite/FolderTree'
 import { TrackTable } from '../components/composite/TrackTable'
-import { ContextMenu } from '../components/composite/ContextMenu'
-import type { ContextMenuItem } from '../components/composite/ContextMenu'
+import { useHost } from '../data'
+import type { SerializableMenuItem } from '../services/types'
+import type { Grouping, Density } from '../contexts'
 
 
-// eslint-disable-next-line complexity
+const CONTEXT_MENU_ITEMS: SerializableMenuItem[] = [
+  { label: 'Play', icon: '▶' },
+  { label: 'Add to Playlist', icon: '♩' },
+  { separator: true },
+  { label: 'Edit Tags', icon: '✎' },
+]
+
+const ITEM_HEIGHT      = 32
+const SEPARATOR_HEIGHT = 9
+const PADDING          = 8
+const MENU_WIDTH       = 200
+const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(i =>
+  !i.separator).length * ITEM_HEIGHT +
+                       CONTEXT_MENU_ITEMS.filter(i =>
+                         i.separator).length * SEPARATOR_HEIGHT +
+                       PADDING * 2
+
+
 export function LibraryView () {
-  const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist, sidebarOpen, toggleSidebar, setEditingTrack } = useUI()
-  const { folders, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, isLoading, toggleFolder } = useLibrary()
+  const { sidebarOpen, toggleSidebar, setEditingTrack, selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist, density, setDensity, grouping, setGrouping } = useUI()
+  const { registry, filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, isLoading, toggleFolder } = useLibrary()
   const { play, currentTrack, isPlaying } = useAudio()
   const { libraryPaths } = useSettings()
   const { scanLibrary } = useLibraryScanner()
+  const host = useHost()
+
+  const folders = registry.folders
 
   const [ foldersCollapsed, setFoldersCollapsed ] = useState(false)
   const [ playlistsCollapsed, setPlaylistsCollapsed ] = useState(false)
   const [ promptOpen, setPromptOpen ] = useState(false)
-  const [ contextRect, setContextRect ] = useState<DOMRect | null>(null)
-  const [ contextTrack, setContextTrack ] = useState<Track | null>(null)
   const [ headerVisible, setHeaderVisible ] = useState(true)
-  const lastScrollY = useRef(0)
+  const lastScrollY      = useRef(0)
+  const contextTrackRef  = useRef<Track | null>(null)
+  const [ configOpen, setConfigOpen ] = useState(false)
+  const configBtnRef     = useRef<HTMLButtonElement>(null)
 
   const handleScroll = useCallback((e: Event) => {
     const el = e.target as HTMLElement
@@ -44,10 +66,10 @@ export function LibraryView () {
       : 'Library'
 
   useEffect(() => {
-    if (libraryPaths.length > 0 && folders.length === 0) {
+    if (libraryPaths.length > 0) {
       scanLibrary()
     }
-  }, [ libraryPaths, folders.length, scanLibrary ])
+  }, [ libraryPaths, scanLibrary ])
 
   const handleFolderSelect = (path: string) => {
     selectFolder(path)
@@ -57,36 +79,38 @@ export function LibraryView () {
     toggleFolder(path)
   }
 
-  const handleTrackPlay = (track: Track, index: number) => {
+  const handleTrackPlay = useCallback((track: Track, index: number) => {
     selectTrack(index)
     play(track)
-  }
+  }, [ selectTrack, play ])
 
   const handleNewPlaylist = () =>
     setPromptOpen(true)
 
-  const handleContextMenu = (track: Track, rect: DOMRect) => {
-    setContextTrack(track)
-    setContextRect(rect)
-  }
+  const handleContextMenu = useCallback((track: Track, rect: DOMRect) => {
+    contextTrackRef.current = track
+    host.showContextMenu(
+      CONTEXT_MENU_ITEMS,
+      window.screenX + rect.left,
+      window.screenY + rect.bottom + 4,
+      MENU_WIDTH,
+      MENU_HEIGHT,
+    )
+  }, [ host ])
 
-  const contextMenuItems: readonly ContextMenuItem[] = contextTrack
-    ? [
-      { label:  'Play',
-        icon:   '▶',
-        action: () =>
-          handleTrackPlay(contextTrack, 0) },
-      { label:  'Add to Playlist',
-        icon:   '♩',
-        action: () =>
-          setPromptOpen(true) },
-      { separator: true },
-      { label:  'Edit Tags',
-        icon:   '✎',
-        action: () =>
-          setEditingTrack(contextTrack.id) },
-    ]
-    : []
+  useEffect(() =>
+    host.onContextMenuAction((index: number) => {
+      const track = contextTrackRef.current
+      if (!track)
+        return
+      switch (index) {
+        case 0: handleTrackPlay(track, 0); break
+        case 1: setPromptOpen(true); break
+        // index 2 is the separator — no action
+        case 3: setEditingTrack(track.id); break
+      }
+      contextTrackRef.current = null
+    }), [ handleTrackPlay, setEditingTrack, host ])
 
   const displayTracks = useMemo(() => {
     if (selectedPlaylistId) {
@@ -100,80 +124,18 @@ export function LibraryView () {
     return filteredTracks
   }, [ selectedPlaylistId, selectedFolderPath, playlists, filteredTracks ])
 
+  const noTracksFound = <div className='status-message'>
+    <p>No tracks found</p>
+
+    <small>
+      {selectedPlaylistId
+        ? 'This playlist is empty'
+        : 'Select a folder or add library paths in Settings'}
+    </small>
+  </div>
+
   return (
     <div className='library-view'>
-      <aside className={`library-sidebar ${sidebarOpen ? '' : 'sidebar-collapsed'}`}>
-
-        {/* ─── Folders section ───────────────────── */}
-        <div className='sidebar-section'>
-          <button
-            className='sidebar-section-header'
-            onClick={() =>
-              setFoldersCollapsed(c =>
-                !c)}
-            aria-expanded={!foldersCollapsed}
-          >
-            <span className={`section-chevron ${foldersCollapsed ? '' : 'open'}`}>›</span>
-            <span>Folders</span>
-          </button>
-
-          {!foldersCollapsed &&
-            <FolderTree
-              folders={folders}
-              selectedPath={selectedFolderPath}
-              onSelect={handleFolderSelect}
-              onToggle={handleFolderToggle}
-            />
-          }
-        </div>
-
-        {/* ─── Playlists section ─────────────────── */}
-        <div className='sidebar-section'>
-          <button
-            className='sidebar-section-header'
-            onClick={() =>
-              setPlaylistsCollapsed(c =>
-                !c)}
-            aria-expanded={!playlistsCollapsed}
-          >
-            <span className={`section-chevron ${playlistsCollapsed ? '' : 'open'}`}>›</span>
-            <span>Playlists</span>
-
-            <button
-              className='playlist-new-btn'
-              onClick={e => {
-                e.stopPropagation()
-                handleNewPlaylist()
-              }}
-              title='New playlist'
-              aria-label='New playlist'
-            >
-              +
-            </button>
-          </button>
-
-          {!playlistsCollapsed &&
-            <nav className='playlist-list'>
-              {playlists.length === 0
-                ? <span className='playlist-empty'>No playlists yet</span>
-                : playlists.map(playlist =>
-                  <button
-                    key={playlist.id}
-                    className={`playlist-item ${selectedPlaylistId === playlist.id ? 'active' : ''}`}
-                    onClick={() =>
-                      selectPlaylist(playlist.id)}
-                  >
-                    <span className='playlist-icon' aria-hidden='true'>♩</span>
-                    <span className='playlist-name'>{playlist.name}</span>
-                    <span className='playlist-count'>{playlist.tracks.length}</span>
-                  </button>
-                )
-              }
-            </nav>
-          }
-        </div>
-
-      </aside>
 
       <section className='library-main'>
         <header className={`view-header ${headerVisible ? '' : 'header-hidden'}`}>
@@ -188,28 +150,82 @@ export function LibraryView () {
 
           <h2>{headerTitle}</h2>
 
-          <Input
-            wrapperClass='search-input'
-            type='search'
-            placeholder='Search tracks...'
-            value={searchQuery}
-            onChange={e =>
-              setSearchQuery(e.target.value)}
-          />
+          <div className='header-controls cluster'>
+            <Input
+              wrapperClass='search-input'
+              type='search'
+              placeholder='Search tracks...'
+              value={searchQuery}
+              onChange={e =>
+                setSearchQuery(e.target.value)}
+            />
+
+            {/* Density toggle buttons */}
+            <div className='density-toggle' role='radiogroup' aria-label='Row density'>
+              {([ 'compact', 'normal', 'relaxed' ] as Density[]).map(d =>
+                <button
+                  key={d}
+                  role='radio'
+                  aria-checked={density === d}
+                  className={density === d ? 'active' : ''}
+                  onClick={() =>
+                    setDensity(d)}
+                  title={`${d} density`}
+                >
+                  {d === 'compact' ? '≡' : d === 'normal' ? '≢' : '='}
+                </button>
+              )}
+            </div>
+
+            {/* Config caret button */}
+            <button
+              ref={configBtnRef}
+              className='config-caret-btn'
+              onClick={() =>
+                setConfigOpen(o =>
+                  !o)}
+              aria-label='View options'
+              title='View options'
+            >
+              ⌄
+            </button>
+
+            {configBtnRef.current &&
+              <Popover
+                open={configOpen}
+                anchorRect={configBtnRef.current.getBoundingClientRect()}
+                onClose={() =>
+                  setConfigOpen(false)}
+                placement='bottom'
+              >
+                <div className='config-dropdown'>
+                  <fieldset>
+                    <legend>Grouping</legend>
+
+                    {([ 'none', 'album', 'artist', 'path' ] as Grouping[]).map(g =>
+                      <label key={g}>
+                        <input
+                          type='radio'
+                          name='grouping'
+                          value={g}
+                          checked={grouping === g}
+                          onChange={() =>
+                            setGrouping(g)}
+                        />
+
+                        {g === 'none' ? 'None' : g === 'album' ? 'By Album' : g === 'artist' ? 'By Artist' : 'By Path'}
+                      </label>
+                    )}
+                  </fieldset>
+                </div>
+              </Popover>
+            }
+          </div>
         </header>
 
         <div className='tracks-container'>
           {displayTracks.length === 0 && !isLoading
-            ? <div className='status-message'>
-              <p>No tracks found</p>
-
-              <small>
-                {selectedPlaylistId
-                  ? 'This playlist is empty'
-                  : 'Select a folder or add library paths in Settings'
-                }
-              </small>
-            </div>
+            ? noTracksFound
             : <TrackTable
               tracks={displayTracks}
               isLoading={isLoading}
@@ -222,14 +238,6 @@ export function LibraryView () {
           }
         </div>
       </section>
-
-      <ContextMenu
-        items={contextMenuItems}
-        anchorRect={contextRect}
-        onClose={() => {
-          setContextRect(null); setContextTrack(null)
-        }}
-      />
 
       <PromptDialog
         open={promptOpen}

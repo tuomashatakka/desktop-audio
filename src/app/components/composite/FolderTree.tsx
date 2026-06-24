@@ -1,6 +1,10 @@
 import type { FolderNode } from '../../contexts'
 
 
+/**
+ * Recursively rendered folder tree for the sidebar. Selection and
+ * expand/collapse are controlled by the caller via `onSelect` / `onToggle`.
+ */
 interface FolderTreeProps {
   readonly folders:      ReadonlyArray<FolderNode>
   readonly selectedPath: string | null

@@ -1,6 +1,47 @@
 import { AudioProvider, useAudio } from '../../src/app/contexts/AudioContext'
 import type { Track } from '../../src/app/services/types'
 import { render, act, screen } from '@testing-library/react'
+import { HostProvider } from '../../src/app/data/HostContext'
+import { DataProvider } from '../../src/app/data/DataContext'
+import type { HostBridge, DataSource } from '../../src/app/data'
+
+const mockHost: HostBridge = {
+  minimizeWindow: vi.fn(),
+  maximizeWindow: vi.fn(),
+  closeWindow: vi.fn(),
+  isMaximized: vi.fn(),
+  onMediaPlayPause: vi.fn(() => () => {}),
+  onMediaNext: vi.fn(() => () => {}),
+  onMediaPrev: vi.fn(() => () => {}),
+  showContextMenu: vi.fn(),
+  hideContextMenu: vi.fn(),
+  onContextMenuAction: vi.fn(() => () => {}),
+  updateMediaState: vi.fn(),
+  onMediaSeek: vi.fn(() => () => {}),
+}
+
+const mockDataSource: DataSource = {
+  addRoot: vi.fn(),
+  removeRoot: vi.fn(),
+  listRoots: vi.fn(),
+  scan: vi.fn(),
+  load: vi.fn(),
+  subscribe: vi.fn(() => () => {}),
+  readBytes: vi.fn(),
+  readMetadata: vi.fn(),
+  upsertTrack: vi.fn(),
+  deleteTrack: vi.fn(),
+}
+
+function wrapWithProviders(ui: React.ReactNode) {
+  return (
+    <HostProvider value={mockHost}>
+      <DataProvider value={mockDataSource}>
+        {ui}
+      </DataProvider>
+    </HostProvider>
+  )
+}
 
 const mockTrack: Track = {
   id: 'track-1',
@@ -65,9 +106,11 @@ describe('AudioContext', () => {
 
   it('provides default values', () => {
     render(
-      <AudioProvider>
-        <TestConsumer />
-      </AudioProvider>
+      wrapWithProviders(
+        <AudioProvider>
+          <TestConsumer />
+        </AudioProvider>
+      )
     )
 
     expect(screen.getByTestId('playing')).toHaveTextContent('false')
@@ -80,9 +123,11 @@ describe('AudioContext', () => {
 
   it('setVolume updates volume', async () => {
     render(
-      <AudioProvider>
-        <TestConsumer />
-      </AudioProvider>
+      wrapWithProviders(
+        <AudioProvider>
+          <TestConsumer />
+        </AudioProvider>
+      )
     )
 
     await act(async () => {
@@ -94,9 +139,11 @@ describe('AudioContext', () => {
 
   it('setVolume clamps volume between 0 and 1', async () => {
     render(
-      <AudioProvider>
-        <TestConsumer />
-      </AudioProvider>
+      wrapWithProviders(
+        <AudioProvider>
+          <TestConsumer />
+        </AudioProvider>
+      )
     )
 
     await act(async () => {
