@@ -22,10 +22,11 @@
 
     &.primary {
       background: var(--accent);
-      color: var(--text);
+      color: var(--accent-contrast);
 
       &:hover:not(:disabled) {
         background: var(--accent-hover);
+        box-shadow: var(--glow-turquoise);
       }
     }
 
@@ -125,6 +126,7 @@
     &:focus {
       outline: none;
       border-color: var(--border-focus);
+      box-shadow: 0 0 0 1px var(--accent-muted), 0 0 24px var(--accent-muted);
     }
 
     &::placeholder {
@@ -195,10 +197,10 @@
     color: var(--text-dim);
 
     &.primary { background: var(--accent-muted); color: var(--accent); }
-    &.success { background: rgba(56, 176, 0, 0.15); color: var(--success); }
-    &.warning { background: rgba(255, 190, 11, 0.15); color: var(--warning); }
-    &.danger { background: rgba(255, 0, 110, 0.15); color: var(--danger); }
-    &.info { background: rgba(58, 134, 255, 0.15); color: var(--info); }
+    &.success { background: var(--success-muted); color: var(--success); }
+    &.warning { background: var(--warning-muted); color: var(--warning); }
+    &.danger { background: var(--danger-muted); color: var(--danger); }
+    &.info { background: var(--info-muted); color: var(--info); }
 
     &.dot::before {
       content: "";
@@ -220,10 +222,21 @@
   }
 
   .card {
+    position: relative;
     background: var(--bg-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
+
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 1px;
+      background: var(--grad-edge);
+      opacity: 0.6;
+      pointer-events: none;
+    }
 
     & header {
       padding: var(--sp-4);
@@ -281,25 +294,10 @@
       font-weight: var(--font-semibold);
     }
 
-    &.success {
-      background: rgba(56, 176, 0, 0.1);
-      border-color: rgba(56, 176, 0, 0.3);
-    }
-
-    &.warning {
-      background: rgba(255, 190, 11, 0.1);
-      border-color: rgba(255, 190, 11, 0.3);
-    }
-
-    &.danger {
-      background: rgba(255, 0, 110, 0.1);
-      border-color: rgba(255, 0, 110, 0.3);
-    }
-
-    &.info {
-      background: rgba(58, 134, 255, 0.1);
-      border-color: rgba(58, 134, 255, 0.3);
-    }
+    &.success { background: var(--success-muted); border-color: var(--success); }
+    &.warning { background: var(--warning-muted); border-color: var(--warning); }
+    &.danger { background: var(--danger-muted); border-color: var(--danger); }
+    &.info { background: var(--info-muted); border-color: var(--info); }
   }
 
   .stack {
