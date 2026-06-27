@@ -8,7 +8,7 @@
  */
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { useHost, useData } from '../data'
+import { useHost } from '../data'
 
 
 /** Playback repeat behavior at end of queue. */
@@ -101,6 +101,7 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
   const host = useHost()
 
   useEffect(() => {
+    /** Hydrate settings on mount and resolve the default music dir if needed. */
     const init = async () => {
       const loaded = await loadSettings()
 
