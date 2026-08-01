@@ -6,15 +6,13 @@ import { SettingsView } from './views/SettingsView'
 import { TagEditorView } from './views/TagEditorView'
 import { PlayerBar } from './components/composite/PlayerBar'
 import { useKeyboardShortcuts, useAmbientPalette } from './hooks'
-import { useHost } from './data'
 import { AppLayout, Titlebar, LibrarySidebar, ExpandedPlayerPortal } from './layout'
 
 
 function AppContent () {
-  const { currentView, playerExpanded } = useUI()
+  const { currentView } = useUI()
   const { currentTrack } = useAudio()
   const { theme } = useSettings()
-  const host = useHost()
   const { filteredTracks } = useLibrary()
   const { setCurrentQueue } = useAudio()
 

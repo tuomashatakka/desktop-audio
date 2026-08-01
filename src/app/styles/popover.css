@@ -31,6 +31,26 @@
   margin: 0;
 }
 
+/* Standalone context-menu window: the whole OS window is the menu, so the
+   list floats above a full-bleed dismiss surface. */
+.context-menu-window {
+  position: relative;
+  isolation: isolate;
+
+  & .context-menu-list {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+.context-menu-dismiss {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: none;
+  border: none;
+}
+
 .context-menu-item {
   display: flex;
   align-items: center;

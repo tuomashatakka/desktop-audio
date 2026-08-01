@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { MenuList } from '../components/composite/ContextMenu'
 import type { SerializableMenuItem } from '../services/types'
 
 
@@ -33,30 +34,28 @@ export function ContextMenuApp () {
   const handleClose = () =>
     window.contextMenuAPI?.closeContextMenu()
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape')
+        handleClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () =>
+      document.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   return (
-    <>
-      <div
-        style={{ position: 'fixed', inset: 0, zIndex: 0 }}
+    <div className='context-menu-window'>
+      <MenuList items={items} onSelect={handleAction} />
+
+      {/* Dismiss surface, painted behind the list. Last in the DOM so the menu
+          items come first in tab order; CSS stacks it underneath. */}
+      <button
+        type='button'
+        className='context-menu-dismiss'
+        aria-label='Close menu'
         onClick={handleClose}
       />
-
-      <ul className='context-menu-list' role='menu' style={{ position: 'relative', zIndex: 1 }}>
-        {items.map((item, i) =>
-          item.separator
-            ? <li key={i} className='context-menu-separator' role='separator' />
-            : <li key={i} role='none'>
-              <button
-                role='menuitem'
-                className={`context-menu-item ${item.danger ? 'danger' : ''}`}
-                onClick={() =>
-                  handleAction(i)}
-              >
-                {item.icon && <span className='context-menu-icon' aria-hidden='true'>{item.icon}</span>}
-                {item.label}
-              </button>
-            </li>
-        )}
-      </ul>
-    </>
+    </div>
   )
 }

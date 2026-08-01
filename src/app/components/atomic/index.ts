@@ -6,8 +6,6 @@ export { IconButton } from './IconButton'
 
 export { Skeleton } from './Skeleton'
 
-export { Waveform } from './Waveform'
-
 export { WaveformProgress } from './WaveformProgress'
 
 export { Dialog } from './Dialog'
