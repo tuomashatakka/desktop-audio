@@ -37,7 +37,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          # DeepSource associates coverage with the checked-out commit. Use the
+          # PR head instead of GitHub's synthetic merge commit, with a push fallback.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
@@ -48,14 +50,22 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run tests with coverage
-        run: bun run test --coverage
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        run: bun run test:coverage
 
       - name: Report coverage to DeepSource
+        # Repository secrets are unavailable to workflows from forked PRs.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: |
-          curl -fsSL https://cli.deepsource.com/install | BINDIR=./bin sh
-          ./bin/deepsource report --analyzer test-coverage --key javascript --value-file ./coverage/clover.xml
+          coverage_report='./coverage/lcov.info'
+          test -s "$coverage_report"
+
+          deepsource_cli_dir="${RUNNER_TEMP}/deepsource"
+          mkdir -p "$deepsource_cli_dir"
+          curl -fsSL https://cli.deepsource.com/install | BINDIR="$deepsource_cli_dir" sh
+          "$deepsource_cli_dir/deepsource" report \
+            --analyzer test-coverage \
+            --key javascript \
+            --value-file "$coverage_report"
         env:
           DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
 
