@@ -59,6 +59,21 @@ describe('AppLayout', () => {
     expect(document.querySelector('.app-player')).not.toBeInTheDocument()
   })
 
+  it('keeps a closed sidebar mounted and removes it from interaction', () => {
+    render(
+      <UIProvider value={makeUIValue({ sidebarOpen: false })}>
+        <AppLayout
+          sidebar={<div data-testid='sidebar'>Sidebar</div>}
+          main={<div>Main</div>}
+        />
+      </UIProvider>
+    )
+
+    const sidebar = screen.getByTestId('sidebar').closest('aside')
+    expect(sidebar).toHaveAttribute('aria-hidden', 'true')
+    expect(sidebar).toHaveAttribute('inert')
+  })
+
   it('exposes the active view on the app shell', () => {
     const { container } = render(
       <UIProvider value={makeUIValue({ currentView: 'settings' })}>

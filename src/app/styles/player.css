@@ -468,8 +468,19 @@
   & .play-pause-btn {
     width: 56px;
     height: 56px;
-    border-radius: var(--radius-full);
+    aspect-ratio: 1;
+    border-radius: 50%;
     font-size: 22px;
+  }
+
+  & :is(.prev, .next) > button {
+    border: 1px solid transparent;
+    transition:
+      color var(--duration-fast) var(--ease),
+      background var(--duration-fast) var(--ease),
+      border-color var(--duration-fast) var(--ease);
+
+    &:hover:not(:disabled) { border-color: var(--border-hover); }
   }
 }
 
@@ -611,7 +622,7 @@
     & .play-pause-btn {
       width: auto;
       height: auto;
-      border-radius: var(--radius-full);
+      border-radius: 50%;
       font-size: var(--text-base);
     }
   }

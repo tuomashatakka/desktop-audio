@@ -13,7 +13,7 @@ export function Input ({ label, error, id, className = '', wrapperClass = '', ..
   return (
     <label className={`field ${error ? 'error' : ''} ${wrapperClass}`.trim()}>
       {label && <span>{label}</span>}
-      <input id={inputId} className={`input ${className}`} {...props} />
+      <input id={inputId} className={className || undefined} {...props} />
       {error && <small>{error}</small>}
     </label>
   )

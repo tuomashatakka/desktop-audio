@@ -148,7 +148,6 @@ export function SettingsView () {
             <span>Default Row Density</span>
 
             <select
-              className='select'
               value={defaultDensity}
               onChange={event =>
                 setDefaultDensity(event.target.value as typeof defaultDensity)}
@@ -167,7 +166,6 @@ export function SettingsView () {
             <span>Theme</span>
 
             <select
-              className='select'
               value={theme}
               onChange={event =>
                 setTheme(event.target.value as Theme)}
@@ -256,7 +254,6 @@ export function SettingsView () {
             <span>Repeat Mode</span>
 
             <select
-              className='select'
               value={repeatMode}
               onChange={event =>
                 setRepeatMode(event.target.value as RepeatMode)}

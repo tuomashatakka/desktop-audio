@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import type { ReactNode } from 'react'
+import { useEffect, useId, useRef } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { IconButton } from './IconButton'
 
@@ -11,57 +11,55 @@ interface DialogProps {
   readonly children: ReactNode
 }
 
+const supportsModalDialog = typeof HTMLDialogElement !== 'undefined' &&
+  typeof HTMLDialogElement.prototype.showModal === 'function'
+
 export function Dialog ({ open, onClose, title, children }: DialogProps) {
-  const panelRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
 
   useEffect(() => {
-    if (!open)
+    const dialog = dialogRef.current
+    if (!dialog || !supportsModalDialog)
       return
 
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape')
-        onClose()
-    }
-    document.addEventListener('keydown', handler)
-    return () => {
-      document.removeEventListener('keydown', handler)
-    }
-  }, [ open, onClose ])
-
-  useEffect(() => {
-    if (!open || !panelRef.current)
-      return
-
-    const focusable = panelRef.current.querySelector<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    )
-    focusable?.focus()
+    if (open && !dialog.open)
+      dialog.showModal()
+    else if (!open && dialog.open)
+      dialog.close()
   }, [ open ])
 
-  if (!open)
-    return null
+  const handleBackdropClick = (event: MouseEvent<HTMLDialogElement>) => {
+    const dialog = event.currentTarget
+    const bounds = dialog.getBoundingClientRect()
+    const inside = event.clientX >= bounds.left && event.clientX <= bounds.right &&
+      event.clientY >= bounds.top && event.clientY <= bounds.bottom
+    if (!inside)
+      onClose()
+  }
 
   return createPortal(
-    <div className='dialog-backdrop' onClick={onClose} aria-hidden='true'>
-      <div
-        ref={panelRef}
-        className='dialog-panel'
-        role='dialog'
-        aria-modal='true'
-        aria-labelledby='dialog-title'
-        onClick={e =>
-          e.stopPropagation()}
-      >
-        <div className='dialog-header'>
-          <h3 id='dialog-title'>{title}</h3>
-          <IconButton label='Close dialog' onClick={onClose}>✕</IconButton>
-        </div>
+    <dialog
+      ref={dialogRef}
+      className='dialog-panel'
+      aria-labelledby={titleId}
+      open={!supportsModalDialog && open}
+      onCancel={event => {
+        event.preventDefault()
+        onClose()
+      }}
+      onClick={handleBackdropClick}
+    >
+      <header className='dialog-header'>
+        <h2 id={titleId}>{title}</h2>
 
-        <div className='dialog-body'>
-          {children}
-        </div>
-      </div>
-    </div>,
+        <IconButton type='button' label='Close dialog' onClick={onClose}>
+          <span aria-hidden='true'>✕</span>
+        </IconButton>
+      </header>
+
+      <div className='dialog-body'>{children}</div>
+    </dialog>,
     document.body
   )
 }

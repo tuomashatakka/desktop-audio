@@ -1,51 +1,76 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 
 interface PopoverProps {
   readonly open:       boolean
-  readonly anchorRect: DOMRect | null
+  readonly anchor:     HTMLElement | null
   readonly onClose:    () => void
   readonly children:   ReactNode
+  readonly id?:        string
+  readonly label?:     string
   readonly placement?: 'top' | 'bottom'
 }
 
-export function Popover ({ open, anchorRect, onClose, children, placement = 'bottom' }: PopoverProps) {
+export function Popover ({ open, anchor, onClose, children, id, label, placement = 'bottom' }: PopoverProps) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const generatedId = useId()
+  const popoverId = id || generatedId
+  const anchorName = `--popover-${generatedId.replace(/[^a-z0-9_-]/gi, '')}`
 
-  useEffect(() => {
-    if (!open)
+  useLayoutEffect(() => {
+    const panel = panelRef.current
+    if (!panel || !anchor)
       return
 
-    const onMouse = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node))
-        onClose()
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape')
-        onClose()
-    }
-    document.addEventListener('mousedown', onMouse)
-    document.addEventListener('keydown', onKey)
+    anchor.style.setProperty('anchor-name', anchorName)
+    panel.style.setProperty('position-anchor', anchorName)
     return () => {
-      document.removeEventListener('mousedown', onMouse)
-      document.removeEventListener('keydown', onKey)
+      if (anchor.style.getPropertyValue('anchor-name') === anchorName)
+        anchor.style.removeProperty('anchor-name')
     }
-  }, [ open, onClose ])
+  }, [ anchor, anchorName ])
 
-  if (!open || !anchorRect)
-    return null
+  useEffect(() => {
+    const panel = panelRef.current
+    if (!panel || typeof panel.showPopover !== 'function')
+      return
 
-  const top  = placement === 'bottom' ? anchorRect.bottom + 4 : anchorRect.top - 4
-  // Anchor to the right side of the button, subtract popup width to keep it on screen
-  const left = Math.max(0, anchorRect.right - 200) // 200px is approximate popup width
+    try {
+      if (open && anchor)
+        panel.showPopover()
+      else
+        panel.hidePopover()
+    }
+    catch {
+      // The declarative hidden state remains a safe fallback.
+    }
+  }, [ open, anchor ])
+
+  useEffect(() => {
+    const panel = panelRef.current
+    if (!panel)
+      return
+
+    const handleToggle = (event: Event) => {
+      if ((event as Event & { newState?: string }).newState === 'closed')
+        onClose()
+    }
+    panel.addEventListener('toggle', handleToggle)
+    return () =>
+      panel.removeEventListener('toggle', handleToggle)
+  }, [ onClose ])
 
   return createPortal(
     <div
       ref={panelRef}
+      id={popoverId}
       className={`popover-panel placement-${placement}`}
-      style={{ top, left }}
+      popover='auto'
+      role='dialog'
+      aria-label={label}
+      hidden={!open || !anchor}
     >
       {children}
     </div>,

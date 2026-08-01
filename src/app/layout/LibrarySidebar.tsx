@@ -16,7 +16,7 @@ const MAX_WIDTH = 400
 /** See module docstring. */
 export function LibrarySidebar () {
   const { registry, playlists, toggleFolder, addPlaylist } = useLibrary()
-  const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist } = useUI()
+  const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist, setView } = useUI()
 
   const [ width, setWidth ] = useState(220)
 
@@ -56,7 +56,10 @@ export function LibrarySidebar () {
         <FolderTree
           folders={folders}
           selectedPath={selectedFolderPath}
-          onSelect={selectFolder}
+          onSelect={path => {
+            selectFolder(path)
+            setView('library')
+          }}
           onToggle={toggleFolder}
         />
       </details>
@@ -74,8 +77,10 @@ export function LibrarySidebar () {
                 type='button'
                 className={selectedPlaylistId === playlist.id ? 'active' : ''}
                 aria-current={selectedPlaylistId === playlist.id || undefined}
-                onClick={() =>
-                  selectPlaylist(playlist.id)}
+                onClick={() => {
+                  selectPlaylist(playlist.id)
+                  setView('library')
+                }}
               >
                 <span aria-hidden='true'>♩</span>
                 <span className='name'>{playlist.name}</span>

@@ -1,10 +1,18 @@
 .app-shell {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   width: 100%;
   height: 100vh;
   overflow: hidden;
   background: linear-gradient(135deg, transparent 80%, #fb59cd40 100%);
+}
+
+.app-workspace {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ─── Promoting the player ─────────────────────────
@@ -67,6 +75,8 @@
   overflow: hidden;
 }
 
+.app-shell:not([data-sidebar-open]) .app-sidebar { display: none; }
+
 .app-content {
   display: flex;
   flex-direction: column;
@@ -90,6 +100,19 @@
   overflow: hidden;
 }
 
+.app-view {
+  display: none;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.app-shell:is([data-view='library'], [data-view='player']) .app-view-library,
+.app-shell[data-view='settings'] .app-view-settings,
+.app-shell[data-view='tag-editor'] .app-view-tag-editor {
+  display: flex;
+}
+
 /* Keep the single player mounted without reserving an empty transport bar. */
 .app-shell[data-height-tier='normal']:not([data-view='player'])
   .app-player:has(.player-view[data-empty]) {
@@ -103,20 +126,37 @@
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--sp-2);
   -webkit-app-region: drag;
   user-select: none;
   width: 100%;
   flex-shrink: 0;
 }
 
+.titlebar > .menu-toggle {
+  margin-left: var(--sp-2);
+  -webkit-app-region: no-drag;
+}
+
 .titlebar-logo {
  display: flex;
  align-items: center;
  gap: var(--sp-2);
- padding: 0 var(--sp-4);
+ padding: 0 var(--sp-2);
  -webkit-app-region: no-drag;
 }
+
+.titlebar-context {
+ display: flex;
+ align-items: center;
+ gap: var(--sp-3);
+ flex: 1;
+ min-width: 0;
+ height: 100%;
+ -webkit-app-region: no-drag;
+}
+
+.app-shell:not([data-view='library']) .titlebar-context { display: none; }
 
 .logo-icon {
  font-size: var(--text-lg);
@@ -198,24 +238,27 @@
  }
 }
 
-/* .main-content removed - now using .app-shell grid layout */
+@media (max-width: 900px) {
+  .logo-text,
+  .nav-label { display: none; }
 
-.view-header {
- padding: var(--sp-4) var(--sp-6);
- border-bottom: 1px solid var(--border);
- display: flex;
- align-items: center;
- gap: var(--sp-4);
- background: var(--bg);
+  .nav-item { padding-inline: var(--sp-2); }
+  .titlebar-context { gap: var(--sp-1); }
+}
 
-  & h2 {
-   font-size: 0.8rem;
-   font-weight: 600;
-   letter-spacing: 0.04em;
-   text-transform: uppercase;
-   opacity: 0.7;
-   margin: 0;
-  }
+@media (max-width: 720px) {
+  .library-heading { display: none; }
+}
+
+@media (max-width: 620px) {
+  .view-controls > li:has(.density-toggle) { display: none; }
+}
+
+@media (max-width: 500px) {
+  .titlebar-logo,
+  .view-controls > li:has(.search-input) { display: none; }
+
+  .titlebar-btn { width: 40px; }
 }
 
 /* Scrolls for views that are just long documents (settings, tag editor);

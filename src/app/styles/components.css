@@ -111,15 +111,22 @@
     to { transform: rotate(360deg); }
   }
 
-  .input,
-  .select {
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='color'],
+    [type='file'],
+    [type='hidden']
+  ),
+  select {
     width: 100%;
     padding: var(--sp-2) var(--sp-3);
     font-size: var(--text-base);
     color: var(--text);
     background: var(--bg-input);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 999px;
     transition: border-color var(--duration-fast) var(--ease);
 
     &:focus {
@@ -143,7 +150,7 @@
     flex-direction: column;
     gap: var(--sp-1);
 
-    & label {
+    & > span:first-child {
       font-size: var(--text-sm);
       font-weight: var(--font-medium);
       color: var(--text-dim);

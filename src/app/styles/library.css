@@ -22,55 +22,6 @@
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-
-  & > .view-header-slot { flex: 0 0 auto; }
-}
-
-/* Collapsing header.
-   `1fr -> 0fr` on a grid row is the one way to animate to a zero height
-   without hard-coding what the height is. The header itself stays untouched;
-   the wrapper does the squeezing, and .track-table simply grows into the
-   space — which carries the sticky column header up to the top of the view. */
-
-.view-header-slot {
-  display: grid;
-  grid-template-rows: 1fr;
-  transition:
-    grid-template-rows var(--duration) var(--ease),
-    opacity var(--duration) var(--ease);
-
-  & > * {
-    min-height: 0;
-    overflow: hidden;
-    /* `min-height: 0` can't take a border-box below its own padding + border,
-       so those have to collapse too or the header leaves a 33px stub. */
-    transition:
-      padding-block var(--duration) var(--ease),
-      border-block-end-width var(--duration) var(--ease);
-  }
-}
-
-.library[data-header-hidden] > .view-header-slot {
-  grid-template-rows: 0fr;
-  opacity: 0;
-  pointer-events: none;
-  /* Delayed so the collapse is visible, but the header still leaves the tab
-     order once it's gone. Un-delayed on the way back in (base rule above). */
-  visibility: hidden;
-  transition:
-    grid-template-rows var(--duration) var(--ease),
-    opacity var(--duration) var(--ease),
-    visibility 0s linear var(--duration);
-
-  & > * {
-    padding-block: 0;
-    border-block-end-width: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .view-header-slot,
-  .library[data-header-hidden] > .view-header-slot { transition: none; }
 }
 
 .status-message {
@@ -82,23 +33,43 @@
   & small { display: block; margin-top: var(--sp-2); }
 }
 
-/* ─── Header bar ─────────────────────────────────── */
+/* Library context now shares the permanent shell titlebar. */
+.library-heading {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: var(--sp-2);
+  min-width: 0;
 
-.view-header {
-  & .scan-status {
-    color: var(--text-muted);
-    font-size: var(--text-xs);
+  & h1 {
+    overflow: hidden;
+    color: var(--text);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
-
-  & .view-controls {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-left: auto;
-  }
-
-  & .search-input { width: 250px; }
 }
+
+.scan-status {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.view-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0;
+  list-style: none;
+
+  & > li { display: flex; }
+}
+
+.search-input { width: clamp(8rem, 18vw, 250px); }
 
 /* Hamburger ⇄ left caret. Three bars, absolutely centred so the rotation
    doesn't reflow anything; `aria-expanded` is the only state hook. */
@@ -316,7 +287,7 @@
 
   /* Fixed height so `--head-h` (the sticky offset for group headers) stays
      true no matter what a cell contains. */
-  & [role='row'] {
+  & .track-header-row {
     display: grid;
     grid-template-columns: var(--track-grid);
     align-items: center;
@@ -324,7 +295,7 @@
     height: var(--head-h);
   }
 
-  & [role='columnheader'] {
+  & .track-column-header {
     position: relative;
     display: flex;
     align-items: center;
@@ -339,6 +310,7 @@
     &:hover { color: var(--text-dim); }
     &.sorted { color: var(--accent); }
     &:focus-visible { outline: 1px solid var(--border-focus); }
+    &[tabindex] { cursor: pointer; }
   }
 
   & .label {
@@ -418,6 +390,15 @@
     font-size: var(--text-xs);
     text-align: right;
   }
+}
+
+button.track-row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
 }
 
 /* Relaxed rows stack title over artist — see cellValue().
@@ -505,6 +486,10 @@
     }
   }
 }
+
+.group-rows { min-width: 0; }
+
+.track-group.album > .group-rows { grid-column: 2; }
 
 /* ─── Sidebar ────────────────────────────────────── */
 

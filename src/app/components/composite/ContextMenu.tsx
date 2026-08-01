@@ -1,6 +1,3 @@
-import { Popover } from '../atomic/Popover'
-
-
 /**
  * The presentational half of a context menu: label, icon, danger tint or a
  * separator. Deliberately carries no action — {@link MenuList} reports the
@@ -13,11 +10,6 @@ export interface MenuEntry {
   readonly icon?:      string
   readonly danger?:    boolean
   readonly separator?: boolean
-}
-
-/** In-renderer context menu item — a {@link MenuEntry} that carries its action. */
-export interface ContextMenuItem extends MenuEntry {
-  readonly action?: () => void
 }
 
 interface MenuListProps {
@@ -49,25 +41,5 @@ export function MenuList ({ items, onSelect }: MenuListProps) {
           </li>
       )}
     </ul>
-  )
-}
-
-interface ContextMenuProps {
-  readonly items:      readonly ContextMenuItem[]
-  readonly anchorRect: DOMRect | null
-  readonly onClose:    () => void
-}
-
-/** Context menu anchored to a rect within the main renderer. */
-export function ContextMenu ({ items, anchorRect, onClose }: ContextMenuProps) {
-  return (
-    <Popover open={anchorRect !== null} anchorRect={anchorRect} onClose={onClose}>
-      <MenuList
-        items={items}
-        onSelect={i => {
-          items[i]?.action?.(); onClose()
-        }}
-      />
-    </Popover>
   )
 }

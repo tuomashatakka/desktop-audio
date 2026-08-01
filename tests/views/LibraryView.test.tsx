@@ -1,29 +1,21 @@
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import { LibraryView } from '../../src/app/views/LibraryView'
-import { describe, it, expect, vi } from 'vitest'
-import { renderWithProviders, makeMockDataSource } from '../helpers/renderWithProviders'
-import type { TrackDTO } from '../../src/app/data/DataSource'
+import { renderWithProviders } from '../helpers/renderWithProviders'
+
 
 describe('LibraryView', () => {
-  it('renders library view', () => {
+  it('renders the labeled track collection', async () => {
     renderWithProviders(<LibraryView />)
 
-    // Should have library-related content
-    expect(screen.getByText('Library')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Library tracks' })).toBeInTheDocument()
+    await screen.findByText('No tracks found')
   })
 
-  it('shows empty state when no tracks', async () => {
-    const { findByText } = renderWithProviders(<LibraryView />)
-
-    // Scan runs on mount; wait for it to settle to the empty state.
-    expect(await findByText('No tracks found')).toBeInTheDocument()
-  })
-
-  it('has scan functionality', () => {
-    const mockData = makeMockDataSource()
+  it('shows the empty state after an empty scan', async () => {
     renderWithProviders(<LibraryView />)
 
-    // Check that the component renders without crashing
-    expect(screen.getByText('Library')).toBeInTheDocument()
+    expect(await screen.findByText('No tracks found')).toBeInTheDocument()
   })
+
 })

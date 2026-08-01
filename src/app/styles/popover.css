@@ -1,5 +1,12 @@
 .popover-panel {
   position: fixed;
+  inset: auto;
+  top: anchor(bottom);
+  left: anchor(right);
+  margin: var(--sp-1) 0 0;
+  padding: 0;
+  translate: -100% 0;
+  position-try-fallbacks: flip-block, flip-inline;
   z-index: 150;
   background: var(--bg-raised);
   border: 1px solid var(--border);
@@ -16,13 +23,27 @@
   content: '';
   position: absolute;
   top: -6px;
-  left: 14px;
+  right: 14px;
   width: 10px;
   height: 10px;
   background: var(--bg-raised);
   border-left: 1px solid var(--border);
   border-top: 1px solid var(--border);
   transform: rotate(45deg);
+}
+
+.popover-panel.placement-top {
+  top: auto;
+  bottom: anchor(top);
+  margin: 0 0 var(--sp-1);
+
+  &::before {
+    top: auto;
+    bottom: -6px;
+    border: 0;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
 }
 
 .context-menu-list {

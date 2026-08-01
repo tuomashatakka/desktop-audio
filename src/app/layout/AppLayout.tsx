@@ -23,13 +23,25 @@ export function AppLayout ({ titlebar, sidebar, main, player }: AppLayoutProps) 
   const heightTier = useHeightTier()
 
   return (
-    <div className='app-shell' data-height-tier={heightTier} data-view={currentView}>
-      {sidebar && sidebarOpen && <aside className='app-sidebar'>{sidebar}</aside>}
+    <div
+      className='app-shell'
+      data-height-tier={heightTier}
+      data-view={currentView}
+      data-sidebar-open={sidebarOpen || undefined}
+    >
+      {titlebar && <header className='titlebar'>{titlebar}</header>}
 
-      <div className='app-content'>
-        {titlebar && <header className='titlebar'>{titlebar}</header>}
-        <main className='app-main view-content'>{main}</main>
-        {player && <footer className='app-player'>{player}</footer>}
+      <div className='app-workspace'>
+        {sidebar &&
+          <aside className='app-sidebar' aria-hidden={!sidebarOpen} inert={!sidebarOpen}>
+            {sidebar}
+          </aside>
+        }
+
+        <div className='app-content'>
+          <main className='app-main view-content'>{main}</main>
+          {player && <footer className='app-player'>{player}</footer>}
+        </div>
       </div>
     </div>
   )

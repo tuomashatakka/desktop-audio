@@ -3,6 +3,26 @@ import { useAudio, useLibrary, useUI } from '../contexts'
 import { useHost } from '../data'
 
 
+const INTERACTIVE_TARGETS = [
+  'button',
+  'input',
+  'textarea',
+  'select',
+  'a[href]',
+  'summary',
+  '[contenteditable]:not([contenteditable="false"])',
+  '[role="button"]',
+  '[role="menuitem"]',
+  '[role="option"]',
+  '[role="slider"]',
+  '[role="tab"]',
+].join(', ')
+
+function ownsKeyboardInput (event: KeyboardEvent): boolean {
+  return event.defaultPrevented ||
+    event.target instanceof Element && event.target.closest(INTERACTIVE_TARGETS) !== null
+}
+
 export function useKeyboardShortcuts () {
   const { isPlaying, currentTrack, volume, pause, resume, setVolume, playNext, playPrevious } = useAudio()
   const { filteredTracks } = useLibrary()
@@ -11,7 +31,7 @@ export function useKeyboardShortcuts () {
 
   // eslint-disable-next-line complexity
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+    if (ownsKeyboardInput(e)) {
       return
     }
 

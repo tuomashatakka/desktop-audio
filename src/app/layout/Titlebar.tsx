@@ -1,13 +1,36 @@
+import type { ReactNode } from 'react'
 import { useUI } from '../contexts'
 import { useBridge } from '../data'
 
 
-export function Titlebar () {
-  const { currentView, setView } = useUI()
+export function Titlebar ({ children }: { readonly children?: ReactNode }) {
+  const { currentView, setView, sidebarOpen, toggleSidebar } = useUI()
   const bridge = useBridge()
+
+  const handleSidebar = () => {
+    if (currentView === 'player') {
+      setView('library')
+      if (!sidebarOpen)
+        toggleSidebar()
+      return
+    }
+    toggleSidebar()
+  }
 
   return (
     <>
+      <button
+        type='button'
+        className='menu-toggle'
+        onClick={handleSidebar}
+        aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+        aria-expanded={sidebarOpen}
+      >
+        <span aria-hidden='true' />
+        <span aria-hidden='true' />
+        <span aria-hidden='true' />
+      </button>
+
       <div className='titlebar-logo'>
         <span className='logo-icon' aria-hidden='true'>♫</span>
         <span className='logo-text'>Desktop Audio</span>
@@ -23,7 +46,7 @@ export function Titlebar () {
                 setView('library')}
             >
               <span className='nav-icon' aria-hidden='true'>♫</span>
-              Library
+              <span className='nav-label'>Library</span>
             </button>
           </li>
 
@@ -35,7 +58,7 @@ export function Titlebar () {
                 setView('player')}
             >
               <span className='nav-icon' aria-hidden='true'>▶</span>
-              Player
+              <span className='nav-label'>Player</span>
             </button>
           </li>
 
@@ -47,11 +70,13 @@ export function Titlebar () {
                 setView('settings')}
             >
               <span className='nav-icon' aria-hidden='true'>⚙</span>
-              Settings
+              <span className='nav-label'>Settings</span>
             </button>
           </li>
         </ul>
       </nav>
+
+      {children && <div className='titlebar-context'>{children}</div>}
 
       <menu className='titlebar-controls' aria-label='Window controls'>
         <li>
