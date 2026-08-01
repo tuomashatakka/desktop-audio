@@ -183,10 +183,19 @@ jobs:
           fi
 
           codesign --verify --deep --strict --verbose=2 "$app_path"
+          signature_details="$(codesign -d --verbose=4 "$app_path" 2>&1)"
           if [[ -n "${MACOS_SIGNING_IDENTITY:-}" ]]; then
+            if ! grep -q 'flags=.*runtime' <<< "$signature_details"; then
+              echo "::error::Developer ID builds must enable hardened runtime"
+              exit 1
+            fi
             xcrun stapler validate "$app_path"
             spctl --assess --type execute --verbose=2 "$app_path"
           else
+            if grep -q 'flags=.*runtime' <<< "$signature_details"; then
+              echo "::error::Ad-hoc builds cannot use hardened runtime because their components have no shared Team ID"
+              exit 1
+            fi
             echo "::warning::$app_path has a valid ad-hoc signature but is not notarized"
           fi
 

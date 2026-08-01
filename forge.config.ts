@@ -71,6 +71,9 @@ const macOsPackagerConfig: ForgeConfig['packagerConfig'] = process.platform === 
         : {
             identity: '-',
             identityValidation: false,
+            // Ad-hoc components have no shared Team ID, so hardened runtime's
+            // library validation would reject Electron Framework at launch.
+            optionsForFile: () => ({ hardenedRuntime: false }),
           },
       ...(macOsNotarizeConfig ? { osxNotarize: macOsNotarizeConfig } : {}),
     }
