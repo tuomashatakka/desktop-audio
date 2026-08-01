@@ -468,7 +468,7 @@ body::before {
 .app-shell[data-height-tier='compact'] .time-row { margin-top: var(--sp-1); }
 
 @container player (max-width: 260px) {
-  .app-shell[data-height-tier='compact'] .album-art-card { display: none; }
+  .app-shell[data-height-tier='compact'] .player-art { display: none; }
   .app-shell[data-height-tier='compact'] .player-content {
     grid-template-columns: 1fr;
     grid-template-areas: 'info' 'progress' 'controls';
@@ -496,13 +496,18 @@ body::before {
 .app-shell[data-height-tier='mini'] .player-info :is(.track-artist, .track-album) { display: none; }
 .app-shell[data-height-tier='mini'] .playback-controls { gap: 0; }
 .app-shell[data-height-tier='mini'] .playback-controls > :not(.next) { display: none; }
-.app-shell[data-height-tier='mini'] .progress-section { position: absolute; inset: auto 0 0; width: 100%; }
+.app-shell[data-height-tier='mini'] .progress-section {
+  position: absolute;
+  inset: auto 0 0;
+  grid-area: auto;
+  width: 100%;
+}
 .app-shell[data-height-tier='mini'] .time-row { display: none; }
 .app-shell[data-height-tier='mini'] .waveform-progress { height: var(--sp-1); min-width: 0; padding: 0; }
 .app-shell[data-height-tier='mini'] .wf-bar { max-width: none; border-radius: 0; transform: none; }
 
 @container player (max-width: 260px) {
-  .app-shell[data-height-tier='mini'] .album-art-card { display: none; }
+  .app-shell[data-height-tier='mini'] .player-art { display: none; }
   .app-shell[data-height-tier='mini'] .player-content {
     grid-template-columns: 1fr auto;
     grid-template-areas: 'info controls';
