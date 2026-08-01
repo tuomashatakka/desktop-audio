@@ -41,6 +41,7 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
           <li>
             <button
               className='nav-item'
+              aria-label='Library'
               aria-current={currentView === 'library' ? 'page' : undefined}
               onClick={() =>
                 setView('library')}
@@ -53,6 +54,7 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
           <li>
             <button
               className='nav-item'
+              aria-label='Player'
               aria-current={currentView === 'player' ? 'page' : undefined}
               onClick={() =>
                 setView('player')}
@@ -65,6 +67,7 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
           <li>
             <button
               className='nav-item'
+              aria-label='Settings'
               aria-current={currentView === 'settings' ? 'page' : undefined}
               onClick={() =>
                 setView('settings')}

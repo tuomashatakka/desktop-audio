@@ -98,6 +98,7 @@
 
   .dialog-panel {
     width: min(calc(100vw - var(--sp-8)), 480px);
+    margin: auto;
     padding: 0;
     overflow: hidden;
     animation: surface-in var(--duration-fast) var(--ease);

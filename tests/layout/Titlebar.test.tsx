@@ -19,7 +19,9 @@ describe('Titlebar', () => {
   it('marks the active route and renders the combined context', () => {
     renderWithProviders(<Titlebar><span>Library context</span></Titlebar>)
 
-    expect(screen.getByRole('button', { name: /library/i })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Library' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Player' })).toHaveAttribute('aria-label', 'Player')
+    expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-label', 'Settings')
     expect(screen.getByText('Library context')).toBeInTheDocument()
   })
 })
