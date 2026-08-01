@@ -63,6 +63,20 @@ that stays put is `position: sticky` inside it:
   that scroll internally — `.view-content:has(> .library)`. Document-style
   views (settings, tag editor) still scroll in `.view-content`.
 
+## Ambient wash
+
+`body::before` is a page-wide gradient tinted by the current album art.
+`useAmbientPalette` samples the artwork on a 24×24 canvas, buckets the pixels,
+and writes `--ambient-1/2/3` (dark → light) to the root element.
+
+- Don't reach for `track.coverColor` for this — it's a hash of the *title*
+  (`generateCoverColor` in scanner-worker), not the artwork. It's only the
+  no-art fallback.
+- The three vars are registered with `@property` so they cross-fade between
+  tracks; unregistered custom properties can't be transitioned.
+- `mix-blend-mode` flips per theme: `screen` on dark (glow), `multiply` at
+  lower strength on light (`screen` would blow a light surface out to white).
+
 ## Player tiers
 
 Two independent axes collapse the player, both in `player.css`:

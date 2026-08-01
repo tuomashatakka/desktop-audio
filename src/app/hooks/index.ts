@@ -11,3 +11,5 @@ export * from './useWindowScale'
 export * from './useColumnConfig'
 
 export * from './useThemeApply'
+
+export * from './useAmbientPalette'

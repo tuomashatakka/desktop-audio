@@ -422,25 +422,74 @@
 }
 
 
-/* Global gradient overlay */
+/* ─── Ambient wash ─────────────────────────────────
+   A page-wide gradient tinted by the current album art. `useAmbientPalette`
+   writes --ambient-1/2/3 (dark → light) onto the root element; the values
+   below are the fallback for "nothing playing".
+
+   Registered via @property so the three colours can cross-fade between
+   tracks — unregistered custom properties are not animatable.
+
+   The blend mode has to flip per theme: `screen` lightens, which reads as a
+   glow on a dark surface but blows a light one out to white, so light theme
+   multiplies (and at lower strength) instead. */
+
+@property --ambient-1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #606080;
+}
+
+@property --ambient-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f090f0;
+}
+
+@property --ambient-3 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffafb0;
+}
+
+:root {
+  --ambient-blend: screen;
+  --ambient-strength: 0.75;
+  --ambient-a1: 38%;
+  --ambient-a2: 50%;
+  --ambient-a3: 44%;
+
+  transition:
+    --ambient-1 var(--duration-slow) var(--ease),
+    --ambient-2 var(--duration-slow) var(--ease),
+    --ambient-3 var(--duration-slow) var(--ease);
+}
+
+[data-theme="light"] {
+  --ambient-blend: multiply;
+  --ambient-strength: 0.4;
+  --ambient-a1: 20%;
+  --ambient-a2: 28%;
+  --ambient-a3: 24%;
+}
+
 body::before {
   content: "";
   position: fixed !important;
   display: block !important;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   background: linear-gradient(
     362deg,
-    #60608060 5%,
-    #f090f080 40%,
-    #ffafb070 95%
+    color-mix(in srgb, var(--ambient-1) var(--ambient-a1), transparent) 5%,
+    color-mix(in srgb, var(--ambient-2) var(--ambient-a2), transparent) 40%,
+    color-mix(in srgb, var(--ambient-3) var(--ambient-a3), transparent) 95%
   );
-  mix-blend-mode: screen;
-  filter: brightness(1.02) contrast(0.95) opacity(0.75);
+  mix-blend-mode: var(--ambient-blend);
+  filter: brightness(1.02) contrast(0.95) opacity(var(--ambient-strength));
   z-index: 1000000;
   pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { transition: none; }
 }
