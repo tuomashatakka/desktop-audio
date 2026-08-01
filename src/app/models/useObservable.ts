@@ -16,10 +16,10 @@ export function useObservable<K extends string, V> (model: Model | null, key: K)
     },
     () => {
       if (!model)
-        return undefined
+        return
       return (model as unknown as Record<string, unknown>)[key] as V
     },
-    () => undefined,
+    () => {},
   )
 }
 
