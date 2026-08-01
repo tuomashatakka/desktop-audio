@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { IconButton } from './IconButton'
+import { noop } from '../../utils/noop'
 
 
 interface DialogProps {
@@ -15,8 +16,9 @@ export function Dialog ({ open, onClose, title, children }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // Every path returns a cleanup so the effect's return type stays uniform.
     if (!open)
-      return
+      return noop
 
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape')

@@ -13,6 +13,7 @@
  */
 import { useEffect } from 'react'
 import { useAudio } from '../contexts'
+import { noop } from '../utils/noop'
 
 
 /** Edge length of the sampling canvas. 24² pixels is plenty for a wash. */
@@ -159,7 +160,7 @@ export function useAmbientPalette (): void {
       // No artwork: tint everything with the swatch colour rather than
       // snapping back to the default wash mid-playback.
       apply(fallback ? [ fallback, fallback, fallback ] : null)
-      return
+      return noop
     }
 
     extractPalette(art).then(palette =>

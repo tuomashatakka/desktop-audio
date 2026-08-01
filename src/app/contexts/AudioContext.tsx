@@ -239,8 +239,9 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   // Push current playback state to OS native media controls (MPRIS on Linux)
   const mediaStateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
+    // Every path returns a cleanup so the effect's return type stays uniform.
     if (!state.currentTrack)
-      return
+      return noop
 
     if (mediaStateDebounceRef.current)
       clearTimeout(mediaStateDebounceRef.current)

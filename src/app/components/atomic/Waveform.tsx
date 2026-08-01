@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useAudio } from '../../contexts'
+import { noop } from '../../utils/noop'
 
 
 export function Waveform () {
@@ -8,13 +9,14 @@ export function Waveform () {
   const animationRef = useRef<number | null>(null)
 
   useEffect(() => {
+    // Every path returns a cleanup so the effect's return type stays uniform.
     const canvas = canvasRef.current
     if (!canvas || !analyzer)
-      return
+      return noop
 
     const ctx = canvas.getContext('2d')
     if (!ctx)
-      return
+      return noop
 
     const bufferLength = analyzer.frequencyBinCount
     const dataArray = new Uint8Array(bufferLength)

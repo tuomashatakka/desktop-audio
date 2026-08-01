@@ -22,6 +22,7 @@ const externalModules = [ 'better-sqlite3', 'mpris-service' ];
 function dependencyClosure (roots: string[]): Set<string> {
   const seen = new Set<string>();
 
+  /** Depth-first walk of a package's prod dependencies, recording each in `seen`. */
   const visit = (name: string): void => {
     if (seen.has(name))
       return;
@@ -79,6 +80,7 @@ function stripNativeBuildInputs (buildPath: string): void {
   if (!fs.existsSync(moduleRoot))
     return;
 
+  /** Recursively deletes a path inside the module root, ignoring absences. */
   const remove = (...segments: string[]): void =>
     fs.rmSync(path.join(moduleRoot, ...segments), { recursive: true, force: true });
 

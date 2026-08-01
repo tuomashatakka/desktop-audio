@@ -26,6 +26,7 @@ import { Skeleton } from '../atomic/Skeleton'
 import { Popover } from '../atomic/Popover'
 import { Breadcrumbs } from './Breadcrumbs'
 import type { SortKey } from '../../hooks/useSortableTable'
+import { noop } from '../../utils/noop'
 
 
 const ROW_HEIGHT_BY_DENSITY: Record<Density, number> = {
@@ -351,8 +352,9 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
 
   useEffect(() => {
     const el = scrollRef.current
+    // Every path returns a cleanup so the effect's return type stays uniform.
     if (!el || !onScroll)
-      return
+      return noop
 
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => {

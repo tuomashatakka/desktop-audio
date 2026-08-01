@@ -1,4 +1,5 @@
 import { useRef, useMemo, useCallback, useEffect, useState } from 'react'
+import { noop } from '../../utils/noop'
 
 
 interface WaveformProgressProps {
@@ -88,8 +89,9 @@ export function WaveformProgress ({
 
   // Measure container width for responsive bar count
   useEffect(() => {
+    // Every path returns a cleanup so the effect's return type stays uniform.
     if (!containerRef.current)
-      return
+      return noop
 
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {

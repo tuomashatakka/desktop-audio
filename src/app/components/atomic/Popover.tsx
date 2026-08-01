@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { noop } from '../../utils/noop'
 
 
 interface PopoverProps {
@@ -15,8 +16,9 @@ export function Popover ({ open, anchorRect, onClose, children, placement = 'bot
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // Every path returns a cleanup so the effect's return type stays uniform.
     if (!open)
-      return
+      return noop
 
     const onMouse = (e: MouseEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node))
