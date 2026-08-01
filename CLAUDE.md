@@ -62,6 +62,12 @@ that stays put is `position: sticky` inside it:
 - Ancestors (`.app-main`, `.view-content`) are `overflow: hidden` for views
   that scroll internally — `.view-content:has(> .library)`. Document-style
   views (settings, tag editor) still scroll in `.view-content`.
+- Scrolling down collapses `.view-header` (`data-header-hidden` on `.library`,
+  driven by TrackTable's `onScroll`); the column header then rides up and pins
+  at the top of the view. The collapse is a `1fr → 0fr` grid row on
+  `.view-header-slot` — the one way to animate to a zero height without
+  hard-coding it. `min-height: 0` alone leaves a stub the size of the header's
+  padding + border, so those collapse too.
 
 ## Ambient wash
 
@@ -92,13 +98,13 @@ Two independent axes collapse the player, both in `player.css`:
 
 Two separate height thresholds, and conflating them is a trap:
 
-- `CHROME_MAX_HEIGHT` (300) — a **geometric floor**. Titlebar (40) + player bar
+- `CHROME_MAX_HEIGHT` (480) — a **geometric floor**. Titlebar (40) + player bar
   (72) stop being affordable, so they're hidden and PlayerView takes the whole
   window. `useWindowScale` uses this one for "am I the small window?".
-- `COMPACT_MAX_HEIGHT` (260) — a **styling choice**. The normal centred stack
-  still reads fine above this once the chrome is gone; that band is the `snug`
-  tier (chrome hidden, normal layout, compressed by
-  `@container (max-height: 300px)`).
+- `COMPACT_MAX_HEIGHT` (300) — a **styling choice**. The normal centred stack
+  still reads fine above this once the chrome is gone; the 300–479 band is the
+  `snug` tier (chrome hidden, normal layout, compressed in two steps by
+  `@container (max-height: 420px)` and `(max-height: 340px)`).
 
 Careful: `.player-view` *is* the container, so a `@container` query can never
 style `.player-view` itself — its own padding/gap must hang off the tier

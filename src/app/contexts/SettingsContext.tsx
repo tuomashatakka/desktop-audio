@@ -99,8 +99,8 @@ const DEFAULT_CUSTOM_THEME: CustomTheme = {
     '--border':       '#333',
     '--border-hover': '#555',
     '--success':      '#28a745',
-    '--warning':     '#ffc107',
-    '--danger':      '#dc3545',
+    '--warning':      '#ffc107',
+    '--danger':       '#dc3545',
     '--info':         '#17a2b8',
     '--wf-unplayed':  '#444',
     '--wf-played':    '#e94560',
@@ -119,6 +119,7 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
   const host = useHost()
 
   useEffect(() => {
+
     /** Hydrate settings on mount and resolve the default music dir if needed. */
     const init = async () => {
       const loaded = await loadSettings()

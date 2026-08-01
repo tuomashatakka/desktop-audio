@@ -21,13 +21,13 @@ export type HeightTier = 'normal' | 'snug' | 'compact' | 'mini'
  * from {@link COMPACT_MAX_HEIGHT} precisely so the *layout* can stay normal
  * for a while after the chrome goes.
  */
-export const CHROME_MAX_HEIGHT = 300
+export const CHROME_MAX_HEIGHT = 480
 
 /**
  * Below this height the player switches to the side-by-side compact layout.
- * Matches the 260px container-width breakpoint in player.css.
+ * Matches the 300px container-width breakpoint in player.css.
  */
-export const COMPACT_MAX_HEIGHT = 260
+export const COMPACT_MAX_HEIGHT = 300
 
 /** Below this height only the title, art and next button survive. */
 export const MINI_MAX_HEIGHT = 160

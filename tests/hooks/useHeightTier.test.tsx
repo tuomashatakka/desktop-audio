@@ -47,7 +47,7 @@ describe('useHeightTier', () => {
 
     expect(tier).toHaveTextContent('normal')
 
-    resizeTo(280)
+    resizeTo(400)
     expect(tier).toHaveTextContent('snug')
 
     resizeTo(240)

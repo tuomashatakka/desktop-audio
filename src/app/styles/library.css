@@ -23,7 +23,54 @@
   min-width: 0;
   overflow: hidden;
 
-  & > .view-header { flex: 0 0 auto; }
+  & > .view-header-slot { flex: 0 0 auto; }
+}
+
+/* Collapsing header.
+   `1fr -> 0fr` on a grid row is the one way to animate to a zero height
+   without hard-coding what the height is. The header itself stays untouched;
+   the wrapper does the squeezing, and .track-table simply grows into the
+   space — which carries the sticky column header up to the top of the view. */
+
+.view-header-slot {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--duration) var(--ease),
+    opacity var(--duration) var(--ease);
+
+  & > * {
+    min-height: 0;
+    overflow: hidden;
+    /* `min-height: 0` can't take a border-box below its own padding + border,
+       so those have to collapse too or the header leaves a 33px stub. */
+    transition:
+      padding-block var(--duration) var(--ease),
+      border-block-end-width var(--duration) var(--ease);
+  }
+}
+
+.library[data-header-hidden] > .view-header-slot {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+  /* Delayed so the collapse is visible, but the header still leaves the tab
+     order once it's gone. Un-delayed on the way back in (base rule above). */
+  visibility: hidden;
+  transition:
+    grid-template-rows var(--duration) var(--ease),
+    opacity var(--duration) var(--ease),
+    visibility 0s linear var(--duration);
+
+  & > * {
+    padding-block: 0;
+    border-block-end-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-header-slot,
+  .library[data-header-hidden] > .view-header-slot { transition: none; }
 }
 
 .status-message {

@@ -46,6 +46,9 @@ interface TrackTableProps {
   readonly onContextMenu?: (track: Track, rect: DOMRect) => void
   readonly onNavigate?:    (path: string | null) => void
   readonly roots?:         readonly string[]
+
+  /** Raw scroll events from the list container (drives the header collapse). */
+  readonly onScroll?: (e: Event) => void
 }
 
 function formatDuration (seconds: number): string {
@@ -275,7 +278,7 @@ function buildGroups (sorted: readonly Track[], grouping: Grouping): readonly Gr
   return out
 }
 
-export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay, onContextMenu, onNavigate, roots = []}: TrackTableProps) {
+export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay, onContextMenu, onNavigate, roots = [], onScroll }: TrackTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const { density, grouping } = useUI()
   const { visible, gridTemplate, resizeColumn, reorderColumn } = useColumnConfig()
@@ -333,6 +336,16 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
       </div>
     )
   }, [ visible, density, currentTrack, isPlaying, onPlay, onContextMenu ])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || !onScroll)
+      return
+
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () =>
+      el.removeEventListener('scroll', onScroll)
+  }, [ onScroll ])
 
   // Keep the playing track in view (flat list only — grouped views aren't
   // virtualized, so the virtualizer has no offsets to scroll to).

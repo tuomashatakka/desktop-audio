@@ -26,6 +26,9 @@ const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(i =>
                          i.separator).length * SEPARATOR_HEIGHT +
                        PADDING * 2
 
+/** Scroll depth before the view header starts collapsing. */
+const HEADER_HIDE_AFTER = 48
+
 const DENSITIES: readonly Density[] = [ 'compact', 'normal', 'relaxed' ]
 const DENSITY_GLYPH: Record<Density, string> = { compact: '≡', normal: '≢', relaxed: '=' }
 
@@ -50,6 +53,8 @@ export function LibraryView () {
 
   const [ promptOpen, setPromptOpen ] = useState(false)
   const [ configOpen, setConfigOpen ] = useState(false)
+  const [ headerHidden, setHeaderHidden ] = useState(false)
+  const lastScrollY     = useRef(0)
   const contextTrackRef = useRef<Track | null>(null)
   const configBtnRef    = useRef<HTMLButtonElement>(null)
 
@@ -57,6 +62,18 @@ export function LibraryView () {
     ? playlists.find(p =>
       p.id === selectedPlaylistId)
     : undefined
+
+  /**
+   * Collapse the view header on the way down, bring it back on the way up.
+   * The column header is sticky inside the same scroller, so it simply rides
+   * up into the vacated space and pins there.
+   */
+  const handleScroll = useCallback((e: Event) => {
+    const y = (e.target as HTMLElement).scrollTop
+    const goingDown = y > lastScrollY.current
+    lastScrollY.current = y
+    setHeaderHidden(goingDown && y > HEADER_HIDE_AFTER)
+  }, [])
 
   const handleTrackPlay = useCallback((track: Track, index: number) => {
     selectTrack(index)
@@ -100,76 +117,79 @@ export function LibraryView () {
   const scanning = isLoading && displayTracks.length > 0
 
   return (
-    <section className='library'>
+    <section className='library' data-header-hidden={headerHidden || undefined}>
 
-      <header className='view-header'>
-        <button
-          type='button'
-          className='menu-toggle'
-          onClick={toggleSidebar}
-          aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-          aria-expanded={sidebarOpen}
-        >
-          <span aria-hidden='true' />
-          <span aria-hidden='true' />
-          <span aria-hidden='true' />
-        </button>
-
-        {activePlaylist
-          ? <h2>{activePlaylist.name}</h2>
-          : <Breadcrumbs
-            path={selectedFolderPath}
-            roots={libraryPaths}
-            onNavigate={selectFolder}
-          />
-        }
-
-        {scanning && <small className='scan-status' role='status'>Scanning…</small>}
-
-        <div className='view-controls'>
-          <Input
-            wrapperClass='search-input'
-            type='search'
-            placeholder='Search tracks...'
-            value={searchQuery}
-            onChange={e =>
-              setSearchQuery(e.target.value)}
-          />
-
-          <fieldset className='density-toggle'>
-            <legend>Row density</legend>
-
-            {DENSITIES.map(d =>
-              <label key={d} title={`${d} density`}>
-                <input
-                  type='radio'
-                  name='density'
-                  value={d}
-                  aria-label={`${d} density`}
-                  checked={density === d}
-                  onChange={() =>
-                    setDensity(d)}
-                />
-
-                <span aria-hidden='true'>{DENSITY_GLYPH[d]}</span>
-              </label>
-            )}
-          </fieldset>
-
+      {/* Grid wrapper purely so the header can animate to a zero height
+          without hard-coding what that height is (1fr -> 0fr). */}
+      <div className='view-header-slot'>
+        <header className='view-header'>
           <button
             type='button'
-            ref={configBtnRef}
-            className='config-toggle'
-            onClick={() =>
-              setConfigOpen(o =>
-                !o)}
-            aria-label='View options'
-            aria-expanded={configOpen}
+            className='menu-toggle'
+            onClick={toggleSidebar}
+            aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            aria-expanded={sidebarOpen}
           >
-            ⌄
+            <span aria-hidden='true' />
+            <span aria-hidden='true' />
+            <span aria-hidden='true' />
           </button>
 
-          {configBtnRef.current &&
+          {activePlaylist
+            ? <h2>{activePlaylist.name}</h2>
+            : <Breadcrumbs
+              path={selectedFolderPath}
+              roots={libraryPaths}
+              onNavigate={selectFolder}
+            />
+          }
+
+          {scanning && <small className='scan-status' role='status'>Scanning…</small>}
+
+          <div className='view-controls'>
+            <Input
+              wrapperClass='search-input'
+              type='search'
+              placeholder='Search tracks...'
+              value={searchQuery}
+              onChange={e =>
+                setSearchQuery(e.target.value)}
+            />
+
+            <fieldset className='density-toggle'>
+              <legend>Row density</legend>
+
+              {DENSITIES.map(d =>
+                <label key={d} title={`${d} density`}>
+                  <input
+                    type='radio'
+                    name='density'
+                    value={d}
+                    aria-label={`${d} density`}
+                    checked={density === d}
+                    onChange={() =>
+                      setDensity(d)}
+                  />
+
+                  <span aria-hidden='true'>{DENSITY_GLYPH[d]}</span>
+                </label>
+              )}
+            </fieldset>
+
+            <button
+              type='button'
+              ref={configBtnRef}
+              className='config-toggle'
+              onClick={() =>
+                setConfigOpen(o =>
+                  !o)}
+              aria-label='View options'
+              aria-expanded={configOpen}
+            >
+              ⌄
+            </button>
+
+            {configBtnRef.current &&
             <Popover
               open={configOpen}
               anchorRect={configBtnRef.current.getBoundingClientRect()}
@@ -196,9 +216,10 @@ export function LibraryView () {
                 )}
               </fieldset>
             </Popover>
-          }
-        </div>
-      </header>
+            }
+          </div>
+        </header>
+      </div>
 
       {displayTracks.length === 0 && !isLoading
         ? <p className='status-message'>
@@ -219,6 +240,7 @@ export function LibraryView () {
           onContextMenu={handleContextMenu}
           onNavigate={selectFolder}
           roots={libraryPaths}
+          onScroll={handleScroll}
         />
       }
 

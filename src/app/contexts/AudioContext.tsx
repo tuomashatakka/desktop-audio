@@ -35,8 +35,9 @@ interface AudioContextValue extends AudioState {
   readonly playPrevious:    (tracks: readonly Track[]) => void
   readonly analyzer:        AnalyserNode | null
   readonly setCurrentQueue: (tracks: Track[]) => void
+
   /** Ensure audio context is ready (resumes if suspended). Call after user gesture. */
-  readonly ensureReady:    () => Promise<void>
+  readonly ensureReady: () => Promise<void>
 }
 
 /** Decode an audio file and compute per-bar RMS amplitudes for the waveform. */
@@ -75,8 +76,8 @@ const AudioContext = createContext<AudioContextValue | null>(null)
 /** Global reference to ensureReady function, set by AudioProvider on mount */
 let globalEnsureReady: (() => Promise<void>) | null = null
 
-/** Register the renderer-wide `ensureReady` so non-React code (e.g. the
- *  first-pointer-event handler) can resume the audio context on demand. */
+// Register the renderer-wide `ensureReady` so non-React code (e.g. the
+//  first-pointer-event handler) can resume the audio context on demand.
 export function setGlobalEnsureReady (fn: (() => Promise<void>) | null) {
   globalEnsureReady = fn
 }

@@ -145,31 +145,44 @@
 }
 
 /* ─── Short windows, normal layout (the `snug` tier) ───
-   Once the chrome is gone the player owns the whole window, but the default
-   stack is sized for a tall one. Compress it so it still fits.
+   Chrome is gone (h < CHROME_MAX_HEIGHT) but the layout is still the normal
+   centred stack, which is sized for a tall window. Two steps of compression,
+   keyed off the container's own height rather than the tier, so the band
+   degrades smoothly across its whole 300–479px range.
 
    Left at (0,1,0) specificity on purpose: the compact/mini tier blocks below
-   are attribute-qualified and therefore always win, so this only bites in the
-   band where the layout is still the normal one. */
+   are attribute-qualified and therefore always win, so these only bite while
+   the layout is still the normal one. */
 
 /* .player-view is itself the container, and a container query never applies
    to its own container — so its own box has to be sized off the tier. */
 .app-shell[data-height-tier='snug'] .player-view {
-  gap: var(--sp-2);
-  padding: var(--sp-2);
+  gap: var(--sp-4);
+  padding: var(--sp-4);
 }
 
-@container (max-height: 300px) {
-  .album-art-card { width: clamp(48px, 26cqh, 120px); }
+@container (max-height: 420px) {
+  .album-art-card { width: clamp(64px, 34cqh, 180px); }
 
   .player-info .track-title {
-    font-size: var(--text-base);
+    font-size: var(--text-lg);
     margin-bottom: var(--sp-1);
   }
 
-  .player-info .track-album { display: none; }
-
   .playback-controls { gap: var(--sp-4); }
+
+  .playback-controls .play-pause-btn {
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+  }
+}
+
+@container (max-height: 340px) {
+  .album-art-card { width: clamp(48px, 26cqh, 120px); }
+
+  .player-info .track-title { font-size: var(--text-base); }
+  .player-info .track-album { display: none; }
 
   .playback-controls .play-pause-btn {
     width: 40px;
@@ -180,7 +193,7 @@
   .progress-section .time-row { margin-top: var(--sp-1); }
 }
 
-/* ─── Compact tier (window < 260px tall) ─────────────
+/* ─── Compact tier (window < 300px tall) ─────────────
    Art moves left; controls sit to the LEFT of the progress bar. Named grid
    areas do the reordering, so the JSX keeps its natural reading order.
    Note: this makes tab order (progress → controls) differ from visual order. */
