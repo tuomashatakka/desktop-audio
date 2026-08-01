@@ -51,7 +51,6 @@ const createWindow = () => {
     )
   }
 
-  mainWindow.webContents.openDevTools()
   mainWindow.on('closed', () => {
     mainWindow = null
   })
