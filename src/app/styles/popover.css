@@ -2,10 +2,9 @@
   position: fixed;
   inset: auto;
   top: anchor(bottom);
-  left: anchor(right);
+  right: anchor(right);
   margin: var(--sp-1) 0 0;
   padding: 0;
-  translate: -100% 0;
   position-try-fallbacks: flip-block, flip-inline;
   z-index: 150;
   background: var(--bg-raised);

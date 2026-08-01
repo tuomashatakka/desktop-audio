@@ -23,6 +23,10 @@ export default defineConfig(async ({ command }) => {
 
   return {
     plugins,
+    build: {
+      target:    'chrome146',
+      cssTarget: 'chrome146',
+    },
     optimizeDeps: {
       exclude: ['animejs'],
     },
