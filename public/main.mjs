@@ -1284,7 +1284,7 @@ function main () {
     { threshold: 0.15 }
   )
 
-  document.querySelectorAll('#features .fade-blur, #features .feature-card, #download .fade-blur, #player .fade-blur, #library .fade-blur, .typewriter-line').forEach(el => {
+  document.querySelectorAll('#features .fade-blur, #features .feature-card, #download .fade-blur, #player .fade-blur, #mini .fade-blur, #library .fade-blur, .typewriter-line').forEach(el => {
     observer.observe(el)
   })
 

@@ -484,6 +484,56 @@
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
 }
 
+/* ── Mini Player Showcase ────────────────────── */
+.mini-showcase {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: clamp(0.75rem, 1.6vw, 1.5rem) clamp(1rem, 2.5vw, 2rem);
+  width: min(95vw, 1100px);
+  max-width: 80vw;
+  align-items: end;
+}
+
+/* Intro copy spans the row above the shots. */
+.mini-showcase .split-text {
+  grid-column: 1 / -1;
+  text-align: center;
+}
+
+/* Three portrait-ish shots on the first row, then the slim bar and the
+   smallest one share the last — 8 columns divides for both. */
+.mini-shot {
+  grid-column: span 3;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.mini-shot:nth-of-type(3) { grid-column: span 2; }
+
+/* The slim bar is far wider than it is tall, so it needs the width but
+   almost no height — pair it with the smallest shot on the final row. */
+.mini-shot.wide { grid-column: span 5; }
+.mini-shot:last-of-type { grid-column: span 3; }
+
+.mini-shot img {
+  width: 100%;
+  height: auto;
+  max-height: 34vh;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.mini-shot figcaption {
+  font-size: 0.8125rem;
+  color: var(--clr-text-dim, rgba(255, 255, 255, 0.55));
+  text-align: center;
+}
+
 /* ── Download Section ────────────────────────── */
 #download {
   background:
@@ -993,6 +1043,13 @@
   .split-layout {
     grid-template-columns: 1fr;
     gap: 2rem;
+  }
+  .mini-showcase {
+    grid-template-columns: 1fr;
+  }
+  .mini-shot,
+  .mini-shot.wide {
+    grid-column: 1 / -1;
   }
   .split-layout.reverse {
     direction: ltr;
