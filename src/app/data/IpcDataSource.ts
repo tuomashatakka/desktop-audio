@@ -2,6 +2,7 @@
 // Preserves current Electron behaviour exactly
 
 import type { DataSource, DataEvent, DataListener, LibraryRoot, AudioMetadata, TrackDTO } from './DataSource'
+import { noop } from '../utils/noop'
 
 
 export class IpcDataSource implements DataSource {
@@ -42,22 +43,24 @@ export class IpcDataSource implements DataSource {
     }
   }
 
+  /** Reads the cached library from the main-process SQLite store. */
   async load (): Promise<readonly TrackDTO[]> {
     const tracks = await ((this._ipc?.loadLibrary() as Promise<readonly TrackDTO[]>) ?? Promise.resolve([]))
     this.indexPaths(tracks)
     return tracks
   }
 
+  /** Relays scan batch/done events; returns a combined unsubscribe. */
   subscribe (l: DataListener): () => void {
     const unsubBatch = this._ipc?.onLibraryBatch((batch: unknown[]) => {
       const tracks = batch as TrackDTO[]
       this.indexPaths(tracks)
       l({ type: 'batch', tracks })
-    }) ?? (() => {})
+    }) ?? noop
 
     const unsubDone = this._ipc?.onLibraryDone(() => {
       l({ type: 'done', totalCount: this.trackIdToPath.size })
-    }) ?? (() => {})
+    }) ?? noop
 
     return () => {
       unsubBatch()

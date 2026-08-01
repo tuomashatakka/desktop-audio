@@ -10,12 +10,13 @@
  */
 import { useSyncExternalStore } from 'react'
 import { Model } from './Model'
+import { noop } from '../utils/noop'
 
 
 function subscribeTo (model: Model | null) {
   return (onStoreChange: () => void) => {
     if (!model)
-      return () => {}
+      return noop
 
     model.addEventListener('dirty', onStoreChange)
     model.addEventListener('flush', onStoreChange)

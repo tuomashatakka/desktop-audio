@@ -21,11 +21,10 @@ import { useSortableTable } from '../../hooks/useSortableTable'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import type { ColumnKey, ColumnConfig } from '../../hooks/useColumnConfig'
 import { useUI } from '../../contexts'
-import type { Density, Grouping } from '../../contexts'
+import type { Density, Grouping, Track } from '../../contexts'
 import { Skeleton } from '../atomic/Skeleton'
 import { Popover } from '../atomic/Popover'
 import { Breadcrumbs } from './Breadcrumbs'
-import type { Track } from '../../contexts'
 import type { SortKey } from '../../hooks/useSortableTable'
 
 
@@ -51,6 +50,7 @@ interface TrackTableProps {
   readonly onScroll?: (e: Event) => void
 }
 
+/** `m:ss` for a duration in seconds; `0:00` for missing/non-finite input. */
 function formatDuration (seconds: number): string {
   if (!seconds || !Number.isFinite(seconds))
     return '0:00'
@@ -60,6 +60,7 @@ function formatDuration (seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+/** Human-readable file size in MB (or KB below 1 MB); `—` when unknown. */
 function formatSize (bytes: number): string {
   if (!bytes)
     return '—'
@@ -68,11 +69,13 @@ function formatSize (bytes: number): string {
   return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`
 }
 
+/** The directory holding `path`, handling both `/` and `\\` separators. */
 function parentDir (path: string): string {
   const idx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
   return idx > 0 ? path.slice(0, idx) : '/'
 }
 
+/** Art and index columns carry no orderable value. */
 function isSortableKey (key: ColumnKey): key is SortKey {
   return key !== 'art' && key !== 'index'
 }
@@ -84,6 +87,7 @@ function AlbumArt ({ src, color }: { readonly src?: string; readonly color?: str
     : <span className='album-art' style={{ background: color }} />
 }
 
+/** Renders one cell. The relaxed density stacks title over artist/album. */
 function cellValue (track: Track, key: ColumnKey, index: number, density: Density): React.ReactNode {
   switch (key) {
     case 'art':
@@ -110,6 +114,9 @@ function cellValue (track: Track, key: ColumnKey, index: number, density: Densit
     case 'size': return formatSize(track.size)
     case 'trackNumber': return track.trackNumber ?? ''
     case 'path': return track.path
+    // Exhaustive over ColumnKey today; the default keeps a newly-added key
+    // rendering an empty cell rather than returning undefined.
+    default: return ''
   }
 }
 
@@ -123,6 +130,7 @@ interface HeaderCellProps {
   readonly onContextMenu?: (rect: DOMRect) => void
 }
 
+/** One column header: click to sort, drag to reorder, drag the edge to resize. */
 function HeaderCell ({ col, sortKey, sortDir, toggleSort, onResize, onReorder, onContextMenu }: HeaderCellProps) {
   const ref = useRef<HTMLDivElement>(null)
   const sortable = isSortableKey(col.key)
@@ -205,6 +213,7 @@ function HeaderCell ({ col, sortKey, sortDir, toggleSort, onResize, onReorder, o
   )
 }
 
+/** Popover listing every column with a checkbox, plus a reset button. */
 function ColumnMenu ({ anchorRect, onClose }: { readonly anchorRect: DOMRect | null; readonly onClose: () => void }) {
   const { columns, toggleColumn, resetColumns } = useColumnConfig()
 
@@ -233,6 +242,7 @@ function ColumnMenu ({ anchorRect, onClose }: { readonly anchorRect: DOMRect | n
   )
 }
 
+/** Group identity for a track under the active grouping mode. */
 function bucketKey (track: Track, grouping: Grouping): string {
   switch (grouping) {
     case 'album': return `${track.artist}​${track.album}`
@@ -249,6 +259,7 @@ interface GroupBlock {
   readonly tracks:   readonly Track[]
 }
 
+/** Buckets an already-sorted list into labelled groups; empty when ungrouped. */
 function buildGroups (sorted: readonly Track[], grouping: Grouping): readonly GroupBlock[] {
   if (grouping === 'none')
     return []
@@ -278,6 +289,7 @@ function buildGroups (sorted: readonly Track[], grouping: Grouping): readonly Gr
   return out
 }
 
+/** See module docstring. */
 export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay, onContextMenu, onNavigate, roots = [], onScroll }: TrackTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const { density, grouping } = useUI()
@@ -343,8 +355,9 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
       return
 
     el.addEventListener('scroll', onScroll, { passive: true })
-    return () =>
+    return () => {
       el.removeEventListener('scroll', onScroll)
+    }
   }, [ onScroll ])
 
   // Keep the playing track in view (flat list only — grouped views aren't

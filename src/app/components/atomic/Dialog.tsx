@@ -23,8 +23,9 @@ export function Dialog ({ open, onClose, title, children }: DialogProps) {
         onClose()
     }
     document.addEventListener('keydown', handler)
-    return () =>
+    return () => {
       document.removeEventListener('keydown', handler)
+    }
   }, [ open, onClose ])
 
   useEffect(() => {

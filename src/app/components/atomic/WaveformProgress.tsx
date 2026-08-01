@@ -98,8 +98,9 @@ export function WaveformProgress ({
     })
 
     observer.observe(containerRef.current)
-    return () =>
+    return () => {
       observer.disconnect()
+    }
   }, [])
 
   const seekFromEvent = useCallback((clientX: number) => {

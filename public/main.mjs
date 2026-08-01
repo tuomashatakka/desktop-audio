@@ -85,11 +85,11 @@ function typeText(root = document) {
 
 
 // ── Screenshot gallery + lightbox ──
-async function renderGallery() {
+function renderGallery() {
   const grid = document.getElementById('screenshot-grid')
   if (!grid) return
 
-  let items = window.screenshots || []
+  const items = window.screenshots || []
   // try {
   //   const res = await fetch(new URL('screenshots.json').href, { cache: 'no-cache' })
   //   items = await res.json()
@@ -314,6 +314,14 @@ async function renderGallery() {
   }, { passive: true })
 }
 
+/**
+ * Hero parallax pan, in pixels. Written by main()'s scroll handler and read by
+ * drawEffects()'s render loop, so it has to live at module scope — declaring it
+ * inside drawEffects() made the handler create an implicit global instead, and
+ * the pan silently never reached the renderer.
+ */
+let scrollPanX = 0, scrollPanY = 0
+
 // ── Pointer light source (multi-touch, candle flicker, decay on release) ──
 function applyLighting() {
   const canvas = document.getElementById('pointer-light')
@@ -342,8 +350,8 @@ function applyLighting() {
     dpr = Math.min(window.devicePixelRatio || 1, 2)
     canvas.width = Math.floor(innerWidth * dpr)
     canvas.height = Math.floor(innerHeight * dpr)
-    canvas.style.width = innerWidth + 'px'
-    canvas.style.height = innerHeight + 'px'
+    canvas.style.width = `${innerWidth}px`
+    canvas.style.height = `${innerHeight}px`
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     baseR = Math.min(innerWidth, innerHeight) * 0.18
   }
@@ -459,14 +467,12 @@ function drawEffects() {
   const overlay = document.querySelector('.hero-gradient-overlay')
   const hBloom = document.querySelector('.hero-h-bloom')
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
-  const waveformContainer = document.querySelector('.hero-waveform')
 
   let dpr = 1
   let W = 0, H = 0
   let mouseX = -1000, mouseY = -1000
   let smoothMouseX = -1000, smoothMouseY = -1000
   let gradX = -1000, gradY = -1000
-  let scrollPanX = 0, scrollPanY = 0
 
   const STAR_COUNT = 55
   const WAVE_BAND = 0.14        // fraction of H around wave Y where stars are suppressed
@@ -477,7 +483,6 @@ function drawEffects() {
   const sparks = []
   const gravityWaves = []
   let prevHighlightedEdges = new Set()
-  let lastProminentEdgeKey = null
 
   const generateStars = () => {
     stars.length = 0
@@ -505,8 +510,8 @@ function drawEffects() {
     H = hero.offsetHeight
     canvas.width = Math.floor(W * dpr)
     canvas.height = Math.floor(H * dpr)
-    canvas.style.width = W + 'px'
-    canvas.style.height = H + 'px'
+    canvas.style.width = `${W}px`
+    canvas.style.height = `${H}px`
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     generateStars()
   }
@@ -748,7 +753,7 @@ ctx.globalCompositeOperation = 'screen'
   let last = performance.now()
   let waveTime = 0
   let frameCount = 0
-  let cachedBars = null
+  const cachedBars = null
 
   const draw = (now) => {
     const dt = Math.min(0.05, (now - last) / 1000)
@@ -870,7 +875,7 @@ if (flareAlpha > 0.05) {
         dists.sort((a, b) => a.d - b.d)
         const neighbors = dists.slice(0, NEAREST_K)
 
-        for (const { j, d } of neighbors) {
+        for (const { j } of neighbors) {
           const pairKey = i < j ? `${i}-${j}` : `${j}-${i}`
           if (currentHighlighted.has(pairKey)) continue
           currentHighlighted.add(pairKey)
@@ -980,8 +985,8 @@ function applyPhaseFlash() {
     H = innerHeight
     canvas.width = Math.floor(W * dpr)
     canvas.height = Math.floor(H * dpr)
-    canvas.style.width = W + 'px'
-    canvas.style.height = H + 'px'
+    canvas.style.width = `${W}px`
+    canvas.style.height = `${H}px`
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   }
 
@@ -1157,8 +1162,8 @@ function applyGlitchEffect() {
     H = innerHeight
     canvas.width = Math.floor(W * dpr)
     canvas.height = Math.floor(H * dpr)
-    canvas.style.width = W + 'px'
-    canvas.style.height = H + 'px'
+    canvas.style.width = `${W}px`
+    canvas.style.height = `${H}px`
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   }
 
@@ -1234,7 +1239,7 @@ function applyGlitchEffect() {
 
     const pulse = Math.sin(glitchTime * 0.7) * 0.5 + 0.5
     const randomJitter = Math.random() * 0.015
-    let baseIntensity = 0.008 + pulse * 0.012 + randomJitter
+    const baseIntensity = 0.008 + pulse * 0.012 + randomJitter
 
     let cursorBoost = 0
     if (hasCursor) {

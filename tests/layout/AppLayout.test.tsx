@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { AppLayout } from '../../src/app/layout/AppLayout'
 import { UIProvider } from '../../src/app/contexts'
+import { noop } from '../../src/app/utils/noop'
 
 describe('AppLayout', () => {
   it('renders titlebar, sidebar, main, and player slots', () => {
@@ -15,14 +16,14 @@ describe('AppLayout', () => {
         playerExpanded: false,
         density: 'normal',
         grouping: 'none',
-        setView: () => {},
-        toggleSidebar: () => {},
-        selectFolder: () => {},
-        selectPlaylist: () => {},
-        setEditingTrack: () => {},
-        togglePlayerExpanded: () => {},
-        setDensity: () => {},
-        setGrouping: () => {},
+        setView: noop,
+        toggleSidebar: noop,
+        selectFolder: noop,
+        selectPlaylist: noop,
+        setEditingTrack: noop,
+        togglePlayerExpanded: noop,
+        setDensity: noop,
+        setGrouping: noop,
       }}>
         <AppLayout
           titlebar={<div data-testid="titlebar">Titlebar</div>}
@@ -50,14 +51,14 @@ describe('AppLayout', () => {
         playerExpanded: false,
         density: 'normal',
         grouping: 'none',
-        setView: () => {},
-        toggleSidebar: () => {},
-        selectFolder: () => {},
-        selectPlaylist: () => {},
-        setEditingTrack: () => {},
-        togglePlayerExpanded: () => {},
-        setDensity: () => {},
-        setGrouping: () => {},
+        setView: noop,
+        toggleSidebar: noop,
+        selectFolder: noop,
+        selectPlaylist: noop,
+        setEditingTrack: noop,
+        togglePlayerExpanded: noop,
+        setDensity: noop,
+        setGrouping: noop,
       }}>
         <AppLayout main={<div data-testid="main">Main Only</div>} />
       </UIProvider>
@@ -77,14 +78,14 @@ describe('AppLayout', () => {
         playerExpanded: false,
         density: 'normal',
         grouping: 'none',
-        setView: () => {},
-        toggleSidebar: () => {},
-        selectFolder: () => {},
-        selectPlaylist: () => {},
-        setEditingTrack: () => {},
-        togglePlayerExpanded: () => {},
-        setDensity: () => {},
-        setGrouping: () => {},
+        setView: noop,
+        toggleSidebar: noop,
+        selectFolder: noop,
+        selectPlaylist: noop,
+        setEditingTrack: noop,
+        togglePlayerExpanded: noop,
+        setDensity: noop,
+        setGrouping: noop,
       }}>
         <AppLayout main={<div>Content</div>} />
       </UIProvider>
@@ -104,14 +105,14 @@ describe('AppLayout', () => {
         playerExpanded: false,
         density: 'normal',
         grouping: 'none',
-        setView: () => {},
-        toggleSidebar: () => {},
-        selectFolder: () => {},
-        selectPlaylist: () => {},
-        setEditingTrack: () => {},
-        togglePlayerExpanded: () => {},
-        setDensity: () => {},
-        setGrouping: () => {},
+        setView: noop,
+        toggleSidebar: noop,
+        selectFolder: noop,
+        selectPlaylist: noop,
+        setEditingTrack: noop,
+        togglePlayerExpanded: noop,
+        setDensity: noop,
+        setGrouping: noop,
       }}>
         <AppLayout main={<span data-testid="content">Hello</span>} />
       </UIProvider>
@@ -135,15 +136,15 @@ describe('AppLayout', () => {
         playerExpanded: false,
         density: 'normal',
         grouping: 'none',
-        setView: () => {},
-        toggleSidebar: () => {},
-        selectFolder: () => {},
-        selectPlaylist: () => {},
-        setEditingTrack: () => {},
-        togglePlayerExpanded: () => {},
-        setPlayerExpanded: () => {},
-        setDensity: () => {},
-        setGrouping: () => {},
+        setView: noop,
+        toggleSidebar: noop,
+        selectFolder: noop,
+        selectPlaylist: noop,
+        setEditingTrack: noop,
+        togglePlayerExpanded: noop,
+        setPlayerExpanded: noop,
+        setDensity: noop,
+        setGrouping: noop,
       }}>
         <AppLayout main={<span data-testid="content">Hello</span>} />
       </UIProvider>

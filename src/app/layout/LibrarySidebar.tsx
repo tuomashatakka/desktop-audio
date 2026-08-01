@@ -13,6 +13,7 @@ import { useState, useCallback } from 'react'
 const MIN_WIDTH = 180
 const MAX_WIDTH = 400
 
+/** See module docstring. */
 export function LibrarySidebar () {
   const { registry, playlists, toggleFolder, addPlaylist } = useLibrary()
   const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist } = useUI()

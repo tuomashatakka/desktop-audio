@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { IpcDataSource } from '../../src/app/data/IpcDataSource'
 import type { TrackDTO } from '../../src/app/data/DataSource'
+import type { DataEvent } from '../../src/app/data/DataSource'
 
 describe('IpcDataSource', () => {
   let ds: IpcDataSource
@@ -131,7 +132,7 @@ describe('IpcDataSource', () => {
   })
 
   it('subscribe receives batch events', async () => {
-    const events: any[] = []
+    const events: DataEvent[] = []
     const unsubscribe = ds.subscribe((e) => events.push(e))
     
     expect(typeof unsubscribe).toBe('function')
@@ -151,7 +152,7 @@ describe('IpcDataSource', () => {
   })
   
   it('subscribe receives done event', async () => {
-    const events: any[] = []
+    const events: DataEvent[] = []
     ds.subscribe((e) => events.push(e))
     
     // Simulate done event from IPC
@@ -179,7 +180,7 @@ describe('IpcDataSource', () => {
     }]
 
     // Subscribe to populate trackIdToPath map
-    const events: any[] = []
+    const events: DataEvent[] = []
     ds.subscribe((e) => events.push(e))
 
     // Simulate receiving the batch to populate trackIdToPath map
@@ -218,7 +219,7 @@ describe('IpcDataSource', () => {
     }]
 
     // Subscribe to populate trackIdToPath map
-    const events: any[] = []
+    const events: DataEvent[] = []
     ds.subscribe((e) => events.push(e))
 
     // Simulate receiving the batch to populate trackIdToPath map
@@ -312,7 +313,7 @@ describe('IpcDataSource', () => {
   })
   
   it('handles multiple batch events correctly', async () => {
-    const events: any[] = []
+    const events: DataEvent[] = []
     ds.subscribe((e) => events.push(e))
     
     const batch1 = [{ id: 'track-1', path: '/music/1.mp3', title: 'Song 1', artist: 'A', album: 'B', duration: 180, format: 'mp3', size: 1024, coverColor: '#000' }]

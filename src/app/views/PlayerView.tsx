@@ -4,6 +4,7 @@ import { WaveformProgress } from '../components/atomic/WaveformProgress'
 import { useWindowScale } from '../hooks'
 
 
+/** `m:ss` for a playback position; `0:00` for missing/non-finite input. */
 function formatTime (seconds: number): string {
   if (!seconds || !Number.isFinite(seconds))
     return '0:00'

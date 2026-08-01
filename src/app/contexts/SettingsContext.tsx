@@ -119,7 +119,6 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
   const host = useHost()
 
   useEffect(() => {
-
     /** Hydrate settings on mount and resolve the default music dir if needed. */
     const init = async () => {
       const loaded = await loadSettings()

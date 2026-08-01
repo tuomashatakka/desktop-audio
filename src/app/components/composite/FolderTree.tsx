@@ -19,6 +19,7 @@ interface FolderTreeProps {
   readonly level?:       number
 }
 
+/** See the interface docs above; recurses one level per nested folder. */
 export function FolderTree ({ folders, selectedPath, onSelect, onToggle, level = 0 }: FolderTreeProps) {
   return (
     <ul className='folder-tree' style={{ '--level': level } as React.CSSProperties}>

@@ -1,11 +1,29 @@
 version = 1
 
+# The landing page under public/ is hand-written presentation code — a ~1300-line
+# canvas animation whose style profile (single-letter math locals like W/H/x/y/r,
+# dozens of small inline draw callbacks) is idiomatic there but trips the app
+# rules ~250 times. The genuine findings it surfaced have been fixed; keeping it
+# in scope buries real issues under naming noise.
+exclude_patterns = [
+  "public/**"
+]
+
+test_patterns = [
+  "tests/**"
+]
+
 [[analyzers]]
 name = "javascript"
 enabled = true
 
   [analyzers.meta]
     environment = ["nodejs", "browser"]
+
+    # Inline callbacks (event handlers, effect cleanups, array predicates) are
+    # described by their call site; a JSDoc block on each adds noise without
+    # meaning. Named top-level functions are still required to be documented.
+    skip_doc_coverage = ["arrow-function", "function-expression"]
 
 [[analyzers]]
 name = "test-coverage"

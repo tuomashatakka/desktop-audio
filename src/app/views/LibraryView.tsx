@@ -41,6 +41,7 @@ const GROUPING_LABEL: Record<Grouping, string> = {
 }
 
 
+/** Library screen: header with breadcrumbs and view controls, plus the track table. */
 export function LibraryView () {
   const { sidebarOpen, toggleSidebar, setEditingTrack, selectedFolderPath, selectedPlaylistId, selectFolder, density, setDensity, grouping, setGrouping } = useUI()
   const { filteredTracks, playlists, addPlaylist, searchQuery, setSearchQuery, selectTrack, isLoading } = useLibrary()

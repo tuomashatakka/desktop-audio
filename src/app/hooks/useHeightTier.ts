@@ -32,6 +32,7 @@ export const COMPACT_MAX_HEIGHT = 300
 /** Below this height only the title, art and next button survive. */
 export const MINI_MAX_HEIGHT = 160
 
+/** Maps a window height to its tier. See the threshold constants above. */
 function tierFor (height: number): HeightTier {
   if (height < MINI_MAX_HEIGHT)
     return 'mini'
@@ -59,8 +60,9 @@ export function useHeightTier (): HeightTier {
     handler()
 
     window.addEventListener('resize', handler)
-    return () =>
+    return () => {
       window.removeEventListener('resize', handler)
+    }
   }, [])
 
   return tier

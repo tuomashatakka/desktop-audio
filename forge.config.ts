@@ -112,8 +112,9 @@ const config: ForgeConfig = {
     onlyModules: ['better-sqlite3'],
   },
   hooks: {
-    packageAfterPrune: async (_forgeConfig, buildPath) => {
+    packageAfterPrune: (_forgeConfig, buildPath) => {
       stripNativeBuildInputs(buildPath);
+      return Promise.resolve();
     },
   },
   makers: [

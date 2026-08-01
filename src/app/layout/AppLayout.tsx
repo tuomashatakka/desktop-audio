@@ -10,6 +10,7 @@ interface AppLayoutProps {
   readonly player?:   ReactNode
 }
 
+/** App shell: optional titlebar, sidebar and player around the main view. */
 export function AppLayout ({ titlebar, sidebar, main, player }: AppLayoutProps) {
   const { sidebarOpen } = useUI()
   const heightTier = useHeightTier()

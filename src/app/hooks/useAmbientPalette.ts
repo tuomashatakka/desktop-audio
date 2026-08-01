@@ -32,16 +32,19 @@ const VARS = [ '--ambient-1', '--ambient-2', '--ambient-3' ] as const
 
 type Rgb = readonly [number, number, number]
 
+/** Relative luminance (Rec. 709 weights), used to order stops dark → light. */
 function luminance ([ r, g, b ]: Rgb): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
+/** HSV saturation, used to prefer colourful buckets over near-greys. */
 function saturation ([ r, g, b ]: Rgb): number {
   const max = Math.max(r, g, b)
   const min = Math.min(r, g, b)
   return max === 0 ? 0 : (max - min) / max
 }
 
+/** Formats a sampled colour as a CSS `rgb()` string. */
 function toCss ([ r, g, b ]: Rgb): string {
   return `rgb(${Math.round(r)} ${Math.round(g)} ${Math.round(b)})`
 }

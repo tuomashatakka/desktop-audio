@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import type { Track } from './LibraryContext'
 import { useHost, useData } from '../data'
+import { noop } from '../utils/noop'
 
 
 /** Read-only playback state. */
@@ -111,11 +112,11 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   const data = useData()
 
   // Refs for MediaSession handlers to avoid circular deps
-  const pauseRef = useRef<() => void>(() => {})
-  const resumeRef = useRef<() => void>(() => {})
-  const seekRef = useRef<(time: number) => void>(() => {})
-  const playNextRef = useRef<(tracks: readonly Track[]) => void>(() => {})
-  const playPreviousRef = useRef<(tracks: readonly Track[]) => void>(() => {})
+  const pauseRef = useRef<() => void>(noop)
+  const resumeRef = useRef<() => void>(noop)
+  const seekRef = useRef<(time: number) => void>(noop)
+  const playNextRef = useRef<(tracks: readonly Track[]) => void>(noop)
+  const playPreviousRef = useRef<(tracks: readonly Track[]) => void>(noop)
 
   // Track the current playlist being played
   const currentQueueRef = useRef<Track[]>([])
@@ -336,7 +337,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
           .then(bars =>
             setState(s =>
               ({ ...s, waveformBars: bars })))
-          .catch(() => {})
+          .catch(noop)
       }
     }
     catch (error) {
