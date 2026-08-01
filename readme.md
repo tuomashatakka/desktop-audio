@@ -11,12 +11,10 @@ left. Album art goes first, then the buttons — the title and the progress line
 are the last things standing. At its smallest it's a strip of chrome that still
 plays your music.
 
-| | |
-|:--:|:--:|
-| ![Mini player in a short wide window with art, controls and waveform side by side](public/screenshots/mini-player-landscape.png) | ![Mini player in a tall narrow window with the full stacked layout](public/screenshots/mini-player-portrait.png) |
-| **Landscape** — art, controls & waveform | **Portrait** — the full stack, narrowed |
-| ![Mini player with the album art dropped, title over waveform and controls](public/screenshots/mini-player-compact.png) | ![Smallest mini player showing only album art, track title and the next button](public/screenshots/mini-player-bar.png) |
-| **Compact** — art sheds, controls stack | **Smallest** — art, title, next |
+| | | |
+|:--:|:--:|:--:|
+| ![Mini player in a short wide window with art, controls and waveform side by side](public/screenshots/mini-player-landscape.png) | ![Mini player in a tall narrow window with the full stacked layout](public/screenshots/mini-player-portrait.png) | ![Mini player with the album art dropped, title over waveform and controls](public/screenshots/mini-player-compact.png) |
+| **Landscape** — art, controls & waveform | **Portrait** — the full stack, narrowed | **Compact** — art sheds, controls stack |
 
 ![Mini player as a slim bar with title, next button and a hairline progress line](public/screenshots/mini-player-wide.png)
 

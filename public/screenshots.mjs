@@ -35,11 +35,6 @@ const screenshots = [
     "caption": "Mini player \u2014 Slim bar with hairline progress"
   },
   {
-    "src": "screenshots/mini-player-bar.png",
-    "alt": "Smallest mini player showing only album art, track title and the next button",
-    "caption": "Mini player \u2014 Smallest: art, title, next"
-  },
-  {
     "src": "screenshots/library-view.png",
     "alt": "Library view showing folder tree and track list",
     "caption": "Library \u2014 Folder navigation & track list"
