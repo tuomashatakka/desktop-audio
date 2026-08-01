@@ -22,6 +22,10 @@ export class BrowserHost implements HostBridge {
     return false
   }
 
+  setWindowSize (width: number, height: number): void {
+    console.log('BrowserHost: setWindowSize called (no-op in browser)', width, height)
+  }
+
   onMediaPlayPause (_cb: () => void): () => void {
     return () => {}
   }

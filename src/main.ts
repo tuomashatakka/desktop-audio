@@ -308,6 +308,21 @@ ipcMain.on('window:close', () => {
 ipcMain.handle('window:is-maximized', () =>
   BrowserWindow.getFocusedWindow()?.isMaximized() ?? false)
 
+/**
+ * Resize the focused window's *content* area, so the values round-trip with
+ * the renderer's `window.innerWidth`/`innerHeight`. Un-maximizes first —
+ * `setContentSize` is a no-op on a maximized window.
+ */
+ipcMain.on('window:set-size', (_e, width: number, height: number) => {
+  const win = BrowserWindow.getFocusedWindow()
+  if (!win)
+    return
+  if (win.isMaximized()) {
+    win.unmaximize()
+  }
+  win.setContentSize(Math.round(width), Math.round(height), true)
+})
+
 // ─── Context menu handlers ────────────────────────────────────────────────────
 
 ipcMain.on('contextmenu:show', (_event, payload: {

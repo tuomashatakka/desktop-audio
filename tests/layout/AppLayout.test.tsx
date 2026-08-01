@@ -120,4 +120,36 @@ describe('AppLayout', () => {
     const main = screen.getByTestId('content').closest('.app-main')
     expect(main).toBeInTheDocument()
   })
+
+  it('exposes the window height tier on the shell', () => {
+    Object.defineProperty(window, 'innerHeight', { value: 240, configurable: true, writable: true })
+
+    render(
+      <UIProvider value={{
+        currentView: 'player',
+        previousView: 'library',
+        sidebarOpen: false,
+        selectedFolderPath: null,
+        selectedPlaylistId: null,
+        editingTrackId: null,
+        playerExpanded: false,
+        density: 'normal',
+        grouping: 'none',
+        setView: () => {},
+        toggleSidebar: () => {},
+        selectFolder: () => {},
+        selectPlaylist: () => {},
+        setEditingTrack: () => {},
+        togglePlayerExpanded: () => {},
+        setPlayerExpanded: () => {},
+        setDensity: () => {},
+        setGrouping: () => {},
+      }}>
+        <AppLayout main={<span data-testid="content">Hello</span>} />
+      </UIProvider>
+    )
+
+    const shell = screen.getByTestId('content').closest('.app-shell')
+    expect(shell).toHaveAttribute('data-height-tier', 'compact')
+  })
 })

@@ -4,7 +4,9 @@ export * from './useKeyboardShortcuts'
 
 export * from './useSortableTable'
 
-export * from './useWindowSize'
+export * from './useHeightTier'
+
+export * from './useWindowScale'
 
 export * from './useColumnConfig'
 

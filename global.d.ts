@@ -19,6 +19,7 @@ declare global {
     readonly maximizeWindow: () => void
     readonly closeWindow: () => void
     readonly isMaximized: () => Promise<boolean>
+    readonly setWindowSize: (width: number, height: number) => void
 
     // Media keys
     readonly onMediaPlayPause: (cb: () => void) => () => void

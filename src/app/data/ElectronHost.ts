@@ -24,6 +24,10 @@ export class ElectronHost implements HostBridge {
     return (this._ipc?.isMaximized() as Promise<boolean>) ?? Promise.resolve(false)
   }
 
+  setWindowSize (width: number, height: number): void {
+    this._ipc?.setWindowSize(width, height)
+  }
+
   onMediaPlayPause (cb: () => void): () => void {
     return this._ipc?.onMediaPlayPause(cb) ?? (() => {})
   }

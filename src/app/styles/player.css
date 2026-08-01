@@ -62,6 +62,17 @@
   flex-shrink: 1;
   margin: 0;
 
+  /* It's a <button> (toggles the window size) — strip the native chrome. */
+  padding: 0;
+  border: 0;
+  appearance: none;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-card), 0 0 0 2px var(--border-focus);
+  }
+
   & img {
     width: 100%;
     height: 100%;
@@ -131,17 +142,131 @@
   }
 }
 
-/* ─── Container query: nano tier (≤ 80px tall) ─────── */
+/* ─── Compact tier (window < 300px tall) ─────────────
+   Art moves left; controls sit to the LEFT of the progress bar. Named grid
+   areas do the reordering, so the JSX keeps its natural reading order.
+   Note: this makes tab order (progress → controls) differ from visual order. */
 
-@container (max-height: 80px) {
-  .player-info,
-  .progress-section,
-  .playback-controls :not(.play-pause-btn) {
+.app-shell[data-height-tier='compact'] .player-content,
+.app-shell[data-height-tier='mini'] .player-content {
+  display: grid;
+  align-content: center;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
+
+  & .album-art-card { grid-area: art; }
+  & .player-info    { grid-area: info; text-align: left; }
+  & .progress-section { grid-area: progress; }
+  & .playback-controls { grid-area: controls; }
+}
+
+.app-shell[data-height-tier='compact'] {
+  & .player-view {
+    padding: 0;
+    gap: 0;
+  }
+
+  & .player-content {
+    grid-template-columns: auto auto 1fr;
+    grid-template-areas:
+      'art info     info'
+      'art controls progress';
+  }
+
+  & .album-art-card {
+    width: clamp(56px, 60cqh, 140px);
+    align-self: center;
+  }
+
+  /* Title drops to match the artist/album lines. */
+  & .player-info .track-title {
+    font-size: var(--text-sm);
+    margin: 0 0 var(--sp-1);
+  }
+
+  & .playback-controls {
+    gap: var(--sp-2);
+  }
+
+  & .playback-controls .play-pause-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  & .progress-section .time-row {
+    margin-top: var(--sp-1);
+  }
+}
+
+/* ─── Mini tier (window < 160px tall) ────────────────
+   Art | title | next, with the progress bar as a 4px line pinned to the
+   bottom edge of the window. */
+
+.app-shell[data-height-tier='mini'] {
+  & .player-view {
+    padding: 0;
+    gap: 0;
+  }
+
+  & .player-content {
+    grid-template-columns: auto 1fr auto;
+    /* Reuses the `controls` area name from the shared block above — that
+       selector is more specific, so a rename here would lose and the
+       controls would auto-place onto their own row. */
+    grid-template-areas: 'art info controls';
+    align-items: center;
+    /* Keep content clear of the progress line at the bottom. */
+    padding-bottom: var(--sp-3);
+  }
+
+  & .album-art-card {
+    width: clamp(32px, 70cqh, 72px);
+  }
+
+  & .player-info .track-title {
+    font-size: var(--text-sm);
+    margin: 0;
+  }
+
+  & .player-info .track-artist,
+  & .player-info .track-album {
     display: none;
   }
 
-  .album-art-card {
-    width: clamp(32px, 10cqw, 56px);
+  & .playback-controls {
+    gap: 0;
+  }
+
+  & .playback-controls > :not(.next-btn) {
+    display: none;
+  }
+
+  /* Out of the grid flow entirely: mini's template has no `progress` area,
+     so the abspos box resolves against .player-content's padding box. */
+  & .progress-section {
+    position: absolute;
+    inset: auto 0 0 0;
+    width: 100%;
+  }
+
+  & .progress-section .time-row {
+    display: none;
+  }
+
+  /* Flatten the waveform into a solid 4px bar. Overriding the amplitude
+     transform rather than swapping the component keeps click-to-seek and
+     the role='slider' keyboard handling intact. */
+  & .waveform-progress {
+    height: 4px;
+    min-width: 0;
+    padding: 0;
+  }
+
+  & .wf-bar {
+    transform: none;
+    max-width: none;
+    border-radius: 0;
   }
 }
 

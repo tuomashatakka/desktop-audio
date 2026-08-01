@@ -27,6 +27,18 @@ export interface CustomTheme {
   colors:  Record<string, string>,
 }
 
+/**
+ * Window content dimensions in CSS pixels, matching the renderer's
+ * `window.innerWidth`/`innerHeight`. Cached as `compactSize` (the mini
+ * player) and `expandedSize` (the size restored when growing back) — each
+ * is re-captured on the way out of that size, so resizing the mini window
+ * sticks. See `useWindowScale`.
+ */
+export interface WindowSize {
+  readonly width:  number
+  readonly height: number
+}
+
 /** Persisted settings shape. */
 interface Settings {
   readonly libraryPaths:   readonly string[]
@@ -35,6 +47,8 @@ interface Settings {
   readonly defaultDensity: 'compact' | 'normal' | 'relaxed'
   readonly volume:         number
   readonly repeatMode:     RepeatMode
+  readonly compactSize:    WindowSize
+  readonly expandedSize:   WindowSize
 }
 
 /** Settings plus the action handlers exposed to consumers. */
@@ -48,6 +62,8 @@ interface SettingsContextValue extends Settings {
   readonly setDefaultDensity: (density: 'compact' | 'normal' | 'relaxed') => void
   readonly setVolume:         (volume: number) => void
   readonly setRepeatMode:     (mode: RepeatMode) => void
+  readonly setCompactSize:    (size: WindowSize) => void
+  readonly setExpandedSize:   (size: WindowSize) => void
 }
 
 const STORAGE_KEY = 'desktop-audio-settings'
@@ -62,6 +78,8 @@ const defaultSettings: Settings = {
   defaultDensity: 'normal',
   volume:         0.8,
   repeatMode:     'none',
+  compactSize:    { width: 560, height: 240 },
+  expandedSize:   { width: 1200, height: 800 },
 }
 
 const DEFAULT_CUSTOM_THEME: CustomTheme = {
@@ -184,6 +202,16 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
       ({ ...s, repeatMode: mode }))
   }, [])
 
+  const setCompactSize = useCallback((compactSize: WindowSize) => {
+    setSettings(s =>
+      ({ ...s, compactSize }))
+  }, [])
+
+  const setExpandedSize = useCallback((expandedSize: WindowSize) => {
+    setSettings(s =>
+      ({ ...s, expandedSize }))
+  }, [])
+
   return (
     <SettingsContext.Provider
       value={{
@@ -197,6 +225,8 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
         setDefaultDensity,
         setVolume,
         setRepeatMode,
+        setCompactSize,
+        setExpandedSize,
       }}
     >
       {children}

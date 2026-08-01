@@ -19,6 +19,7 @@ interface ElectronAPI {
   maximizeWindow: () => void
   closeWindow:    () => void
   isMaximized:    () => Promise<boolean>
+  setWindowSize:  (width: number, height: number) => void
 
   // Media keys
   onMediaPlayPause: (cb: () => void) => () => void

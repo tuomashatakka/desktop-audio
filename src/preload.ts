@@ -50,6 +50,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('window:close'),
   isMaximized: () =>
     ipcRenderer.invoke('window:is-maximized'),
+  setWindowSize: (width: number, height: number) =>
+    ipcRenderer.send('window:set-size', width, height),
   onMediaPlayPause: (cb: () => void) => {
     const h = () =>
       cb()

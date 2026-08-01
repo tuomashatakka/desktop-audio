@@ -7,6 +7,31 @@
   background: linear-gradient(135deg, transparent 80%, #fb59cd40 100%);
 }
 
+/* ─── Short-window tiers ───────────────────────────
+   Below 300px tall the chrome is dropped entirely and PlayerView owns the
+   whole window, so the window has to be draggable from the player itself.
+   Tier is set as `data-height-tier` by AppLayout (see useHeightTier). */
+
+.app-shell[data-height-tier='compact'],
+.app-shell[data-height-tier='mini'] {
+  & .titlebar,
+  & .app-player,
+  & .app-sidebar {
+    display: none;
+  }
+
+  & .player-view {
+    -webkit-app-region: drag;
+  }
+
+  /* Drag regions swallow clicks — every control must opt back out. */
+  & .album-art-card,
+  & .playback-controls,
+  & .progress-section {
+    -webkit-app-region: no-drag;
+  }
+}
+
 .app-sidebar {
   align-self: stretch;
   height: 100%;
@@ -154,25 +179,30 @@
  transition: transform var(--duration) var(--ease),
              opacity var(--duration) var(--ease);
 
- & h2 {
+  & h2 {
    font-size: 0.8rem;
    font-weight: 600;
    letter-spacing: 0.04em;
    text-transform: uppercase;
    opacity: 0.7;
    margin: 0;
- }
+  }
 }
 
 .view-header.header-hidden {
- transform: translateY(-100%);
- opacity: 0;
- pointer-events: none;
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .view-content {
- flex: 1;
- overflow: auto;
+  display: flex;
+  flex: 1;
+  overflow: auto;
+
+  > .player-view {
+    flex: 1 0;
+  }
 }
 
 .player-bar {
