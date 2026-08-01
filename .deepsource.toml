@@ -23,7 +23,7 @@ enabled = true
     # Inline callbacks (event handlers, effect cleanups, array predicates) are
     # described by their call site; a JSDoc block on each adds noise without
     # meaning. Named top-level functions are still required to be documented.
-    skip_doc_coverage = ["arrow-function", "function-expression"]
+    skip_doc_coverage = ["arrow-function-expression", "function-expression"]
 
 [[analyzers]]
 name = "test-coverage"
