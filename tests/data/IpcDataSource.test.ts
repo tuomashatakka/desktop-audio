@@ -100,7 +100,36 @@ describe('IpcDataSource', () => {
     expect(mockElectronAPI.loadLibrary).toHaveBeenCalledTimes(1)
     expect(result).toEqual(mockTracks)
   })
-  
+
+  // Regression: tracks restored from SQLite arrive via load(), not via a
+  // scan batch. load() used to skip indexing, so on every app restart the
+  // library rendered fine but playback threw "No path found for trackId".
+  it('load indexes track paths so playback works without a rescan', async () => {
+    const mockTracks: TrackDTO[] = [
+      {
+        id: '/music/song1.mp3',
+        path: '/music/song1.mp3',
+        title: 'Song 1',
+        artist: 'Artist 1',
+        album: 'Album 1',
+        duration: 180,
+        format: 'mp3',
+        size: 1024,
+        coverColor: '#ff0000'
+      }
+    ]
+    mockElectronAPI.loadLibrary.mockResolvedValue(mockTracks)
+
+    await ds.load()
+
+    // No subscribe(), no batch event — exactly the cold-start path
+    await ds.readBytes('/music/song1.mp3')
+    expect(mockElectronAPI.readFile).toHaveBeenCalledWith('/music/song1.mp3')
+
+    await ds.readMetadata('/music/song1.mp3')
+    expect(mockElectronAPI.getAudioMetadata).toHaveBeenCalledWith('/music/song1.mp3')
+  })
+
   it('subscribe receives batch events', async () => {
     const events: any[] = []
     const unsubscribe = ds.subscribe((e) => events.push(e))

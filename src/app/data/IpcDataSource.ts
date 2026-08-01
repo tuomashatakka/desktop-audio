@@ -30,17 +30,28 @@ export class IpcDataSource implements DataSource {
     this._ipc?.scanLibrary([ ...rootIds ])
   }
 
+  /**
+   * readBytes/readMetadata resolve a trackId through this map, so every path
+   * tracks enter the renderer by has to index them — not just live scans.
+   * Tracks restored from SQLite on startup come through load(), which used to
+   * skip this, leaving playback broken until the user triggered a rescan.
+   */
+  private indexPaths (tracks: readonly TrackDTO[]): void {
+    for (const t of tracks) {
+      this.trackIdToPath.set(t.id, t.path)
+    }
+  }
+
   async load (): Promise<readonly TrackDTO[]> {
-    return (this._ipc?.loadLibrary() as Promise<readonly TrackDTO[]>) ?? Promise.resolve([])
+    const tracks = await ((this._ipc?.loadLibrary() as Promise<readonly TrackDTO[]>) ?? Promise.resolve([]))
+    this.indexPaths(tracks)
+    return tracks
   }
 
   subscribe (l: DataListener): () => void {
     const unsubBatch = this._ipc?.onLibraryBatch((batch: unknown[]) => {
       const tracks = batch as TrackDTO[]
-      // Store path mappings for readBytes
-      for (const t of tracks) {
-        this.trackIdToPath.set(t.id, t.path)
-      }
+      this.indexPaths(tracks)
       l({ type: 'batch', tracks })
     }) ?? (() => {})
 
