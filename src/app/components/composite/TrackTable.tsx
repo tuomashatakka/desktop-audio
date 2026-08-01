@@ -1,13 +1,21 @@
 /**
  * TrackTable — the main music list.
  *
- * Renders a sortable, reorderable, resizable column table with three
- * grouping modes (`none` / `album` / `artist|path`) and three densities.
- * Column layout, sort state, and grouping are persisted via context hooks;
- * scrolling uses `@tanstack/react-virtual` for the flat view and native
- * scrolling for grouped views.
+ * A sortable, reorderable, resizable grid with four grouping modes
+ * (`none` / `album` / `artist` / `path`) and three densities. Column layout,
+ * sort state and grouping are persisted via context hooks.
+ *
+ * Layout: one scroll container owns everything. The column header row is the
+ * scroller's first child and `position: sticky`, so it pins as soon as you
+ * scroll past it. The flat list is virtualized with `@tanstack/react-virtual`
+ * (absolutely positioned rows inside a spacer sized to the whole list);
+ * grouped views render in full because their row offsets aren't uniform.
+ *
+ * The div grid carries the full ARIA table role chain (table → rowgroup →
+ * row → columnheader/cell); a real `<table>` can't be virtualized or
+ * column-resized without fighting table layout.
  */
-import { useRef, useEffect, useState, useMemo, useCallback } from 'react'
+import { useRef, useState, useMemo, useEffect, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useSortableTable } from '../../hooks/useSortableTable'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
@@ -16,6 +24,7 @@ import { useUI } from '../../contexts'
 import type { Density, Grouping } from '../../contexts'
 import { Skeleton } from '../atomic/Skeleton'
 import { Popover } from '../atomic/Popover'
+import { Breadcrumbs } from './Breadcrumbs'
 import type { Track } from '../../contexts'
 import type { SortKey } from '../../hooks/useSortableTable'
 
@@ -35,7 +44,8 @@ interface TrackTableProps {
   readonly isPlaying:      boolean
   readonly onPlay:         (track: Track, index: number) => void
   readonly onContextMenu?: (track: Track, rect: DOMRect) => void
-  readonly onScroll?:      (e: Event) => void
+  readonly onNavigate?:    (path: string | null) => void
+  readonly roots?:         readonly string[]
 }
 
 function formatDuration (seconds: number): string {
@@ -64,23 +74,28 @@ function isSortableKey (key: ColumnKey): key is SortKey {
   return key !== 'art' && key !== 'index'
 }
 
+/** Always square, always cropped — see `.album-art` in library.css. */
+function AlbumArt ({ src, color }: { readonly src?: string; readonly color?: string }) {
+  return src
+    ? <img className='album-art' src={src} alt='' loading='lazy' />
+    : <span className='album-art' style={{ background: color }} />
+}
+
 function cellValue (track: Track, key: ColumnKey, index: number, density: Density): React.ReactNode {
   switch (key) {
     case 'art':
-      return track.albumArt
-        ? <img src={track.albumArt} alt='' />
-        : <span className='art-swatch' style={{ background: track.coverColor }} />
+      return <AlbumArt src={track.albumArt} color={track.coverColor} />
     case 'index':
       return index + 1
     case 'title':
       return density === 'relaxed'
         ? <>
-          <span className='row-title'>{track.title}</span>
+          <strong>{track.title}</strong>
 
-          <span className='row-subtitle'>
+          <small>
             {track.artist}
             {track.album ? ` — ${track.album}` : ''}
-          </span>
+          </small>
         </>
         : track.title
     case 'artist': return track.artist
@@ -176,43 +191,27 @@ function HeaderCell ({ col, sortKey, sortDir, toggleSort, onResize, onReorder, o
       onKeyDown={e =>
         sortable && e.key === 'Enter' && toggleSort(col.key as SortKey)}
     >
-      <span className='header-label'>{col.label}</span>
+      <span className='label'>{col.label}</span>
 
       {isSorted &&
-        <span className='sort-indicator' aria-hidden='true'>
-          {sortDir === 'asc' ? ' ▲' : ' ▼'}
-        </span>
+        <span aria-hidden='true'>{sortDir === 'asc' ? '▲' : '▼'}</span>
       }
 
-      <span
-        className='col-resize-handle'
-        onMouseDown={handleResizeStart}
-        aria-hidden='true'
-      />
+      <span className='resize-handle' onMouseDown={handleResizeStart} aria-hidden='true' />
     </div>
   )
 }
 
-interface ColumnMenuProps {
-  readonly anchorRect: DOMRect | null
-  readonly onClose:    () => void
-}
-
-function ColumnMenu ({ anchorRect, onClose }: ColumnMenuProps) {
+function ColumnMenu ({ anchorRect, onClose }: { readonly anchorRect: DOMRect | null; readonly onClose: () => void }) {
   const { columns, toggleColumn, resetColumns } = useColumnConfig()
 
   return (
-    <Popover
-      open={anchorRect !== null}
-      anchorRect={anchorRect}
-      onClose={onClose}
-      placement='bottom'
-    >
-      <fieldset className='column-menu'>
+    <Popover open={anchorRect !== null} anchorRect={anchorRect} onClose={onClose} placement='bottom'>
+      <fieldset className='config-menu'>
         <legend>Columns</legend>
 
         {columns.map(c =>
-          <label key={c.key} className={c.fixed ? 'fixed' : ''}>
+          <label key={c.key}>
             <input
               type='checkbox'
               checked={c.visible}
@@ -266,16 +265,17 @@ function buildGroups (sorted: readonly Track[], grouping: Grouping): readonly Gr
       : grouping === 'artist' ? first.artist || 'Unknown Artist'
       : /* path */ key
 
+    const count = `${tracks.length} track${tracks.length === 1 ? '' : 's'}`
     const subtitle = grouping === 'album'
-      ? `${first.artist || 'Unknown Artist'} · ${tracks.length} track${tracks.length === 1 ? '' : 's'}`
-      : `${tracks.length} track${tracks.length === 1 ? '' : 's'}`
+      ? `${first.artist || 'Unknown Artist'} · ${count}`
+      : count
 
     out.push({ key, label, subtitle, tracks })
   }
   return out
 }
 
-export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay, onContextMenu, onScroll }: TrackTableProps) {
+export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay, onContextMenu, onNavigate, roots = []}: TrackTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const { density, grouping } = useUI()
   const { visible, gridTemplate, resizeColumn, reorderColumn } = useColumnConfig()
@@ -283,52 +283,36 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
 
   const [ menuRect, setMenuRect ] = useState<DOMRect | null>(null)
 
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el || !onScroll)
-      return
-    el.addEventListener('scroll', onScroll)
-    return () =>
-      el.removeEventListener('scroll', onScroll)
-  }, [ onScroll ])
-
   const groups = useMemo(() =>
     buildGroups(sorted, grouping), [ sorted, grouping ])
 
   const rowHeight = ROW_HEIGHT_BY_DENSITY[density]
-  const rowCount = isLoading ? SKELETON_ROW_COUNT : sorted.length
+
+  /** Skeletons stand in for an empty list only — never over cached rows. */
+  const showSkeleton = isLoading && sorted.length === 0
+  const flat = grouping === 'none' || showSkeleton
 
   const virtualizer = useVirtualizer({
-    count:            rowCount,
+    count:            showSkeleton ? SKELETON_ROW_COUNT : flat ? sorted.length : 0,
     getScrollElement: () =>
       scrollRef.current,
     estimateSize: () =>
       rowHeight,
-    overscan: 8,
+    overscan: 12,
   })
 
-  const wrapStyle = useMemo(() =>
-    ({ '--track-grid': gridTemplate } as React.CSSProperties), [ gridTemplate ])
+  const style = useMemo(() =>
+    ({ '--track-grid': gridTemplate, '--row-h': `${rowHeight}px` }) as React.CSSProperties,
+  [ gridTemplate, rowHeight ])
 
-  // Auto-scroll to current track when it changes
-  useEffect(() => {
-    if (!currentTrack || !scrollRef.current || !virtualizer)
-      return
-
-    const trackIndex = sorted.findIndex(t =>
-      t.id === currentTrack.id)
-    if (trackIndex < 0)
-      return
-
-    virtualizer.scrollToIndex(trackIndex, { align: 'center' })
-  }, [ currentTrack?.id, virtualizer, sorted ])
-
-  const renderRow = useCallback((track: Track, index: number) => {
+  const renderRow = useCallback((track: Track, index: number, rowStyle?: React.CSSProperties) => {
     const active = currentTrack?.id === track.id
     return (
       <div
         key={track.id}
         role='row'
+        aria-rowindex={index + 1}
+        style={rowStyle}
         className={`track-row ${active ? 'active' : ''}`}
         onClick={() =>
           onPlay(track, index)}
@@ -342,7 +326,7 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
         aria-selected={active}
       >
         {visible.map(col =>
-          <span key={col.key} className={`col-${col.key}`}>
+          <span key={col.key} role='cell' className={`col-${col.key}`}>
             {col.key === 'index' && active && isPlaying ? '▶' : cellValue(track, col.key, index, density)}
           </span>
         )}
@@ -350,112 +334,143 @@ export function TrackTable ({ tracks, isLoading, currentTrack, isPlaying, onPlay
     )
   }, [ visible, density, currentTrack, isPlaying, onPlay, onContextMenu ])
 
-  const handleHeaderContextMenu = useCallback((rect: DOMRect) => {
-    setMenuRect(rect)
-  }, [])
+  // Keep the playing track in view (flat list only — grouped views aren't
+  // virtualized, so the virtualizer has no offsets to scroll to).
+  useEffect(() => {
+    if (!currentTrack || !flat || showSkeleton)
+      return
+
+    const index = sorted.findIndex(t =>
+      t.id === currentTrack.id)
+    if (index >= 0)
+      virtualizer.scrollToIndex(index, { align: 'center' })
+  }, [ currentTrack?.id, flat, showSkeleton, sorted, virtualizer ])
+
+  /** Row index within the full sorted list, so numbering survives grouping. */
+  const indexOf = useCallback((track: Track, fallback: number) => {
+    const i = sorted.findIndex(x =>
+      x.id === track.id)
+    return i >= 0 ? i : fallback
+  }, [ sorted ])
 
   return (
-    <div className='track-table-wrap' data-density={density} style={wrapStyle}>
+    <div
+      className='track-table'
+      data-density={density}
+      style={style}
+      role='table'
+      aria-label='Tracks'
+      aria-rowcount={sorted.length}
+      aria-busy={isLoading || undefined}
+    >
+      <div ref={scrollRef} className='track-scroll'>
 
-      {/* Sticky header row */}
-      <div className='track-header' role='row'>
-        {visible.map(col =>
-          <HeaderCell
-            key={col.key}
-            col={col}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            toggleSort={toggleSort}
-            onResize={resizeColumn}
-            onReorder={reorderColumn}
-            onContextMenu={handleHeaderContextMenu}
-          />
-        )}
+        <div className='track-header' role='rowgroup'>
+          <div role='row'>
+            {visible.map(col =>
+              <HeaderCell
+                key={col.key}
+                col={col}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                toggleSort={toggleSort}
+                onResize={resizeColumn}
+                onReorder={reorderColumn}
+                onContextMenu={setMenuRect}
+              />
+            )}
+          </div>
+        </div>
+
+        {flat
+          ? <div className='track-body' role='rowgroup' style={{ height: virtualizer.getTotalSize() }}>
+            {virtualizer.getVirtualItems().map(vrow => {
+              const rowStyle: React.CSSProperties = {
+                position:    'absolute',
+                insetInline: 0,
+                top:         0,
+                height:      vrow.size,
+                transform:   `translateY(${vrow.start}px)`,
+              }
+
+              if (showSkeleton)
+                return (
+                  <div key={vrow.key} className='track-row' style={rowStyle} aria-hidden='true'>
+                    {visible.map(col =>
+                      <span key={col.key} className={`col-${col.key}`}>
+                        <Skeleton
+                          width={col.key === 'art' ? 'var(--art)' : '60%'}
+                          height={col.key === 'art' ? 'var(--art)' : undefined}
+                        />
+                      </span>
+                    )}
+                  </div>
+                )
+
+              const track = sorted[vrow.index]
+              return track ? renderRow(track, vrow.index, rowStyle) : null
+            })}
+          </div>
+
+          : <div className='track-body grouped' role='rowgroup' data-grouping={grouping}>
+            {groups.map(g => {
+              const rows = g.tracks.map((t, i) =>
+                renderRow(t, indexOf(t, i)))
+
+              if (grouping === 'album')
+                return (
+                  <section key={g.key} className='track-group album'>
+                    <AlbumArt src={g.tracks[0].albumArt} color={g.tracks[0].coverColor} />
+
+                    <header>
+                      <h3>{g.label}</h3>
+                      <small>{g.subtitle}</small>
+                    </header>
+
+                    <div className='group-rows'>{rows}</div>
+                  </section>
+                )
+
+              // Path groups get a clickable trail instead of a heading, so the
+              // collapse affordance is dropped here — interactive content
+              // inside <summary> would nest buttons.
+              if (grouping === 'path')
+                return (
+                  <section key={g.key} className='track-group path' aria-label={g.key}>
+                    <header>
+                      <Breadcrumbs
+                        path={g.key}
+                        roots={roots}
+                        onNavigate={p =>
+                          onNavigate?.(p)}
+                        label='Group folder'
+                      />
+
+                      <small>{g.subtitle}</small>
+                    </header>
+
+                    {rows}
+                  </section>
+                )
+
+              return (
+                <details key={g.key} className='track-group' open>
+                  <summary>
+                    <span className='group-title'>{g.label}</span>
+                    <small>{g.subtitle}</small>
+                  </summary>
+
+                  {rows}
+                </details>
+              )
+            })}
+          </div>
+        }
       </div>
 
       <ColumnMenu anchorRect={menuRect}
         onClose={() =>
           setMenuRect(null)} />
-
-      {/* Body */}
-      <div ref={scrollRef} className='track-table-scroll'>
-
-        {grouping === 'none' || isLoading
-          ? <div>
-            {isLoading
-              ? virtualizer.getVirtualItems().map(vrow =>
-                <div
-                  key={vrow.key}
-                  className='track-row skeleton-row'
-                  style={{ height: rowHeight }}
-                  aria-hidden='true'
-                >
-                  {visible.map(col =>
-                    <span key={col.key} className={`col-${col.key}`}>
-                      <Skeleton width={col.key === 'art' ? '24px' : '60%'} height={col.key === 'art' ? '24px' : undefined} />
-                    </span>
-                  )}
-                </div>
-              )
-              : sorted.map((track, idx) => {
-                if (!track)
-                  return null
-                return (
-                  <div key={track.id} style={{ height: rowHeight }}>
-                    {renderRow(track, idx)}
-                  </div>
-                )
-              })
-            }
-          </div>
-          : grouping === 'album'
-            ? <div className='track-groups album-groups'>
-              {groups.map(g => {
-                const first = g.tracks[0]
-                return (
-                  <div key={g.key} className='track-album-group'>
-                    <div className='group-art'>
-                      {first.albumArt
-                        ? <img src={first.albumArt} alt='' />
-                        : <span className='swatch' style={{ background: first.coverColor }} />
-                      }
-                    </div>
-
-                    <div className='group-meta'>
-                      <span className='group-title'>{g.label}</span>
-                      <span className='group-subtitle'>{g.subtitle}</span>
-                    </div>
-
-                    <div className='group-tracks'>
-                      {g.tracks.map((t, i) => {
-                        const idx = sorted.findIndex(x =>
-                          x.id === t.id)
-                        return renderRow(t, idx >= 0 ? idx : i)
-                      })}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            : <div className='track-groups flat-groups'>
-              {groups.map(g =>
-                <details key={g.key} className='track-flat-group' open>
-                  <summary className='track-group-header'>
-                    <span className='group-title'>{g.label}</span>
-                    <span className='group-subtitle'>{g.subtitle}</span>
-                  </summary>
-
-                  {g.tracks.map(t => {
-                    const idx = sorted.findIndex(x =>
-                      x.id === t.id)
-                    return renderRow(t, idx)
-                  })}
-                </details>
-              )}
-            </div>
-        }
-      </div>
-
     </div>
   )
 }

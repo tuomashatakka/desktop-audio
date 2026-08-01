@@ -10,7 +10,7 @@
 import { useCallback } from 'react'
 import { useSettings, useUI } from '../contexts'
 import { useHost } from '../data'
-import { COMPACT_MAX_HEIGHT } from './useHeightTier'
+import { CHROME_MAX_HEIGHT } from './useHeightTier'
 
 
 /** Returns a callback that toggles the window between compact and expanded. */
@@ -22,7 +22,9 @@ export function useWindowScale () {
   return useCallback(() => {
     const current = { width: window.innerWidth, height: window.innerHeight }
 
-    if (current.height < COMPACT_MAX_HEIGHT) {
+    // "Am I currently the small window?" — that's the chrome threshold, not
+    // the layout one: everything below it is a chrome-less mini window.
+    if (current.height < CHROME_MAX_HEIGHT) {
       setCompactSize(current)
       setView(previousView ?? 'library')
       host.setWindowSize(expandedSize.width, expandedSize.height)

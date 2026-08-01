@@ -1,146 +1,99 @@
+/**
+ * LibrarySidebar — folder tree + playlists.
+ *
+ * Only mounted while the sidebar is open (see AppLayout), so there is no
+ * internal open/closed state. Both sections are native `<details>`, so their
+ * collapse is CSS/platform behaviour rather than React state.
+ */
 import { useLibrary, useUI } from '../contexts'
 import { FolderTree } from '../components/composite/FolderTree'
-import type { FolderEntry } from '../models'
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 
+
+const MIN_WIDTH = 180
+const MAX_WIDTH = 400
 
 export function LibrarySidebar () {
   const { registry, playlists, toggleFolder, addPlaylist } = useLibrary()
-  const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist, sidebarOpen } = useUI()
+  const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist } = useUI()
 
-  const [ foldersCollapsed, setFoldersCollapsed ] = useState(false)
-  const [ playlistsCollapsed, setPlaylistsCollapsed ] = useState(false)
-  const [ sidebarWidth, setSidebarWidth ] = useState(220)
-  const sidebarRef = useRef<HTMLDivElement>(null)
-  const isResizing = useRef(false)
+  const [ width, setWidth ] = useState(220)
 
   const folders = Array.from(registry.folders.values())
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    isResizing.current = true
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing.current)
-        return
+    const onMove = (ev: MouseEvent) =>
+      setWidth(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, ev.clientX)))
 
-      const newWidth = Math.max(180, Math.min(400, e.clientX))
-      setSidebarWidth(newWidth)
-    }
-
-    const handleMouseUp = () => {
-      isResizing.current = false
+    const onUp = () => {
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
     }
 
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
   }, [])
 
-  const handleFolderSelect = (path: string) => {
-    selectFolder(path)
-  }
-
-  const handleFolderToggle = (path: string) => {
-    toggleFolder(path)
-  }
-
-  const handleNewPlaylist = () => {
-    addPlaylist('New Playlist')
-  }
-
   return (
-    <div
-      ref={sidebarRef}
-      className='library-sidebar'
-      style={{
-        width:    sidebarOpen ? sidebarWidth : 0,
-        minWidth: sidebarOpen ? 180 : 0,
-        overflow: sidebarOpen ? 'auto' : 'hidden',
-      }}
-    >
-      {sidebarOpen &&
-        <>
-          <div
-            className='sidebar-resize-handle'
-            onMouseDown={handleMouseDown}
-          />
+    <nav className='library-sidebar' style={{ width }} aria-label='Library'>
+      <span
+        className='resize-handle'
+        onMouseDown={handleResizeStart}
+        role='separator'
+        aria-orientation='vertical'
+      />
 
-          {/* ─── Folders section ───────────────────── */}
-          <div className='sidebar-section'>
-            <button
-              className='sidebar-section-header'
-              onClick={() =>
-                setFoldersCollapsed(c =>
-                  !c)}
-              aria-expanded={!foldersCollapsed}
-            >
-              <span className={`section-chevron ${foldersCollapsed ? '' : 'open'}`}>›</span>
-              <span>Folders</span>
-            </button>
+      <details open>
+        <summary>Folders</summary>
 
-            {!foldersCollapsed &&
         <FolderTree
           folders={folders}
           selectedPath={selectedFolderPath}
-          onSelect={handleFolderSelect}
-          onToggle={handleFolderToggle}
+          onSelect={selectFolder}
+          onToggle={toggleFolder}
         />
-            }
-          </div>
+      </details>
 
-          {/* ─── Playlists section ─────────────────── */}
-          <div className='sidebar-section'>
-            <button
-              className='sidebar-section-header'
-              onClick={() =>
-                setPlaylistsCollapsed(c =>
-                  !c)}
-              aria-expanded={!playlistsCollapsed}
-            >
-              <span className={`section-chevron ${playlistsCollapsed ? '' : 'open'}`}>›</span>
-              <span>Playlists</span>
+      <details open>
+        {/* The "new playlist" control is the last list item rather than a
+            button inside <summary> — nesting a button in a summary nests
+            two buttons in the a11y tree. */}
+        <summary>Playlists</summary>
 
+        <ul className='playlist-list'>
+          {playlists.map(playlist =>
+            <li key={playlist.id}>
               <button
-                className='playlist-new-btn'
-                onClick={e => {
-                  e.stopPropagation()
-                  handleNewPlaylist()
-                }}
-                title='New playlist'
-                aria-label='New playlist'
+                type='button'
+                className={selectedPlaylistId === playlist.id ? 'active' : ''}
+                aria-current={selectedPlaylistId === playlist.id || undefined}
+                onClick={() =>
+                  selectPlaylist(playlist.id)}
               >
-                +
+                <span aria-hidden='true'>♩</span>
+                <span className='name'>{playlist.name}</span>
+                <small>{playlist.tracks.length}</small>
               </button>
-            </button>
+            </li>
+          )}
 
-            {!playlistsCollapsed &&
-          <nav className='playlist-list'>
-            {playlists.length === 0
-              ? <span className='playlist-empty'>No playlists yet</span>
-              : playlists.map(playlist =>
-                <button
-                  key={playlist.id}
-                  className={`playlist-item ${selectedPlaylistId === playlist.id ? 'active' : ''}`}
-                  onClick={() =>
-                    selectPlaylist(playlist.id)}
-                >
-                  <span className='playlist-icon' aria-hidden='true'>♩</span>
-                  <span className='playlist-name'>{playlist.name}</span>
-                  <span className='playlist-count'>{playlist.tracks.length}</span>
-                </button>
-              )
-            }
-          </nav>
-            }
-          </div>
-        </>
-      }
-    </div>
+          <li>
+            <button type='button'
+              className='add-playlist'
+              onClick={() =>
+                addPlaylist('New Playlist')}>
+              <span aria-hidden='true'>+</span>
+              <span className='name'>New playlist</span>
+            </button>
+          </li>
+        </ul>
+      </details>
+    </nav>
   )
 }

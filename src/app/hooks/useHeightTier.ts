@@ -11,10 +11,23 @@ import { useState, useEffect } from 'react'
 
 
 /** Window-height bucket driving the player layout. */
-export type HeightTier = 'normal' | 'compact' | 'mini'
+export type HeightTier = 'normal' | 'snug' | 'compact' | 'mini'
 
-/** Below this height the player goes side-by-side and chrome is hidden. */
-export const COMPACT_MAX_HEIGHT = 300
+/**
+ * Below this height the chrome (40px titlebar + 72px player bar) eats more of
+ * the window than it earns, so it's hidden and PlayerView takes the lot.
+ *
+ * This is a hard geometric floor, not a styling preference — it's separate
+ * from {@link COMPACT_MAX_HEIGHT} precisely so the *layout* can stay normal
+ * for a while after the chrome goes.
+ */
+export const CHROME_MAX_HEIGHT = 300
+
+/**
+ * Below this height the player switches to the side-by-side compact layout.
+ * Matches the 260px container-width breakpoint in player.css.
+ */
+export const COMPACT_MAX_HEIGHT = 260
 
 /** Below this height only the title, art and next button survive. */
 export const MINI_MAX_HEIGHT = 160
@@ -24,6 +37,8 @@ function tierFor (height: number): HeightTier {
     return 'mini'
   if (height < COMPACT_MAX_HEIGHT)
     return 'compact'
+  if (height < CHROME_MAX_HEIGHT)
+    return 'snug'
   return 'normal'
 }
 

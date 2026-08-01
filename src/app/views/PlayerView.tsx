@@ -57,7 +57,10 @@ export function PlayerView () {
 
         {/* Track info */}
         <div className='player-info'>
-          <h2 className='track-title'>{currentTrack.title}</h2>
+          {/* The inner span is the marquee track: it sizes to the text so CSS
+              can compare it against the title box and scroll only the
+              overflow. See `.track-title` in player.css. */}
+          <h2 className='track-title'><span>{currentTrack.title}</span></h2>
           <p className='track-artist'>{currentTrack.artist}</p>
           <p className='track-album'>{currentTrack.album}</p>
         </div>

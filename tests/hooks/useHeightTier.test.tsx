@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
-import { useHeightTier, COMPACT_MAX_HEIGHT, MINI_MAX_HEIGHT } from '../../src/app/hooks/useHeightTier'
+import { useHeightTier, CHROME_MAX_HEIGHT, COMPACT_MAX_HEIGHT, MINI_MAX_HEIGHT } from '../../src/app/hooks/useHeightTier'
 
 const ORIGINAL_HEIGHT = window.innerHeight
 
@@ -27,7 +27,9 @@ describe('useHeightTier', () => {
 
   it.each([
     [ 800, 'normal' ],
-    [ COMPACT_MAX_HEIGHT, 'normal' ],
+    [ CHROME_MAX_HEIGHT, 'normal' ],
+    [ CHROME_MAX_HEIGHT - 1, 'snug' ],
+    [ COMPACT_MAX_HEIGHT, 'snug' ],
     [ COMPACT_MAX_HEIGHT - 1, 'compact' ],
     [ MINI_MAX_HEIGHT, 'compact' ],
     [ MINI_MAX_HEIGHT - 1, 'mini' ],
@@ -38,12 +40,15 @@ describe('useHeightTier', () => {
     expect(screen.getByTestId('tier')).toHaveTextContent(expected)
   })
 
-  it('updates as the window is resized across both thresholds', () => {
+  it('updates as the window is resized across every threshold', () => {
     setHeight(800)
     render(<Probe />)
     const tier = screen.getByTestId('tier')
 
     expect(tier).toHaveTextContent('normal')
+
+    resizeTo(280)
+    expect(tier).toHaveTextContent('snug')
 
     resizeTo(240)
     expect(tier).toHaveTextContent('compact')

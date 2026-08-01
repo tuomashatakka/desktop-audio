@@ -59,7 +59,9 @@
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
   overflow: hidden;
-  flex-shrink: 1;
+  /* Never shrink: in a column flex a shrinking height would defeat
+     `aspect-ratio` and the art would stop being square. */
+  flex: 0 0 auto;
   margin: 0;
 
   /* It's a <button> (toggles the window size) — strip the native chrome. */
@@ -142,7 +144,43 @@
   }
 }
 
-/* ─── Compact tier (window < 300px tall) ─────────────
+/* ─── Short windows, normal layout (the `snug` tier) ───
+   Once the chrome is gone the player owns the whole window, but the default
+   stack is sized for a tall one. Compress it so it still fits.
+
+   Left at (0,1,0) specificity on purpose: the compact/mini tier blocks below
+   are attribute-qualified and therefore always win, so this only bites in the
+   band where the layout is still the normal one. */
+
+/* .player-view is itself the container, and a container query never applies
+   to its own container — so its own box has to be sized off the tier. */
+.app-shell[data-height-tier='snug'] .player-view {
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+}
+
+@container (max-height: 300px) {
+  .album-art-card { width: clamp(48px, 26cqh, 120px); }
+
+  .player-info .track-title {
+    font-size: var(--text-base);
+    margin-bottom: var(--sp-1);
+  }
+
+  .player-info .track-album { display: none; }
+
+  .playback-controls { gap: var(--sp-4); }
+
+  .playback-controls .play-pause-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+
+  .progress-section .time-row { margin-top: var(--sp-1); }
+}
+
+/* ─── Compact tier (window < 260px tall) ─────────────
    Art moves left; controls sit to the LEFT of the progress bar. Named grid
    areas do the reordering, so the JSX keeps its natural reading order.
    Note: this makes tab order (progress → controls) differ from visual order. */
@@ -171,6 +209,31 @@
     grid-template-areas:
       'art info     info'
       'art controls progress';
+  }
+
+  /* Art is the first thing to go — the controls still have to be reachable.
+     Side-by-side controls/progress stop working around here too: below 260px
+     neither gets a usable share of the row, so they stack in the conventional
+     title → progress → controls order instead. */
+  @container (max-width: 260px) {
+    & .album-art-card { display: none; }
+
+    & .player-content {
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        'info'
+        'progress'
+        'controls';
+    }
+
+    & .playback-controls { justify-content: center; }
+  }
+
+  /* Stacking costs vertical space, which is exactly what's scarce down here —
+     shed the album line and the timestamps to buy it back. */
+  @container (max-width: 260px) and (max-height: 200px) {
+    & .player-info .track-album { display: none; }
+    & .progress-section .time-row { display: none; }
   }
 
   & .album-art-card {
@@ -242,6 +305,26 @@
     display: none;
   }
 
+  /* Shedding order as the window narrows: album art, then the next button.
+     The title and the progress line are the last things standing. */
+  @container (max-width: 260px) {
+    & .album-art-card { display: none; }
+
+    & .player-content {
+      grid-template-columns: 1fr auto;
+      grid-template-areas: 'info controls';
+    }
+  }
+
+  @container (max-width: 180px) {
+    & .playback-controls { display: none; }
+
+    & .player-content {
+      grid-template-columns: 1fr;
+      grid-template-areas: 'info';
+    }
+  }
+
   /* Out of the grid flow entirely: mini's template has no `progress` area,
      so the abspos box resolves against .player-content's padding box. */
   & .progress-section {
@@ -275,6 +358,7 @@
 .player-info {
   text-align: center;
   width: 100%;
+  min-width: 0;
 
   & .track-title {
     font-size: var(--text-xl);
@@ -288,6 +372,44 @@
 
   & .track-artist { font-size: var(--text-sm); color: var(--text-dim); margin: 0 0 var(--sp-1); }
   & .track-album  { font-size: var(--text-sm); color: var(--text-muted); margin: 0; }
+}
+
+/* ─── Marquee title (tight tiers only) ───────────────
+   Self-disabling: `100cqw` is the title box, `100%` is the text. A title that
+   fits makes the difference positive, `min()` clamps it to 0, and the
+   animation runs but never moves. No JS measurement, no overflow class. */
+
+.app-shell[data-height-tier='compact'],
+.app-shell[data-height-tier='mini'] {
+  & .player-info .track-title {
+    container-type: inline-size;
+    text-overflow: clip;
+
+    & > span {
+      display: inline-block;
+      white-space: nowrap;
+      animation: title-marquee 12s var(--ease) infinite;
+    }
+  }
+}
+
+@keyframes title-marquee {
+  0%,
+  15% { transform: translateX(0); }
+
+  50%,
+  65% { transform: translateX(min(0px, calc(100cqw - 100%))); }
+
+  100% { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-info .track-title > span { animation: none; }
+
+  .app-shell[data-height-tier='compact'] .player-info .track-title,
+  .app-shell[data-height-tier='mini'] .player-info .track-title {
+    text-overflow: ellipsis;
+  }
 }
 
 /* ─── Progress section ─────────────────────────── */

@@ -10,8 +10,11 @@
 /* ─── Short-window tiers ───────────────────────────
    Below 300px tall the chrome is dropped entirely and PlayerView owns the
    whole window, so the window has to be draggable from the player itself.
+   `snug` is chrome-less but still uses the *normal* player layout; `compact`
+   and `mini` change the layout too (see player.css).
    Tier is set as `data-height-tier` by AppLayout (see useHeightTier). */
 
+.app-shell[data-height-tier='snug'],
 .app-shell[data-height-tier='compact'],
 .app-shell[data-height-tier='mini'] {
   & .titlebar,
@@ -56,10 +59,14 @@
   width: 100%;
 }
 
+/* The view owns its own scrolling: .app-main just supplies a definite height
+   so a nested `overflow: auto` (the track list) has something to size against. */
 .app-main {
+  display: flex;
+  flex-direction: column;
   flex: 1;
-  overflow: auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .titlebar {
@@ -166,18 +173,12 @@
 /* .main-content removed - now using .app-shell grid layout */
 
 .view-header {
- position: sticky;
- top: 0;
- z-index: 10;
  padding: var(--sp-4) var(--sp-6);
  border-bottom: 1px solid var(--border);
  display: flex;
  align-items: center;
- justify-content: space-between;
  gap: var(--sp-4);
  background: var(--bg);
- transition: transform var(--duration) var(--ease),
-             opacity var(--duration) var(--ease);
 
   & h2 {
    font-size: 0.8rem;
@@ -189,19 +190,22 @@
   }
 }
 
-.view-header.header-hidden {
-  transform: translateY(-100%);
-  opacity: 0;
-  pointer-events: none;
-}
-
+/* Scrolls for views that are just long documents (settings, tag editor);
+   yields to views that manage their own scroll container. */
 .view-content {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: auto;
 
-  > .player-view {
-    flex: 1 0;
+  &:has(> .library),
+  &:has(> .player-view) {
+    overflow: hidden;
+  }
+
+  > * {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 }
 
@@ -230,7 +234,7 @@
 
 .player-bar-art {
  width: 40px;
- height: 40px;
+ aspect-ratio: 1;
  background: var(--bg-hover);
  border-radius: var(--radius);
  overflow: hidden;
