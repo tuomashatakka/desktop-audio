@@ -65,7 +65,7 @@ export function LibraryToolbar () {
 
         <li>
           <fieldset className='density-toggle'>
-            <legend>Row density</legend>
+            <legend className='sr-only'>Row density</legend>
 
             {DENSITIES.map(densityOption =>
               <label key={densityOption} title={`${densityOption} density`}>

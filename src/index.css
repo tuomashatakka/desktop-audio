@@ -1,18 +1,1 @@
 @import './app/styles/main.css';
-
-@layer base {
-  html, body, #app {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    background: transparent;
-  }
-
-  body {
-    -webkit-app-region: no-drag;
-  }
-
-  #app {
-    background-color: var(--bg)
-  }
-}
