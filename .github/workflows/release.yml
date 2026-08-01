@@ -67,7 +67,7 @@ jobs:
             slug: linux-x64
           - os: macos-latest
             slug: darwin-arm64
-          - os: macos-13
+          - os: macos-15-intel
             slug: darwin-x64
           - os: windows-latest
             slug: win32-x64
@@ -106,10 +106,89 @@ jobs:
       - name: Generate icons
         run: bun scripts/generate-icon.mjs
 
+      - name: Configure macOS release signing
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [[ -z "$MACOS_CERTIFICATE" ]]; then
+            echo "::warning::MACOS_CERTIFICATE is not configured; this artifact will be ad-hoc signed and cannot pass Gatekeeper automatically"
+            exit 0
+          fi
+
+          missing=0
+          for name in MACOS_CERTIFICATE_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::$name must be configured when MACOS_CERTIFICATE is set"
+              missing=1
+            fi
+          done
+          [[ "$missing" == 0 ]] || exit 1
+
+          certificate_path="$RUNNER_TEMP/developer-id-application.p12"
+          keychain_path="$RUNNER_TEMP/app-signing.keychain-db"
+          keychain_password="$(openssl rand -base64 32)"
+          printf '%s' "$MACOS_CERTIFICATE" | base64 --decode > "$certificate_path"
+
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$keychain_path"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -k "$keychain_password" \
+            "$keychain_path"
+
+          signing_identity="$(security find-identity -v -p codesigning "$keychain_path" \
+            | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' \
+            | head -n 1)"
+          if [[ -z "$signing_identity" ]]; then
+            echo "::error::The imported certificate does not contain a Developer ID Application identity"
+            exit 1
+          fi
+
+          printf 'MACOS_SIGNING_IDENTITY=%s\n' "$signing_identity" >> "$GITHUB_ENV"
+          printf 'MACOS_KEYCHAIN_PATH=%s\n' "$keychain_path" >> "$GITHUB_ENV"
+
       - name: Build application
+        if: runner.os != 'macOS'
         run: bun run make
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build macOS application
+        if: runner.os == 'macOS'
+        run: bun run make
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Verify macOS application trust
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          app_path="$(find out -maxdepth 2 -type d -name '*.app' -print -quit)"
+          if [[ -z "$app_path" ]]; then
+            echo "::error::No packaged macOS application was found"
+            exit 1
+          fi
+
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          if [[ -n "${MACOS_SIGNING_IDENTITY:-}" ]]; then
+            xcrun stapler validate "$app_path"
+            spctl --assess --type execute --verbose=2 "$app_path"
+          else
+            echo "::warning::$app_path has a valid ad-hoc signature but is not notarized"
+          fi
 
       - name: Collect artifacts
         shell: bash

@@ -42,6 +42,40 @@ function dependencyClosure (roots: string[]): Set<string> {
 
 const bundledModules = dependencyClosure(externalModules);
 
+const macOsSigningIdentity = process.env.MACOS_SIGNING_IDENTITY;
+const macOsKeychainPath = process.env.MACOS_KEYCHAIN_PATH;
+const appleId = process.env.APPLE_ID;
+const appleIdPassword = process.env.APPLE_APP_SPECIFIC_PASSWORD;
+const appleTeamId = process.env.APPLE_TEAM_ID;
+
+const macOsNotarizeConfig = macOsSigningIdentity && appleId && appleIdPassword && appleTeamId
+  ? {
+      appleId,
+      appleIdPassword,
+      teamId: appleTeamId,
+    }
+  : undefined;
+
+/**
+ * Fuses mutate Electron's executable, so every macOS build needs a final signing
+ * pass. Local and credential-free CI builds use an ad-hoc identity; release CI
+ * upgrades to Developer ID signing and notarization when its secrets are set.
+ */
+const macOsPackagerConfig: ForgeConfig['packagerConfig'] = process.platform === 'darwin'
+  ? {
+      osxSign: macOsSigningIdentity
+        ? {
+            identity: macOsSigningIdentity,
+            ...(macOsKeychainPath ? { keychain: macOsKeychainPath } : {}),
+          }
+        : {
+            identity: '-',
+            identityValidation: false,
+          },
+      ...(macOsNotarizeConfig ? { osxNotarize: macOsNotarizeConfig } : {}),
+    }
+  : {};
+
 /**
  * The Vite plugin's default `ignore` keeps only `/.vite`, which silently drops
  * every externalized dependency and produces an app that cannot start. Keep
@@ -106,6 +140,7 @@ const config: ForgeConfig = {
     asar: true,
     icon: './assets/icon',
     ignore: ignorePackagedFile,
+    ...macOsPackagerConfig,
   },
   rebuildConfig: {
     force: true,

@@ -43,3 +43,21 @@ bun run make         # production build
 ```
 
 See [CLAUDE.md](CLAUDE.md) for architecture notes.
+
+## macOS release signing
+
+Local macOS packages and CI builds without Apple credentials receive a valid
+ad-hoc signature. That is useful for development, but downloaded artifacts will
+not pass Gatekeeper automatically.
+
+For trusted public artifacts, configure these GitHub Actions repository secrets:
+
+- `MACOS_CERTIFICATE`: a base64-encoded Developer ID Application `.p12`
+- `MACOS_CERTIFICATE_PASSWORD`: the `.p12` export password
+- `APPLE_ID`: the Apple developer account email
+- `APPLE_APP_SPECIFIC_PASSWORD`: an app-specific password for notarization
+- `APPLE_TEAM_ID`: the ten-character Apple developer team ID
+
+The release workflow imports the certificate into a temporary keychain, signs
+the app, submits it to Apple for notarization, staples the ticket, and verifies
+both the signature and Gatekeeper assessment before uploading the artifact.
