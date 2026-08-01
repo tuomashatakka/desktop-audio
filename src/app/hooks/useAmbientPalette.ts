@@ -3,7 +3,7 @@
  *
  * The art is drawn into a tiny offscreen canvas and quantised into colour
  * buckets; the three most common buckets, ordered dark → light, become
- * `--ambient-1/2/3` on the root element. `body::before` in app.css builds its
+ * `--ambient-1/2/3` on the root element. `body::before` in layout.css builds its
  * gradient from those, so the whole app takes on the colour of what's playing.
  *
  * Note this deliberately does *not* use `track.coverColor` as the primary

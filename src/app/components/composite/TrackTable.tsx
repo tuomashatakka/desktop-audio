@@ -73,7 +73,7 @@ function isSortableKey (key: ColumnKey): key is SortKey {
   return key !== 'art' && key !== 'index'
 }
 
-/** Always square, always cropped — see `.album-art` in library.css. */
+/** Always square, always cropped — see `.album-art` in views.css. */
 function AlbumArt ({ src, color }: { readonly src?: string; readonly color?: string }) {
   return src
     ? <img className='album-art' src={src} alt='' loading='lazy' />
@@ -342,8 +342,8 @@ export function TrackTable ({
   })
 
   const style = useMemo(() =>
-    ({ '--track-grid': gridTemplate, '--row-h': `${rowHeight}px` }) as React.CSSProperties,
-  [ gridTemplate, rowHeight ])
+    ({ '--track-grid': gridTemplate }) as React.CSSProperties,
+  [ gridTemplate ])
 
   useEffect(() => {
     const currentIndex = currentTrack

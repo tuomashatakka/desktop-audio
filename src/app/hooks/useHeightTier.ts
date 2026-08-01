@@ -25,7 +25,7 @@ export const CHROME_MAX_HEIGHT = 480
 
 /**
  * Below this height the player switches to the side-by-side compact layout.
- * Matches the 300px container-width breakpoint in player.css.
+ * Matches the compact-player breakpoint in layout.css.
  */
 export const COMPACT_MAX_HEIGHT = 300
 

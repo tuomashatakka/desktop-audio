@@ -7,3 +7,26 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+:where(.prompt-actions, .footer-actions) {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+:where(
+  .library-heading h1,
+  .breadcrumbs button,
+  .breadcrumbs [aria-current],
+  .track-header .label,
+  .track-row > span,
+  .playlist-list .name,
+  .folder-name,
+  .path-item > span,
+  .file-info dd
+) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

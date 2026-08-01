@@ -1,9 +1,9 @@
 /**
  * LibrarySidebar — folder tree + playlists.
  *
- * Only mounted while the sidebar is open (see AppLayout), so there is no
- * internal open/closed state. Both sections are native `<details>`, so their
- * collapse is CSS/platform behaviour rather than React state.
+ * Mounted once by AppLayout and hidden or revealed from shell state in CSS.
+ * Both sections are native `<details>`, so their collapse is platform
+ * behaviour rather than duplicated React state.
  */
 import { useLibrary, useUI } from '../contexts'
 import { FolderTree } from '../components/composite/FolderTree'

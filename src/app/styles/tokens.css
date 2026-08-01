@@ -1,7 +1,4 @@
-/* ============================================================
-   MONO design system fonts — shared with the Android app.
-   JetBrains Mono intentionally dropped; only Montserrat + Sofia Pro ship.
-   ============================================================ */
+/* MONO fonts and the small semantic token API consumed by the app. */
 @font-face {
   font-family: "Montserrat";
   src: url("./fonts/Montserrat-Hairline.otf") format("opentype");
@@ -9,6 +6,7 @@
   font-style: normal;
   font-display: swap;
 }
+
 @font-face {
   font-family: "Montserrat";
   src: url("./fonts/Montserrat-Light.otf") format("opentype");
@@ -16,6 +14,7 @@
   font-style: normal;
   font-display: swap;
 }
+
 @font-face {
   font-family: "Montserrat";
   src: url("./fonts/Montserrat-Regular.otf") format("opentype");
@@ -23,6 +22,7 @@
   font-style: normal;
   font-display: swap;
 }
+
 @font-face {
   font-family: "Montserrat";
   src: url("./fonts/Montserrat-Black.otf") format("opentype");
@@ -30,6 +30,7 @@
   font-style: normal;
   font-display: swap;
 }
+
 @font-face {
   font-family: "Sofia Pro";
   src: url("./fonts/SofiaProLight.ttf") format("truetype");
@@ -38,108 +39,72 @@
   font-display: swap;
 }
 
-/* ============================================================
-   TWO-TIER DESIGN TOKENS
+/* Registered colours let the album-art wash cross-fade between tracks. */
+@property --ambient-1 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #606080;
+}
 
-   Tier 1 — MONO PRIMITIVES (--mono-*, --accent-*, --grad-*, --glow-*)
-     The single source of truth, lifted verbatim from the MONO design
-     canvas (system/colors_and_type.css). Re-theme the whole app by
-     editing only this tier.
+@property --ambient-2 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #f090f0;
+}
 
-   Tier 2 — SEMANTIC ALIASES (--bg, --accent, --text, --radius, …)
-     The app-facing API every component reads. Each one points at a
-     Tier-1 primitive, so swapping the palette never touches a component.
-
-   Dark, flat, sharp. Saturated accents. Cinematic blurs.
-   ============================================================ */
+@property --ambient-3 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #ffafb0;
+}
 
 @layer tokens {
   :root {
-    /* ──────────────────────────────────────────────────────────
-       TIER 1 — MONO PRIMITIVES
-       ────────────────────────────────────────────────────────── */
-
-    /* surfaces */
+    /* palette primitives */
     --mono-ink: #0b0b10;
     --mono-onyx: #111118;
     --mono-graphite: #1a1a22;
     --mono-slate: #2a2a35;
-
-    /* foreground */
     --mono-fg1: #f4f4f8;
     --mono-fg2: #c5c5d0;
     --mono-fg3: #8888a0;
-    --mono-fg4: #555568;
     --mono-fg-inverse: #0a0a0e;
-
-    /* accents */
     --mono-turquoise: #00e5d1;
     --mono-turquoise-glow: #5cffec;
-    --mono-turquoise-muted: rgba(0, 229, 209, 0.14);
     --mono-crimson: #ff2e7e;
-    --mono-crimson-muted: rgba(255, 46, 126, 0.14);
     --mono-violet: #c8b6ff;
-    --mono-violet-muted: rgba(200, 182, 255, 0.14);
-
-    /* semantic primitives */
     --mono-success: #5dffa0;
     --mono-warning: #ffd166;
     --mono-info: #5cd1ff;
 
-    /* hairline borders */
-    --mono-border-hairline: rgba(255, 255, 255, 0.06);
-    --mono-border-soft: rgba(255, 255, 255, 0.10);
-    --mono-border-strong: rgba(255, 255, 255, 0.20);
-
-    /* accent glows */
-    --glow-turquoise: 0 0 0 1px var(--mono-turquoise-muted), 0 0 32px rgba(0, 229, 209, 0.25);
-
-    /* backdrop blur */
-
-    /* ──────────────────────────────────────────────────────────
-       TIER 2 — SEMANTIC ALIASES (app API → primitives)
-       ────────────────────────────────────────────────────────── */
-
-    /* surfaces */
+    /* app-facing colour roles */
     --bg: var(--mono-ink);
     --bg-raised: var(--mono-onyx);
     --bg-input: var(--mono-graphite);
     --bg-hover: var(--mono-slate);
-
-    /* accent — MONO turquoise is primary */
-    --accent: var(--mono-turquoise);
-    --accent-hover: var(--mono-turquoise-glow);
-    --accent-muted: var(--mono-turquoise-muted);
-    --accent-alt: var(--mono-violet);
-    --accent-contrast: var(--mono-fg-inverse);
-
-    /* status */
-    --success: var(--mono-success);
-    --warning: var(--mono-warning);
-    --danger: var(--mono-crimson);
-    --info: var(--mono-info);
-    --success-muted: rgba(93, 255, 160, 0.12);
-    --warning-muted: rgba(255, 209, 102, 0.12);
-    --danger-muted: var(--mono-crimson-muted);
-    --info-muted: rgba(92, 209, 255, 0.12);
-
-    /* text */
     --text: var(--mono-fg1);
     --text-dim: var(--mono-fg2);
     --text-muted: var(--mono-fg3);
-
-    /* borders */
-    --border: var(--mono-border-soft);
-    --border-hover: var(--mono-border-strong);
+    --accent: var(--mono-turquoise);
+    --accent-hover: var(--mono-turquoise-glow);
+    --accent-alt: var(--mono-violet);
+    --accent-contrast: var(--mono-fg-inverse);
+    --accent-muted: color-mix(in srgb, var(--accent) 14%, transparent);
+    --success: var(--mono-success);
+    --warning: var(--mono-warning);
+    --danger: var(--mono-crimson);
+    --danger-muted: color-mix(in srgb, var(--danger) 14%, transparent);
+    --info: var(--mono-info);
+    --border: rgb(255 255 255 / 10%);
+    --border-hover: rgb(255 255 255 / 20%);
     --border-focus: var(--accent);
+    --overlay: rgb(0 0 0 / 60%);
+    --shell-wash: rgb(251 89 205 / 25%);
 
-    /* ── TYPOGRAPHY (shared with the Android app) ──────────────── */
-    /* Sofia Pro Light is a cinematic display face; Montserrat carries UI/body. */
-    --font-display: "Sofia Pro", "Montserrat", system-ui, -apple-system, sans-serif;
-    --font: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    /* JetBrains Mono dropped — system monospace fallback only. */
+    /* type */
+    --font-display: "Sofia Pro", "Montserrat", system-ui, sans-serif;
+    --font: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-mono: "SF Mono", Monaco, "Cascadia Code", monospace;
-
     --text-xs: 11px;
     --text-sm: 12px;
     --text-base: 14px;
@@ -147,12 +112,12 @@
     --text-xl: 20px;
     --text-2xl: 24px;
     --text-3xl: 32px;
-
     --weight-light: 300;
     --font-medium: 500;
     --font-semibold: 600;
 
-    /* ── SPACING (4px base) ────────────────────────────────────── */
+    /* 4px spacing scale */
+    --sp-0-5: 2px;
     --sp-1: 4px;
     --sp-2: 8px;
     --sp-3: 12px;
@@ -161,50 +126,38 @@
     --sp-8: 32px;
     --sp-12: 48px;
 
-    /* ── RADII — MONO is sharp by default ──────────────────────── */
-    --radius-xs: 0;
-    --radius-sm: 0;
+    /* MONO is deliberately sharp: one square and one softened radius. */
     --radius: 0;
     --radius-lg: 2px;
-    --radius-xl: 2px;
     --radius-full: 9999px;
+    --titlebar-h: 40px;
 
-    /* ── ELEVATION ─────────────────────────────────────────────── */
-    --shadow-lg: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 12px 32px rgba(0, 0, 0, 0.5);
-    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 32px 80px rgba(0, 0, 0, 0.7);
+    --shadow-lg: 0 1px 0 rgb(255 255 255 / 5%) inset, 0 12px 32px rgb(0 0 0 / 50%);
+    --shadow-card: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 32px 80px rgb(0 0 0 / 70%);
+    --accent-glow: 0 0 0 1px var(--accent-muted), 0 0 32px color-mix(in srgb, var(--accent) 25%, transparent);
+    --focus-ring: 0 0 0 2px var(--border-focus);
 
-    /* ── MOTION ────────────────────────────────────────────────── */
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
     --duration-fast: 100ms;
     --duration: 200ms;
     --duration-slow: 300ms;
 
-    /* ── WAVEFORM (played portion rides the accent) ────────────── */
-    --wf-unplayed: rgba(255, 255, 255, 0.15);
+    --wf-unplayed: rgb(255 255 255 / 15%);
     --wf-played: var(--accent);
   }
 
-  /* ────────────────────────────────────────────────────────────
-     LIGHT THEME — only surfaces/text/border/elevation flip.
-     The MONO accent + typography stay constant across themes.
-     ──────────────────────────────────────────────────────────── */
-  [data-theme="light"] {
+  [data-theme='light'] {
     --bg: #f0f0f0;
-    --bg-raised: #ffffff;
+    --bg-raised: #fff;
     --bg-input: #e8e8e8;
     --bg-hover: #dedede;
-
-    --text: #111111;
-    --text-dim: #444444;
-    --text-muted: #888888;
-
-    --border: rgba(0, 0, 0, 0.08);
-    --border-hover: rgba(0, 0, 0, 0.18);
-
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06);
-    --shadow-card: 0 12px 40px rgba(0, 0, 0, 0.12);
-
-    --wf-unplayed: rgba(0, 0, 0, 0.13);
-    --wf-played: var(--accent);
+    --text: #111;
+    --text-dim: #444;
+    --text-muted: #888;
+    --border: rgb(0 0 0 / 8%);
+    --border-hover: rgb(0 0 0 / 18%);
+    --shadow-lg: 0 8px 24px rgb(0 0 0 / 10%), 0 2px 8px rgb(0 0 0 / 6%);
+    --shadow-card: 0 12px 40px rgb(0 0 0 / 12%);
+    --wf-unplayed: rgb(0 0 0 / 13%);
   }
 }

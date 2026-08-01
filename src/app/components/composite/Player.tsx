@@ -111,7 +111,7 @@ function PlayerVolume ({ hasTrack, volume, onChange }: {
  * Mounted once, permanently, in the shell's footer — never conditionally
  * rendered per view. Whether it reads as a transport bar along the bottom or
  * as a full-window now-playing screen is decided entirely in CSS, off
- * `data-view` and `data-height-tier` on `.app-shell`. See `player.css`.
+ * `data-view` and `data-height-tier` on `.app-shell`. See `layout.css`.
  *
  * The class hooks here (`.player-view`, `.player-content`, `.album-art-card`,
  * `.player-info`, `.progress-section`, `.playback-controls`) are a deliberate
@@ -153,7 +153,7 @@ export function Player () {
 
         {/* The inner span on the title is the marquee track: it sizes to the
             text so CSS can compare it against the title box and scroll only
-            the overflow. See `.track-title` in player.css. */}
+            the overflow. See `.track-title` in layout.css. */}
         <hgroup className='player-info'>
           <h2 className='track-title'>
             <span>{currentTrack?.title ?? 'Nothing playing'}</span>
