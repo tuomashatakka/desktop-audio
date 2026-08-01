@@ -7,69 +7,86 @@ export function Titlebar () {
   const bridge = useBridge()
 
   return (
-    <div className='titlebar-drag'>
+    <>
       <div className='titlebar-logo'>
-        <span className='logo-icon'>♫</span>
+        <span className='logo-icon' aria-hidden='true'>♫</span>
         <span className='logo-text'>Desktop Audio</span>
       </div>
 
-      <nav className='titlebar-nav'>
-        <button
-          className={`nav-item ${currentView === 'library' ? 'active' : ''}`}
-          onClick={() =>
-            setView('library')}
-        >
-          <span className='nav-icon'>♫</span>
-          Library
-        </button>
+      <nav aria-label='Primary'>
+        <ul className='titlebar-nav'>
+          <li>
+            <button
+              className='nav-item'
+              aria-current={currentView === 'library' ? 'page' : undefined}
+              onClick={() =>
+                setView('library')}
+            >
+              <span className='nav-icon' aria-hidden='true'>♫</span>
+              Library
+            </button>
+          </li>
 
-        <button
-          className={`nav-item ${currentView === 'player' ? 'active' : ''}`}
-          onClick={() =>
-            setView('player')}
-        >
-          <span className='nav-icon'>▶</span>
-          Player
-        </button>
+          <li>
+            <button
+              className='nav-item'
+              aria-current={currentView === 'player' ? 'page' : undefined}
+              onClick={() =>
+                setView('player')}
+            >
+              <span className='nav-icon' aria-hidden='true'>▶</span>
+              Player
+            </button>
+          </li>
 
-        <button
-          className={`nav-item ${currentView === 'settings' ? 'active' : ''}`}
-          onClick={() =>
-            setView('settings')}
-        >
-          <span className='nav-icon'>⚙</span>
-          Settings
-        </button>
+          <li>
+            <button
+              className='nav-item'
+              aria-current={currentView === 'settings' ? 'page' : undefined}
+              onClick={() =>
+                setView('settings')}
+            >
+              <span className='nav-icon' aria-hidden='true'>⚙</span>
+              Settings
+            </button>
+          </li>
+        </ul>
       </nav>
 
-      <div className='titlebar-controls'>
-        <button
-          className='titlebar-btn'
-          onClick={() =>
-            bridge.minimizeWindow()}
-          aria-label='Minimize'
-        >
-          ─
-        </button>
+      <menu className='titlebar-controls' aria-label='Window controls'>
+        <li>
+          <button
+            className='titlebar-btn'
+            onClick={() =>
+              bridge.minimizeWindow()}
+            aria-label='Minimize'
+          >
+            <span aria-hidden='true'>─</span>
+          </button>
+        </li>
 
-        <button
-          className='titlebar-btn'
-          onClick={() =>
-            bridge.maximizeWindow()}
-          aria-label='Maximize'
-        >
-          □
-        </button>
+        <li>
+          <button
+            className='titlebar-btn'
+            onClick={() =>
+              bridge.maximizeWindow()}
+            aria-label='Maximize'
+          >
+            <span aria-hidden='true'>□</span>
+          </button>
+        </li>
 
-        <button
-          className='titlebar-btn titlebar-btn-close'
-          onClick={() =>
-            bridge.closeWindow()}
-          aria-label='Close'
-        >
-          ✕
-        </button>
-      </div>
-    </div>
+        <li>
+          <button
+            className='titlebar-btn titlebar-btn-close'
+            onClick={() =>
+              bridge.closeWindow()}
+            aria-label='Close'
+          >
+            <span aria-hidden='true'>✕</span>
+          </button>
+        </li>
+      </menu>
+    </>
   )
 }

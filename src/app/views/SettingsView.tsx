@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react'
-import { useSettings, useUI } from '../contexts'
+import { useRef } from 'react'
+import type { ChangeEvent } from 'react'
+import { useSettings } from '../contexts'
 import type { RepeatMode, Theme, CustomTheme } from '../contexts'
 import { useData } from '../data'
 import { useThemeApply } from '../hooks'
@@ -27,6 +28,13 @@ const THEME_COLORS = [
   { key: '--wf-played', label: 'Waveform Played' },
 ]
 
+const SETTINGS_SECTIONS = [
+  { id: 'settings-library', label: 'Library' },
+  { id: 'settings-appearance', label: 'Appearance' },
+  { id: 'settings-playback', label: 'Playback' },
+  { id: 'settings-about', label: 'About' },
+] as const
+
 export function SettingsView () {
   const {
     libraryPaths, theme, customTheme, defaultDensity,
@@ -35,20 +43,16 @@ export function SettingsView () {
     setTheme, setCustomTheme, exportTheme, importTheme, setDefaultDensity,
     setVolume, setRepeatMode,
   } = useSettings()
-  const { density, setDensity } = useUI()
   const data = useData()
+  const themeFileRef = useRef<HTMLInputElement>(null)
 
-  const [ activeSection, setActiveSection ] = useState('library')
-
-  // Apply custom theme for live preview
   useThemeApply(theme, theme === 'custom' ? customTheme : null)
 
   const handleAddPath = async () => {
     try {
       const path = await data.addRoot()
-      if (path) {
+      if (path)
         addLibraryPath(path)
-      }
     }
     catch (error) {
       console.error('Failed to add path:', error)
@@ -56,14 +60,12 @@ export function SettingsView () {
   }
 
   const handleColorChange = (key: string, value: string) => {
-    if (theme !== 'custom') {
+    if (theme !== 'custom')
       setTheme('custom')
-    }
 
     const updated = exportTheme()
     updated.colors[key] = value
     setCustomTheme(updated)
-    // Live preview
     document.documentElement.style.setProperty(key, value)
   }
 
@@ -71,37 +73,27 @@ export function SettingsView () {
     const themeData = exportTheme()
     const blob = new Blob([ JSON.stringify(themeData, null, 2) ], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${themeData.name || 'custom-theme'}.json`
-    a.click()
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${themeData.name || 'custom-theme'}.json`
+    link.click()
     URL.revokeObjectURL(url)
   }
 
-  const handleImportTheme = () => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.json'
-    input.onchange = e => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (!file)
-        return
+  const handleThemeFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file)
+      return
 
-      const reader = new FileReader()
-      reader.onload = () => {
-        try {
-          const data = JSON.parse(reader.result as string) as CustomTheme
-          if (data.version === 1 && data.colors) {
-            importTheme(data)
-          }
-        }
-        catch {
-          // Invalid theme file
-        }
-      }
-      reader.readAsText(file)
+    try {
+      const imported = JSON.parse(await file.text()) as CustomTheme
+      if (imported.version === 1 && imported.colors)
+        importTheme(imported)
     }
-    input.click()
+    catch {
+      // An invalid theme leaves the current theme untouched.
+    }
   }
 
   const handleSaveTheme = () => {
@@ -113,199 +105,174 @@ export function SettingsView () {
 
   return (
     <div className='settings-view'>
-      {/* Left rail navigation */}
-      <nav className='settings-nav'>
-        <button
-          className={activeSection === 'library' ? 'active' : ''}
-          onClick={() =>
-            setActiveSection('library')}
-        >
-          Library
-        </button>
-
-        <button
-          className={activeSection === 'appearance' ? 'active' : ''}
-          onClick={() =>
-            setActiveSection('appearance')}
-        >
-          Appearance
-        </button>
-
-        <button
-          className={activeSection === 'playback' ? 'active' : ''}
-          onClick={() =>
-            setActiveSection('playback')}
-        >
-          Playback
-        </button>
-
-        <button
-          className={activeSection === 'about' ? 'active' : ''}
-          onClick={() =>
-            setActiveSection('about')}
-        >
-          About
-        </button>
+      <nav className='settings-nav' aria-label='Settings sections'>
+        <ul>
+          {SETTINGS_SECTIONS.map(({ id, label }) =>
+            <li key={id}>
+              <a href={`#${id}`}>{label}</a>
+            </li>
+          )}
+        </ul>
       </nav>
 
-      {/* Right pane */}
       <div className='settings-pane'>
-        {activeSection === 'library' &&
-          <section id='library'>
-            <h4>Library</h4>
+        <section id='settings-library' aria-labelledby='settings-library-heading'>
+          <h2 id='settings-library-heading'>Library</h2>
+          <p className='section-description'>Library folders to scan for audio files</p>
 
-            <div className='stack sm'>
-              <p className='section-description'>Library folders to scan for audio files</p>
+          {libraryPaths.length === 0
+            ? <p className='status-message'>No library paths added</p>
+            : <ul className='path-list'>
+              {libraryPaths.map(path =>
+                <li key={path} className='path-item'>
+                  <span title={path}>{path}</span>
 
-              {libraryPaths.length === 0
-                ? <p className='status-message'>No library paths added</p>
-                : <div className='path-list stack sm'>
-                  {libraryPaths.map(path =>
-                    <div key={path} className='path-item'>
-                      <span>{path}</span>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='sm'
+                    aria-label={`Remove ${path}`}
+                    onClick={() =>
+                      removeLibraryPath(path)}
+                  >
+                    <span aria-hidden='true'>×</span>
+                  </Button>
+                </li>
+              )}
+            </ul>
+          }
 
-                      <Button
-                        variant='ghost'
-                        size='sm'
-                        onClick={() =>
-                          removeLibraryPath(path)}
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              }
+          <Button type='button' variant='secondary' onClick={handleAddPath}>Add Folder</Button>
 
-              <Button variant='secondary' onClick={handleAddPath}>Add Folder</Button>
+          <label className='field default-density'>
+            <span>Default Row Density</span>
 
-              <div className='field' style={{ marginTop: 'var(--sp-4)' }}>
-                <span>Default Row Density</span>
+            <select
+              className='select'
+              value={defaultDensity}
+              onChange={event =>
+                setDefaultDensity(event.target.value as typeof defaultDensity)}
+            >
+              <option value='compact'>Compact</option>
+              <option value='normal'>Normal</option>
+              <option value='relaxed'>Relaxed</option>
+            </select>
+          </label>
+        </section>
 
-                <select
-                  className='select'
-                  value={defaultDensity}
-                  onChange={e =>
-                    setDefaultDensity(e.target.value as typeof defaultDensity)}
-                >
-                  <option value='compact'>Compact</option>
-                  <option value='normal'>Normal</option>
-                  <option value='relaxed'>Relaxed</option>
-                </select>
-              </div>
-            </div>
-          </section>
-        }
+        <section id='settings-appearance' aria-labelledby='settings-appearance-heading'>
+          <h2 id='settings-appearance-heading'>Appearance</h2>
 
-        {activeSection === 'appearance' &&
-          <section id='theme'>
-            <h4>Appearance</h4>
+          <label className='field'>
+            <span>Theme</span>
 
-            <div className='stack sm'>
-              <label className='field'>
-                <span>Theme</span>
+            <select
+              className='select'
+              value={theme}
+              onChange={event =>
+                setTheme(event.target.value as Theme)}
+            >
+              <option value='dark'>Dark</option>
+              <option value='light'>Light</option>
+              <option value='custom'>Custom</option>
+            </select>
+          </label>
 
-                <select
-                  className='select'
-                  value={theme}
-                  onChange={e =>
-                    setTheme(e.target.value as Theme)}
-                >
-                  <option value='dark'>Dark</option>
-                  <option value='light'>Light</option>
-                  <option value='custom'>Custom</option>
-                </select>
-              </label>
+          <div className='theme-editor' hidden={theme !== 'custom'}>
+            <h3>Custom Theme Colors</h3>
 
-              {theme === 'custom' &&
-                <div className='theme-editor'>
-                  <h5>Custom Theme Colors</h5>
+            <ul className='color-grid'>
+              {THEME_COLORS.map(({ key, label }) =>
+                <li key={key} className='color-field'>
+                  <label>
+                    <span>{label}</span>
 
-                  <div className='color-grid'>
-                    {THEME_COLORS.map(({ key, label }) =>
-                      <div key={key} className='color-field'>
-                        <label>
-                          <span>{label}</span>
+                    <input
+                      type='color'
+                      value={currentColors[key] || '#000000'}
+                      onChange={event =>
+                        handleColorChange(key, event.target.value)}
+                    />
 
-                          <input
-                            type='color'
-                            value={currentColors[key] || '#000000'}
-                            onChange={e =>
-                              handleColorChange(key, e.target.value)}
-                          />
+                    <span className='color-value'>{currentColors[key] || ''}</span>
+                  </label>
+                </li>
+              )}
+            </ul>
 
-                          <span className='color-value'>{currentColors[key] || ''}</span>
-                        </label>
-                      </div>
-                    )}
-                  </div>
+            <menu className='theme-actions'>
+              <li><Button type='button' variant='secondary' size='sm' onClick={handleSaveTheme}>Save</Button></li>
+              <li><Button type='button' variant='secondary' size='sm' onClick={handleExportTheme}>Export</Button></li>
 
-                  <div className='theme-actions cluster'>
-                    <Button variant='secondary' size='sm' onClick={handleSaveTheme}>Save</Button>
-                    <Button variant='secondary' size='sm' onClick={handleExportTheme}>Export</Button>
-                    <Button variant='secondary' size='sm' onClick={handleImportTheme}>Import</Button>
-                  </div>
-                </div>
-              }
-            </div>
-          </section>
-        }
+              <li>
+                <Button type='button'
+                  variant='secondary'
+                  size='sm'
+                  onClick={() =>
+                    themeFileRef.current?.click()}>
+                  Import
+                </Button>
+              </li>
+            </menu>
 
-        {activeSection === 'playback' &&
-          <section id='playback'>
-            <h4>Playback</h4>
+            <input
+              ref={themeFileRef}
+              type='file'
+              accept='.json,application/json'
+              aria-label='Import custom theme'
+              hidden
+              onChange={handleThemeFile}
+            />
+          </div>
+        </section>
 
-            <div className='stack sm'>
-              <label className='field'>
-                <span>Default Volume</span>
+        <section id='settings-playback' aria-labelledby='settings-playback-heading'>
+          <h2 id='settings-playback-heading'>Playback</h2>
 
-                <div className='volume-control cluster'>
-                  <input
-                    type='range'
-                    className='slider'
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={volume}
-                    onChange={e =>
-                      setVolume(Number(e.target.value))}
-                  />
+          <label className='field'>
+            <span>Default Volume</span>
 
-                  <span className='volume-value mono text-sm'>
-                    {Math.round(volume * 100)}
-                    %
-                  </span>
-                </div>
-              </label>
+            <span className='volume-setting'>
+              <input
+                id='settings-volume'
+                type='range'
+                className='slider'
+                min={0}
+                max={1}
+                step={0.01}
+                value={volume}
+                onChange={event =>
+                  setVolume(Number(event.target.value))}
+              />
 
-              <label className='field'>
-                <span>Repeat Mode</span>
+              <output htmlFor='settings-volume' className='volume-value'>
+                {Math.round(volume * 100)}
+                %
+              </output>
+            </span>
+          </label>
 
-                <select
-                  className='select'
-                  value={repeatMode}
-                  onChange={e =>
-                    setRepeatMode(e.target.value as RepeatMode)}
-                >
-                  <option value='none'>No Repeat</option>
-                  <option value='one'>Repeat One</option>
-                  <option value='all'>Repeat All</option>
-                </select>
-              </label>
-            </div>
-          </section>
-        }
+          <label className='field'>
+            <span>Repeat Mode</span>
 
-        {activeSection === 'about' &&
-          <section id='about'>
-            <h4>About</h4>
+            <select
+              className='select'
+              value={repeatMode}
+              onChange={event =>
+                setRepeatMode(event.target.value as RepeatMode)}
+            >
+              <option value='none'>No Repeat</option>
+              <option value='one'>Repeat One</option>
+              <option value='all'>Repeat All</option>
+            </select>
+          </label>
+        </section>
 
-            <div className='about-content'>
-              <p>Desktop Audio Player v1.0.0</p>
-              <p>Built with Electron + React</p>
-            </div>
-          </section>
-        }
+        <section id='settings-about' aria-labelledby='settings-about-heading'>
+          <h2 id='settings-about-heading'>About</h2>
+          <p>Desktop Audio Player v1.0.0</p>
+          <p>Built with Electron + React</p>
+        </section>
       </div>
     </div>
   )

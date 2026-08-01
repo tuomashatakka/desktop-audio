@@ -110,13 +110,6 @@
   flex-shrink: 0;
 }
 
-.titlebar-drag {
- display: flex;
- align-items: center;
- flex: 1;
- height: 100%;
-}
-
 .titlebar-logo {
  display: flex;
  align-items: center;
@@ -138,6 +131,9 @@
 .titlebar-nav {
  display: flex;
  gap: var(--sp-1);
+ margin: 0;
+ padding: 0;
+ list-style: none;
  -webkit-app-region: no-drag;
 }
 
@@ -160,7 +156,7 @@
    color: var(--text);
  }
 
- &.active {
+ &[aria-current='page'] {
    background: var(--accent-muted);
    color: var(--accent);
  }
@@ -173,7 +169,12 @@
 .titlebar-controls {
  display: flex;
  height: 100%;
+ margin: 0 0 0 auto;
+ padding: 0;
+ list-style: none;
  -webkit-app-region: no-drag;
+
+ & li { height: 100%; }
 }
 
 .titlebar-btn {
