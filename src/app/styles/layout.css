@@ -100,6 +100,8 @@
 
 .titlebar-controls { display: flex; height: 100%; margin-left: auto; -webkit-app-region: no-drag; }
 .titlebar-controls li { height: 100%; }
+:root[data-runtime='browser'] .titlebar { -webkit-app-region: no-drag; }
+:root[data-runtime='browser'] .titlebar-controls { display: none; }
 .titlebar-btn {
   width: 46px;
   height: 100%;

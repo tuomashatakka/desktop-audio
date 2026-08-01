@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 
 
 export default defineConfig(async ({ command }) => {
+  const isBrowser = process.env.VITE_BRIDGE === 'browser'
+  const isWebBuild = command === 'build' && isBrowser
   const react = (await import('@vitejs/plugin-react')).default
   const plugins = [react()]
 
@@ -16,14 +18,28 @@ export default defineConfig(async ({ command }) => {
   //
   // It also pulls undici under bun and breaks
   // `webidl.util.markAsUncloneable`, so it stays out of `vite build` too.
-  if (command === 'serve' && process.env.VITE_BRIDGE === 'browser') {
+  if (command === 'serve' && isBrowser) {
     const { default: mkcert } = await import('vite-plugin-mkcert')
     plugins.push(mkcert())
   }
 
   return {
+    // GitHub Pages hosts the browser build below /app/. Relative asset URLs
+    // keep the artifact portable across project-page and custom-domain roots.
+    ...(isWebBuild
+      ? {
+        base:      './',
+        publicDir: false,
+      }
+      : {}),
     plugins,
     build: {
+      ...(isWebBuild
+        ? {
+          outDir:      'dist/web',
+          emptyOutDir: true,
+        }
+        : {}),
       target:    'chrome146',
       cssTarget: 'chrome146',
     },

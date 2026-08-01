@@ -7,6 +7,8 @@ import './index.css'
 
 
 const isElectron = typeof window !== 'undefined' && Boolean(window.electronAPI)
+document.documentElement.dataset.runtime = isElectron ? 'electron' : 'browser'
+
 const host = isElectron ? new ElectronHost() : new BrowserHost()
 const data = isElectron ? new IpcDataSource() : new WebFsDataSource()
 

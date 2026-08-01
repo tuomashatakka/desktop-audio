@@ -5,10 +5,18 @@ on:
     branches: [main]
   release:
     types: [published]
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       contents: read
       pages: write
@@ -28,11 +36,25 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
       - name: Sync app design tokens into public/
         run: cp src/app/styles/tokens.css public/tokens.css
 
       - name: Generate screenshots manifest
         run: node scripts/build-screenshots-manifest.mjs
+
+      - name: Build browser app
+        run: bun run build:web
+
+      - name: Add browser app to Pages artifact
+        run: |
+          mkdir -p public/app
+          cp -R dist/web/. public/app/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

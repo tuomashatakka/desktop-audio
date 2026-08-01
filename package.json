@@ -18,7 +18,8 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
-    "dev:web": "VITE_BRIDGE=browser vite --config vite.renderer.config.ts"
+    "dev:web": "VITE_BRIDGE=browser vite --config vite.renderer.config.ts",
+    "build:web": "VITE_BRIDGE=browser vite build --config vite.renderer.config.ts"
   },
   "keywords": [],
   "author": {
