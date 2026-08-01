@@ -5,7 +5,7 @@ import { PlayerView } from './views/PlayerView'
 import { SettingsView } from './views/SettingsView'
 import { TagEditorView } from './views/TagEditorView'
 import { PlayerBar } from './components/composite/PlayerBar'
-import { useKeyboardShortcuts } from './hooks'
+import { useKeyboardShortcuts, useAmbientPalette } from './hooks'
 import { useHost } from './data'
 import { AppLayout, Titlebar, LibrarySidebar, ExpandedPlayerPortal } from './layout'
 
@@ -20,6 +20,7 @@ function AppContent () {
 
   // All hooks must be called unconditionally before any early return
   useKeyboardShortcuts()
+  useAmbientPalette()
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)

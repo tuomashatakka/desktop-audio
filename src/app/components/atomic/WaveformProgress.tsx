@@ -67,15 +67,16 @@ export function WaveformProgress ({
       const eased = 1 - Math.pow(1 - progress, 3)
 
       const newBars = new Float32Array(startBars.length)
-      for (let i = 0; i < startBars.length; i++) {
-        newBars[i] = startBars[i] + (targetBars[i] - startBars[i]) * eased
+      for (const [ i, startBar ] of startBars.entries()) {
+        newBars[i] = startBar + (targetBars[i] - startBar) * eased
       }
 
       setAnimatedBars(newBars)
 
       if (progress < 1) {
         requestAnimationFrame(animate)
-      } else {
+      }
+      else {
         setAnimatedBars(null) // Use the real bars directly
       }
     }
@@ -90,14 +91,16 @@ export function WaveformProgress ({
     if (!containerRef.current)
       return
 
-    const observer = new ResizeObserver((entries) => {
+    const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
         setContainerWidth(entry.contentRect.width)
       }
     })
 
     observer.observe(containerRef.current)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+    }
   }, [])
 
   const seekFromEvent = useCallback((clientX: number) => {

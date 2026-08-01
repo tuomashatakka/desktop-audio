@@ -214,6 +214,14 @@ type WorkerMessage =
   { type: 'done'; totalCount: number } |
   { type: 'error'; message: string }
 
+/**
+ * `worker.terminate()` emits 'exit' with code 1, not 0 — a deliberate
+ * shutdown is indistinguishable from a crash without tracking intent.
+ * Without this, every quit prints a spurious "exited with code 1".
+ */
+// eslint-disable-next-line functional/no-let
+let quitting = false
+
 // eslint-disable-next-line functional/no-let
 let scanWorker: Worker | null = null
 
@@ -229,15 +237,17 @@ function getScanWorker (): Worker {
   scanWorker.on('error', err =>
     console.error('[scanner-worker]', err))
   scanWorker.on('exit', code => {
-    if (code !== 0)
+    if (code !== 0 && !quitting)
       console.error('[scanner-worker] exited with code', code)
     scanWorker = null
   })
   return scanWorker
 }
 
-app.on('before-quit', () =>
-  scanWorker?.terminate())
+app.on('before-quit', () => {
+  quitting = true
+  scanWorker?.terminate()
+})
 
 // Streaming scan — delegates all work to the scanner worker
 ipcMain.on('library:scan', (event, dirPaths: string[]) => {
@@ -298,6 +308,21 @@ ipcMain.on('window:close', () => {
 ipcMain.handle('window:is-maximized', () =>
   BrowserWindow.getFocusedWindow()?.isMaximized() ?? false)
 
+/**
+ * Resize the focused window's *content* area, so the values round-trip with
+ * the renderer's `window.innerWidth`/`innerHeight`. Un-maximizes first —
+ * `setContentSize` is a no-op on a maximized window.
+ */
+ipcMain.on('window:set-size', (_e, width: number, height: number) => {
+  const win = BrowserWindow.getFocusedWindow()
+  if (!win)
+    return
+  if (win.isMaximized()) {
+    win.unmaximize()
+  }
+  win.setContentSize(Math.round(width), Math.round(height), true)
+})
+
 // ─── Context menu handlers ────────────────────────────────────────────────────
 
 ipcMain.on('contextmenu:show', (_event, payload: {
@@ -355,15 +380,17 @@ function getDbWriter (): Worker {
   dbWriter.on('error', err =>
     console.error('[db-writer]', err))
   dbWriter.on('exit', code => {
-    if (code !== 0)
+    if (code !== 0 && !quitting)
       console.error('[db-writer] exited with code', code)
     dbWriter = null
   })
   return dbWriter
 }
 
-app.on('before-quit', () =>
-  dbWriter?.terminate())
+app.on('before-quit', () => {
+  quitting = true
+  dbWriter?.terminate()
+})
 
 // ─── Model write handlers ───────────────────────────────────────────────────
 

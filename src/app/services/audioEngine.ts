@@ -93,16 +93,18 @@ export class AudioEngine {
     const handler = () =>
       callback(this.audioElement?.currentTime || 0)
     this.audioElement?.addEventListener('timeupdate', handler)
-    return () =>
+    return () => {
       this.audioElement?.removeEventListener('timeupdate', handler)
+    }
   }
 
   onEnded (callback: () => void): () => void {
     const handler = () =>
       callback()
     this.audioElement?.addEventListener('ended', handler)
-    return () =>
+    return () => {
       this.audioElement?.removeEventListener('ended', handler)
+    }
   }
 
   async getWaveformData (samples: number = 100): Promise<Float32Array> {

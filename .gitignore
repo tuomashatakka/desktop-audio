@@ -93,3 +93,6 @@ typings/
 # Electron-Forge
 out/
 dist/
+
+# Playwright MCP scratch output
+.playwright-mcp/

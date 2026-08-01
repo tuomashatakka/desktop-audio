@@ -74,6 +74,11 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
       const newRegistry = new ModelRegistry()
       for (const track of tracks)
         newRegistry.addTrack(track)
+      // Folders are set separately (only on scan `done`) and must survive a
+      // track-only update — otherwise replaying the cache on remount empties
+      // the sidebar tree and nothing ever puts it back.
+      for (const folder of s.registry.folders.values())
+        newRegistry.addFolder(folder)
       return { ...s, registry: newRegistry }
     })
   }, [])

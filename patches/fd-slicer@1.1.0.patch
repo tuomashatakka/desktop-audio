@@ -1,0 +1,69 @@
+diff --git a/index.js b/index.js
+index 65d32a3ecb7d22329f5465cb2ef127f70e54be43..2cd1d78045d18f358403eb8ecb438da9d352c871 100644
+--- a/index.js
++++ b/index.js
+@@ -87,31 +87,35 @@ function ReadStream(context, options) {
+   this.start = options.start || 0;
+   this.endOffset = options.end;
+   this.pos = this.start;
+-  this.destroyed = false;
++  // NOTE: `destroyed` is an accessor on modern Node's Readable.prototype that
++  // proxies to `_readableState.destroyed`. Assigning it here would make core
++  // treat the stream as destroyed and silently swallow our `push(null)` EOF,
++  // so the stream would never emit 'end'. Track our own state separately.
++  this._fdSlicerDestroyed = false;
+ }
+ 
+ ReadStream.prototype._read = function(n) {
+   var self = this;
+-  if (self.destroyed) return;
++  if (self._fdSlicerDestroyed) return;
+ 
+   var toRead = Math.min(self._readableState.highWaterMark, n);
+   if (self.endOffset != null) {
+     toRead = Math.min(toRead, self.endOffset - self.pos);
+   }
+   if (toRead <= 0) {
+-    self.destroyed = true;
++    self._fdSlicerDestroyed = true;
+     self.push(null);
+     self.context.unref();
+     return;
+   }
+   self.context.pend.go(function(cb) {
+-    if (self.destroyed) return cb();
+-    var buffer = new Buffer(toRead);
++    if (self._fdSlicerDestroyed) return cb();
++    var buffer = Buffer.allocUnsafe(toRead);
+     fs.read(self.context.fd, buffer, 0, toRead, self.pos, function(err, bytesRead) {
+       if (err) {
+         self.destroy(err);
+       } else if (bytesRead === 0) {
+-        self.destroyed = true;
++        self._fdSlicerDestroyed = true;
+         self.push(null);
+         self.context.unref();
+       } else {
+@@ -123,12 +127,16 @@ ReadStream.prototype._read = function(n) {
+   });
+ };
+ 
+-ReadStream.prototype.destroy = function(err) {
+-  if (this.destroyed) return;
+-  err = err || new Error("stream destroyed");
+-  this.destroyed = true;
+-  this.emit('error', err);
+-  this.context.unref();
++// Implement `_destroy` rather than overriding `destroy`. Overriding `destroy`
++// bypasses Node's stream teardown, so 'close' is never emitted -- which makes
++// `stream.pipeline()` / `stream.finished()` hang forever waiting on this
++// stream. Delegating to core also keeps `readable.destroyed` accurate.
++ReadStream.prototype._destroy = function(err, callback) {
++  if (!this._fdSlicerDestroyed) {
++    this._fdSlicerDestroyed = true;
++    this.context.unref();
++  }
++  callback(err);
+ };
+ 
+ util.inherits(WriteStream, Writable);

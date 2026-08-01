@@ -18,6 +18,9 @@ export interface HostBridge {
   closeWindow(): void
   isMaximized(): Promise<boolean>
 
+  /** Resize the window's content area (matches `window.innerWidth/innerHeight`). */
+  setWindowSize(width: number, height: number): void
+
   // Media keys
   onMediaPlayPause(cb: () => void): () => void
   onMediaNext(cb: () => void): () => void

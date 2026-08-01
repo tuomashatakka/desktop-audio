@@ -20,15 +20,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_: unknown, tracks: unknown[]) =>
       cb(tracks)
     ipcRenderer.on('library:batch', handler)
-    return () =>
+    return () => {
       ipcRenderer.removeListener('library:batch', handler)
+    }
   },
   onLibraryDone: (cb: () => void) => {
     const handler = () =>
       cb()
     ipcRenderer.on('library:done', handler)
-    return () =>
+    return () => {
       ipcRenderer.removeListener('library:done', handler)
+    }
   },
 
   // Files
@@ -50,26 +52,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('window:close'),
   isMaximized: () =>
     ipcRenderer.invoke('window:is-maximized'),
+  setWindowSize: (width: number, height: number) =>
+    ipcRenderer.send('window:set-size', width, height),
   onMediaPlayPause: (cb: () => void) => {
     const h = () =>
       cb()
     ipcRenderer.on('media:play-pause', h)
-    return () =>
+    return () => {
       ipcRenderer.removeListener('media:play-pause', h)
+    }
   },
   onMediaNext: (cb: () => void) => {
     const h = () =>
       cb()
     ipcRenderer.on('media:next', h)
-    return () =>
+    return () => {
       ipcRenderer.removeListener('media:next', h)
+    }
   },
   onMediaPrev: (cb: () => void) => {
     const h = () =>
       cb()
     ipcRenderer.on('media:prev', h)
-    return () =>
+    return () => {
       ipcRenderer.removeListener('media:prev', h)
+    }
   },
 
   // Context menu
@@ -81,8 +88,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const h = (_: unknown, { index }: { index: number }) =>
       cb(index)
     ipcRenderer.on('contextmenu:action', h)
-    return () =>
+    return () => {
       ipcRenderer.removeListener('contextmenu:action', h)
+    }
   },
 
   // Media state
@@ -92,8 +100,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const h = (_: unknown, delta: number) =>
       cb(delta)
     ipcRenderer.on('media:seek', h)
-    return () =>
+    return () => {
       ipcRenderer.removeListener('media:seek', h)
+    }
   },
 
   // Write IPC

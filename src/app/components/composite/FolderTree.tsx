@@ -4,6 +4,12 @@ import type { FolderNode } from '../../contexts'
 /**
  * Recursively rendered folder tree for the sidebar. Selection and
  * expand/collapse are controlled by the caller via `onSelect` / `onToggle`.
+ *
+ * Nested `<ul>`/`<li>` rather than `role="tree"`: a real tree widget owes the
+ * user arrow-key roaming and a single tab stop, which this doesn't implement.
+ * A nested list of buttons is honest about what it is and is keyboard-usable
+ * out of the box. Disclosure and selection are two sibling buttons — never a
+ * click handler on a `<span>` inside a `<button>`.
  */
 interface FolderTreeProps {
   readonly folders:      ReadonlyArray<FolderNode>
@@ -13,54 +19,54 @@ interface FolderTreeProps {
   readonly level?:       number
 }
 
+/** See the interface docs above; recurses one level per nested folder. */
 export function FolderTree ({ folders, selectedPath, onSelect, onToggle, level = 0 }: FolderTreeProps) {
-  const Wrapper = level === 0 ? 'nav' : 'div'
-
   return (
-    <Wrapper className='folder-tree'>
-      {folders.map(folder =>
-        <div key={folder.id} className='folder-tree-node'>
-          <button
-            className={`folder-row ${selectedPath === folder.path ? 'active' : ''}`}
-            onClick={() =>
-              onSelect(folder.path)}
-            style={{ paddingLeft: `calc(var(--sp-3) + ${level * 12}px)` }}
-          >
-            <span
-              className='folder-toggle'
-              onClick={e => {
-                e.stopPropagation()
-                onToggle(folder.path)
-              }}
-              aria-hidden='true'
-            >
-              {folder.children.length > 0
-                ? <span className={`folder-chevron ${folder.expanded ? 'open' : ''}`}>›</span>
-                : <span className='folder-chevron-spacer' />
+    <ul className='folder-tree' style={{ '--level': level } as React.CSSProperties}>
+      {folders.map(folder => {
+        const hasChildren = folder.children.length > 0
+        const selected = selectedPath === folder.path
+
+        return (
+          <li key={folder.id}>
+            <div className={`folder-row ${selected ? 'active' : ''}`}>
+              {hasChildren
+                ? <button
+                  type='button'
+                  className={`disclosure ${folder.expanded ? 'open' : ''}`}
+                  onClick={() =>
+                    onToggle(folder.path)}
+                  aria-expanded={folder.expanded}
+                  aria-label={`${folder.expanded ? 'Collapse' : 'Expand'} ${folder.name}`}
+                >
+                  ›
+                </button>
+                : <span className='disclosure' aria-hidden='true' />
               }
-            </span>
 
-            <span className='folder-icon' aria-hidden='true'>
-              {folder.children.length > 0
-                ? folder.expanded ? '⊟' : '⊞'
-                : '▸'
-              }
-            </span>
+              <button
+                type='button'
+                className='folder-name'
+                aria-current={selected || undefined}
+                onClick={() =>
+                  onSelect(folder.path)}
+              >
+                {folder.name}
+              </button>
+            </div>
 
-            <span className='folder-name'>{folder.name}</span>
-          </button>
-
-          {folder.expanded && folder.children.length > 0 &&
-            <FolderTree
-              folders={folder.children}
-              selectedPath={selectedPath}
-              onSelect={onSelect}
-              onToggle={onToggle}
-              level={level + 1}
-            />
-          }
-        </div>
-      )}
-    </Wrapper>
+            {folder.expanded && hasChildren &&
+              <FolderTree
+                folders={folder.children}
+                selectedPath={selectedPath}
+                onSelect={onSelect}
+                onToggle={onToggle}
+                level={level + 1}
+              />
+            }
+          </li>
+        )
+      })}
+    </ul>
   )
 }

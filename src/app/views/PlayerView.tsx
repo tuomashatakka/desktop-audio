@@ -1,8 +1,10 @@
 import { useAudio, useLibrary } from '../contexts'
 import { IconButton, Button } from '../components/atomic'
 import { WaveformProgress } from '../components/atomic/WaveformProgress'
+import { useWindowScale } from '../hooks'
 
 
+/** `m:ss` for a playback position; `0:00` for missing/non-finite input. */
 function formatTime (seconds: number): string {
   if (!seconds || !Number.isFinite(seconds))
     return '0:00'
@@ -15,6 +17,9 @@ function formatTime (seconds: number): string {
 export function PlayerView () {
   const { currentTrack, isPlaying, currentTime, duration, waveformBars, pause, resume, seek, playNext, playPrevious } = useAudio()
   const { filteredTracks } = useLibrary()
+
+  // Must run before the early return — hooks cannot be conditional.
+  const toggleWindowScale = useWindowScale()
 
   if (!currentTrack) {
     return (
@@ -38,17 +43,25 @@ export function PlayerView () {
       }
 
       <div className='player-content'>
-        {/* Album art */}
-        <figure className='album-art-card'>
+        {/* Album art — doubles as the compact/expanded window toggle */}
+        <button
+          type='button'
+          className='album-art-card'
+          aria-label='Toggle compact player size'
+          onClick={toggleWindowScale}
+        >
           {currentTrack.albumArt
             ? <img src={currentTrack.albumArt} alt='Album art' />
             : <span className='art-fallback'>♫</span>
           }
-        </figure>
+        </button>
 
         {/* Track info */}
         <div className='player-info'>
-          <h2 className='track-title'>{currentTrack.title}</h2>
+          {/* The inner span is the marquee track: it sizes to the text so CSS
+              can compare it against the title box and scroll only the
+              overflow. See `.track-title` in player.css. */}
+          <h2 className='track-title'><span>{currentTrack.title}</span></h2>
           <p className='track-artist'>{currentTrack.artist}</p>
           <p className='track-album'>{currentTrack.album}</p>
         </div>
@@ -72,6 +85,7 @@ export function PlayerView () {
         <div className='playback-controls'>
           <IconButton
             label='Previous'
+            className='prev-btn'
             onClick={() =>
               playPrevious(filteredTracks)}
           >
@@ -89,6 +103,7 @@ export function PlayerView () {
 
           <IconButton
             label='Next'
+            className='next-btn'
             onClick={() =>
               playNext(filteredTracks)}
           >

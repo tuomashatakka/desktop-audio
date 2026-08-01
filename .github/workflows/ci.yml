@@ -22,7 +22,7 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install --legacy-peer-deps
+        run: bun install --frozen-lockfile
 
       - name: Run ESLint
         run: bun run lint
@@ -45,7 +45,7 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install --legacy-peer-deps
+        run: bun install --frozen-lockfile
 
       - name: Run tests with coverage
         run: bun run test --coverage
@@ -60,6 +60,9 @@ jobs:
           DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
 
   build:
+    # On main, release.yml already builds all four platforms and publishes.
+    # Running make here too would just duplicate ~10 minutes of work.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck, test]
 
@@ -72,8 +75,21 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Setup Node (native module toolchain)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Linux packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot dpkg
+
       - name: Install dependencies
-        run: bun install --legacy-peer-deps
+        run: bun install --frozen-lockfile
+
+      - name: Generate icons
+        run: bun scripts/generate-icon.mjs
 
       - name: Build application
         run: bun run make
@@ -82,10 +98,8 @@ jobs:
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
-        env:
-          BUILD_DIR: releases
         with:
           name: desktop-audio-artifacts
-          path: |
-            ${{ env.BUILD_DIR }}/make/**
-            ${{ env.BUILD_DIR }}/desktop-audio-darwin-arm64/**
+          path: out/make/**
+          retention-days: 7
+          if-no-files-found: error

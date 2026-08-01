@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useUI } from '../contexts'
+import { useHeightTier } from '../hooks'
 
 
 interface AppLayoutProps {
@@ -9,11 +10,13 @@ interface AppLayoutProps {
   readonly player?:   ReactNode
 }
 
+/** App shell: optional titlebar, sidebar and player around the main view. */
 export function AppLayout ({ titlebar, sidebar, main, player }: AppLayoutProps) {
   const { sidebarOpen } = useUI()
+  const heightTier = useHeightTier()
 
   return (
-    <div className='app-shell'>
+    <div className='app-shell' data-height-tier={heightTier}>
       {sidebar && sidebarOpen && <aside className='app-sidebar'>{sidebar}</aside>}
 
       <div className='app-content'>

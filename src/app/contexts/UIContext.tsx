@@ -21,9 +21,14 @@ export type Density = 'compact' | 'normal' | 'relaxed'
 /** How tracks are grouped in the track table (`none` = flat list). */
 export type Grouping = 'none' | 'album' | 'artist' | 'path'
 
-/** Read-only snapshot of UI state. */
+/**
+ * Read-only snapshot of UI state. `previousView` holds whatever was active
+ * before the last {@link UIContextValue.setView} call, so the mini player
+ * can restore it when the window grows back.
+ */
 interface UIState {
   readonly currentView:        ViewType
+  readonly previousView:       ViewType | null
   readonly sidebarOpen:        boolean
   readonly selectedFolderPath: string | null
   readonly selectedPlaylistId: string | null
@@ -41,6 +46,7 @@ interface UIContextValue extends UIState {
   readonly selectPlaylist:       (id: string | null) => void
   readonly setEditingTrack:      (id: string | null) => void
   readonly togglePlayerExpanded: () => void
+  readonly setPlayerExpanded:    (expanded: boolean) => void
   readonly setDensity:           (d: Density) => void
   readonly setGrouping:          (g: Grouping) => void
 }
@@ -68,6 +74,7 @@ export function UIProvider ({ children, value }: { readonly children: ReactNode;
   const [ state, setState ] = useState<UIState>(() =>
     ({
       currentView:        'library',
+      previousView:       null,
       sidebarOpen:        false,
       selectedFolderPath: null,
       selectedPlaylistId: null,
@@ -79,7 +86,9 @@ export function UIProvider ({ children, value }: { readonly children: ReactNode;
 
   const setView = useCallback((view: ViewType) => {
     setState(s =>
-      ({ ...s, currentView: view }))
+      s.currentView === view
+        ? s
+        : { ...s, currentView: view, previousView: s.currentView })
   }, [])
 
   const toggleSidebar = useCallback(() => {
@@ -102,13 +111,20 @@ export function UIProvider ({ children, value }: { readonly children: ReactNode;
       ({ ...s, editingTrackId: id }))
     if (id) {
       setState(s =>
-        ({ ...s, currentView: 'tag-editor' }))
+        s.currentView === 'tag-editor'
+          ? s
+          : { ...s, currentView: 'tag-editor', previousView: s.currentView })
     }
   }, [])
 
   const togglePlayerExpanded = useCallback(() => {
     setState(s =>
       ({ ...s, playerExpanded: !s.playerExpanded }))
+  }, [])
+
+  const setPlayerExpanded = useCallback((playerExpanded: boolean) => {
+    setState(s =>
+      s.playerExpanded === playerExpanded ? s : { ...s, playerExpanded })
   }, [])
 
   const setDensity = useCallback((d: Density) => {
@@ -139,6 +155,7 @@ export function UIProvider ({ children, value }: { readonly children: ReactNode;
         selectPlaylist,
         setEditingTrack,
         togglePlayerExpanded,
+        setPlayerExpanded,
         setDensity,
         setGrouping,
       }}

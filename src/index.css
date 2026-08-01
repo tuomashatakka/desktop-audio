@@ -26,4 +26,8 @@
   body {
     -webkit-app-region: no-drag;
   }
+
+  #app {
+    background-color: var(--bg)
+  }
 }

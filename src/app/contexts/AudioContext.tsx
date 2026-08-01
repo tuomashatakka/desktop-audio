@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import type { Track } from './LibraryContext'
 import { useHost, useData } from '../data'
+import { noop } from '../utils/noop'
 
 
 /** Read-only playback state. */
@@ -35,8 +36,9 @@ interface AudioContextValue extends AudioState {
   readonly playPrevious:    (tracks: readonly Track[]) => void
   readonly analyzer:        AnalyserNode | null
   readonly setCurrentQueue: (tracks: Track[]) => void
+
   /** Ensure audio context is ready (resumes if suspended). Call after user gesture. */
-  readonly ensureReady:    () => Promise<void>
+  readonly ensureReady: () => Promise<void>
 }
 
 /** Decode an audio file and compute per-bar RMS amplitudes for the waveform. */
@@ -75,8 +77,8 @@ const AudioContext = createContext<AudioContextValue | null>(null)
 /** Global reference to ensureReady function, set by AudioProvider on mount */
 let globalEnsureReady: (() => Promise<void>) | null = null
 
-/** Register the renderer-wide `ensureReady` so non-React code (e.g. the
- *  first-pointer-event handler) can resume the audio context on demand. */
+// Register the renderer-wide `ensureReady` so non-React code (e.g. the
+//  first-pointer-event handler) can resume the audio context on demand.
 export function setGlobalEnsureReady (fn: (() => Promise<void>) | null) {
   globalEnsureReady = fn
 }
@@ -110,11 +112,11 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   const data = useData()
 
   // Refs for MediaSession handlers to avoid circular deps
-  const pauseRef = useRef<() => void>(() => {})
-  const resumeRef = useRef<() => void>(() => {})
-  const seekRef = useRef<(time: number) => void>(() => {})
-  const playNextRef = useRef<(tracks: readonly Track[]) => void>(() => {})
-  const playPreviousRef = useRef<(tracks: readonly Track[]) => void>(() => {})
+  const pauseRef = useRef<() => void>(noop)
+  const resumeRef = useRef<() => void>(noop)
+  const seekRef = useRef<(time: number) => void>(noop)
+  const playNextRef = useRef<(tracks: readonly Track[]) => void>(noop)
+  const playPreviousRef = useRef<(tracks: readonly Track[]) => void>(noop)
 
   // Track the current playlist being played
   const currentQueueRef = useRef<Track[]>([])
@@ -335,7 +337,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
           .then(bars =>
             setState(s =>
               ({ ...s, waveformBars: bars })))
-          .catch(() => {})
+          .catch(noop)
       }
     }
     catch (error) {

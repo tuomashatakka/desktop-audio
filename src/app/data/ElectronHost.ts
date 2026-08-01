@@ -3,6 +3,7 @@
 
 import type { HostBridge } from './HostBridge'
 import type { SerializableMenuItem, MediaState } from '../services/types'
+import { noop } from '../utils/noop'
 
 
 export class ElectronHost implements HostBridge {
@@ -24,16 +25,22 @@ export class ElectronHost implements HostBridge {
     return (this._ipc?.isMaximized() as Promise<boolean>) ?? Promise.resolve(false)
   }
 
+  /** Resizes the BrowserWindow content area via IPC. */
+  setWindowSize (width: number, height: number): void {
+    this._ipc?.setWindowSize(width, height)
+  }
+
+  /** Subscribes to the OS play/pause media key; returns an unsubscribe. */
   onMediaPlayPause (cb: () => void): () => void {
-    return this._ipc?.onMediaPlayPause(cb) ?? (() => {})
+    return this._ipc?.onMediaPlayPause(cb) ?? noop
   }
 
   onMediaNext (cb: () => void): () => void {
-    return this._ipc?.onMediaNext(cb) ?? (() => {})
+    return this._ipc?.onMediaNext(cb) ?? noop
   }
 
   onMediaPrev (cb: () => void): () => void {
-    return this._ipc?.onMediaPrev(cb) ?? (() => {})
+    return this._ipc?.onMediaPrev(cb) ?? noop
   }
 
   showContextMenu (items: SerializableMenuItem[], x: number, y: number, w: number, h: number): void {
@@ -45,7 +52,7 @@ export class ElectronHost implements HostBridge {
   }
 
   onContextMenuAction (cb: (i: number) => void): () => void {
-    return this._ipc?.onContextMenuAction(cb) ?? (() => {})
+    return this._ipc?.onContextMenuAction(cb) ?? noop
   }
 
   updateMediaState (s: MediaState): void {
@@ -53,7 +60,7 @@ export class ElectronHost implements HostBridge {
   }
 
   onMediaSeek (cb: (delta: number) => void): () => void {
-    return this._ipc?.onMediaSeek(cb) ?? (() => {})
+    return this._ipc?.onMediaSeek(cb) ?? noop
   }
 
   async selectDirectory (): Promise<string | null> {
