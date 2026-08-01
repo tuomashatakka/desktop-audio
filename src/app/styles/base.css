@@ -43,23 +43,6 @@
     color: var(--accent);
   }
 
-  code {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    background: var(--bg-input);
-    padding: var(--sp-1) var(--sp-2);
-    border-radius: var(--radius-sm);
-  }
-
-  pre {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    background: var(--bg-input);
-    padding: var(--sp-4);
-    border-radius: var(--radius);
-    overflow-x: auto;
-  }
-
   ::selection {
     background: var(--accent-muted);
     color: var(--text);

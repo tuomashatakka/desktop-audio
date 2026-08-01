@@ -60,12 +60,10 @@
        ────────────────────────────────────────────────────────── */
 
     /* surfaces */
-    --mono-void: #050507;
     --mono-ink: #0b0b10;
     --mono-onyx: #111118;
     --mono-graphite: #1a1a22;
     --mono-slate: #2a2a35;
-    --mono-fog: #444452;
 
     /* foreground */
     --mono-fg1: #f4f4f8;
@@ -79,10 +77,8 @@
     --mono-turquoise-glow: #5cffec;
     --mono-turquoise-muted: rgba(0, 229, 209, 0.14);
     --mono-crimson: #ff2e7e;
-    --mono-crimson-glow: #ff6aa8;
     --mono-crimson-muted: rgba(255, 46, 126, 0.14);
     --mono-violet: #c8b6ff;
-    --mono-violet-glow: #e0d4ff;
     --mono-violet-muted: rgba(200, 182, 255, 0.14);
 
     /* semantic primitives */
@@ -96,21 +92,14 @@
     --mono-border-strong: rgba(255, 255, 255, 0.20);
 
     /* signature gradients */
-    --grad-primary: linear-gradient(90deg, var(--mono-turquoise) 0%, var(--mono-violet) 50%, var(--mono-crimson) 100%);
-    --grad-edge: linear-gradient(90deg, transparent 0%, var(--mono-turquoise) 25%, var(--mono-crimson) 75%, transparent 100%);
-    --grad-aurora:
       radial-gradient(120% 80% at 0% 0%, rgba(0, 229, 209, 0.18) 0%, transparent 55%),
       radial-gradient(120% 80% at 100% 100%, rgba(255, 46, 126, 0.16) 0%, transparent 55%),
       radial-gradient(80% 80% at 50% 100%, rgba(200, 182, 255, 0.14) 0%, transparent 60%);
 
     /* accent glows */
     --glow-turquoise: 0 0 0 1px var(--mono-turquoise-muted), 0 0 32px rgba(0, 229, 209, 0.25);
-    --glow-crimson: 0 0 0 1px var(--mono-crimson-muted), 0 0 32px rgba(255, 46, 126, 0.25);
-    --glow-violet: 0 0 0 1px var(--mono-violet-muted), 0 0 32px rgba(200, 182, 255, 0.20);
 
     /* backdrop blur */
-    --backdrop-glass: blur(24px) saturate(140%);
-    --backdrop-deep: blur(48px) saturate(160%);
 
     /* ──────────────────────────────────────────────────────────
        TIER 2 — SEMANTIC ALIASES (app API → primitives)
@@ -121,7 +110,6 @@
     --bg-raised: var(--mono-onyx);
     --bg-input: var(--mono-graphite);
     --bg-hover: var(--mono-slate);
-    --bg-window: var(--mono-ink);
 
     /* accent — MONO turquoise is primary */
     --accent: var(--mono-turquoise);
@@ -144,24 +132,19 @@
     --text: var(--mono-fg1);
     --text-dim: var(--mono-fg2);
     --text-muted: var(--mono-fg3);
-    --text-faint: var(--mono-fg4);
-    --text-inverse: var(--mono-fg-inverse);
 
     /* borders */
     --border: var(--mono-border-soft);
     --border-hover: var(--mono-border-strong);
-    --border-hairline: var(--mono-border-hairline);
     --border-focus: var(--accent);
 
     /* ── TYPOGRAPHY (shared with the Android app) ──────────────── */
     /* Sofia Pro Light is a cinematic display face; Montserrat carries UI/body. */
     --font-display: "Sofia Pro", "Montserrat", system-ui, -apple-system, sans-serif;
-    --font-body: "Montserrat", system-ui, -apple-system, sans-serif;
     --font: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     /* JetBrains Mono dropped — system monospace fallback only. */
     --font-mono: "SF Mono", Monaco, "Cascadia Code", monospace;
 
-    --text-2xs: 10px;
     --text-xs: 11px;
     --text-sm: 12px;
     --text-base: 14px;
@@ -169,27 +152,10 @@
     --text-xl: 20px;
     --text-2xl: 24px;
     --text-3xl: 32px;
-    --text-4xl: 56px;
-    --text-display: 88px;
 
-    --leading-tight: 1.1;
-    --leading-snug: 1.25;
-    --leading-normal: 1.5;
-    --leading-relaxed: 1.75;
-
-    --tracking-tightest: -0.04em;
-    --tracking-tight: -0.02em;
-    --tracking-normal: 0;
-    --tracking-wide: 0.08em;
-    --tracking-widest: 0.24em;
-
-    --weight-hairline: 100;
     --weight-light: 300;
-    --weight-black: 900;
-    --font-normal: 400;
     --font-medium: 500;
     --font-semibold: 600;
-    --font-bold: 700;
 
     /* ── SPACING (4px base) ────────────────────────────────────── */
     --sp-1: 4px;
@@ -209,15 +175,11 @@
     --radius-full: 9999px;
 
     /* ── ELEVATION ─────────────────────────────────────────────── */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
-    --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 4px 12px rgba(0, 0, 0, 0.35);
     --shadow-lg: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 12px 32px rgba(0, 0, 0, 0.5);
     --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 32px 80px rgba(0, 0, 0, 0.7);
 
     /* ── MOTION ────────────────────────────────────────────────── */
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
-    --ease-cinematic: cubic-bezier(0.16, 1, 0.3, 1);
-    --ease-snap: cubic-bezier(0.5, 1.6, 0.4, 1);
     --duration-fast: 100ms;
     --duration: 200ms;
     --duration-slow: 300ms;
@@ -236,19 +198,14 @@
     --bg-raised: #ffffff;
     --bg-input: #e8e8e8;
     --bg-hover: #dedede;
-    --bg-window: #f0f0f0;
 
     --text: #111111;
     --text-dim: #444444;
     --text-muted: #888888;
-    --text-faint: #aaaaaa;
 
     --border: rgba(0, 0, 0, 0.08);
     --border-hover: rgba(0, 0, 0, 0.18);
-    --border-hairline: rgba(0, 0, 0, 0.05);
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
-    --shadow: 0 2px 4px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06);
     --shadow-card: 0 12px 40px rgba(0, 0, 0, 0.12);
 
