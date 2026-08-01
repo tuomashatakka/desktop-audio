@@ -3,9 +3,8 @@
  *
  * Both sizes live in {@link useSettings} so they survive a restart, and each
  * is re-captured on the way *out* of that size — resize the mini window and
- * that becomes the size you get next time. Shrinking also forces the player
- * view (and collapses the expanded-player overlay, which can be the surface
- * the click came from); growing restores whichever view was active before.
+ * that becomes the size you get next time. Shrinking forces the player view;
+ * growing restores whichever view was active before.
  */
 import { useCallback } from 'react'
 import { useSettings, useUI } from '../contexts'
@@ -16,7 +15,7 @@ import { CHROME_MAX_HEIGHT } from './useHeightTier'
 /** Returns a callback that toggles the window between compact and expanded. */
 export function useWindowScale () {
   const { compactSize, expandedSize, setCompactSize, setExpandedSize } = useSettings()
-  const { previousView, setView, playerExpanded, setPlayerExpanded } = useUI()
+  const { previousView, setView } = useUI()
   const host = useHost()
 
   return useCallback(() => {
@@ -32,9 +31,6 @@ export function useWindowScale () {
     }
 
     setExpandedSize(current)
-    if (playerExpanded) {
-      setPlayerExpanded(false)
-    }
     setView('player')
     host.setWindowSize(compactSize.width, compactSize.height)
   }, [
@@ -44,8 +40,6 @@ export function useWindowScale () {
     setExpandedSize,
     previousView,
     setView,
-    playerExpanded,
-    setPlayerExpanded,
     host,
   ])
 }

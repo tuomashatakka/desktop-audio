@@ -33,22 +33,19 @@ interface UIState {
   readonly selectedFolderPath: string | null
   readonly selectedPlaylistId: string | null
   readonly editingTrackId:     string | null
-  readonly playerExpanded:     boolean
   readonly density:            Density
   readonly grouping:           Grouping
 }
 
 /** UI state plus the actions that mutate it. */
 interface UIContextValue extends UIState {
-  readonly setView:              (view: ViewType) => void
-  readonly toggleSidebar:        () => void
-  readonly selectFolder:         (path: string | null) => void
-  readonly selectPlaylist:       (id: string | null) => void
-  readonly setEditingTrack:      (id: string | null) => void
-  readonly togglePlayerExpanded: () => void
-  readonly setPlayerExpanded:    (expanded: boolean) => void
-  readonly setDensity:           (d: Density) => void
-  readonly setGrouping:          (g: Grouping) => void
+  readonly setView:         (view: ViewType) => void
+  readonly toggleSidebar:   () => void
+  readonly selectFolder:    (path: string | null) => void
+  readonly selectPlaylist:  (id: string | null) => void
+  readonly setEditingTrack: (id: string | null) => void
+  readonly setDensity:      (d: Density) => void
+  readonly setGrouping:     (g: Grouping) => void
 }
 
 const UIContext = createContext<UIContextValue | null>(null)
@@ -79,7 +76,6 @@ export function UIProvider ({ children, value }: { readonly children: ReactNode;
       selectedFolderPath: null,
       selectedPlaylistId: null,
       editingTrackId:     null,
-      playerExpanded:     false,
       density:            loadDensity(),
       grouping:           loadGrouping(),
     }))
@@ -109,23 +105,9 @@ export function UIProvider ({ children, value }: { readonly children: ReactNode;
   const setEditingTrack = useCallback((id: string | null) => {
     setState(s =>
       ({ ...s, editingTrackId: id }))
-    if (id) {
-      setState(s =>
-        s.currentView === 'tag-editor'
-          ? s
-          : { ...s, currentView: 'tag-editor', previousView: s.currentView })
-    }
-  }, [])
-
-  const togglePlayerExpanded = useCallback(() => {
-    setState(s =>
-      ({ ...s, playerExpanded: !s.playerExpanded }))
-  }, [])
-
-  const setPlayerExpanded = useCallback((playerExpanded: boolean) => {
-    setState(s =>
-      s.playerExpanded === playerExpanded ? s : { ...s, playerExpanded })
-  }, [])
+    if (id)
+      setView('tag-editor')
+  }, [ setView ])
 
   const setDensity = useCallback((d: Density) => {
     setState(s =>
@@ -154,8 +136,6 @@ export function UIProvider ({ children, value }: { readonly children: ReactNode;
         selectFolder,
         selectPlaylist,
         setEditingTrack,
-        togglePlayerExpanded,
-        setPlayerExpanded,
         setDensity,
         setGrouping,
       }}

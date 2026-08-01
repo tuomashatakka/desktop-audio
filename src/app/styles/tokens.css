@@ -91,11 +91,6 @@
     --mono-border-soft: rgba(255, 255, 255, 0.10);
     --mono-border-strong: rgba(255, 255, 255, 0.20);
 
-    /* signature gradients */
-      radial-gradient(120% 80% at 0% 0%, rgba(0, 229, 209, 0.18) 0%, transparent 55%),
-      radial-gradient(120% 80% at 100% 100%, rgba(255, 46, 126, 0.16) 0%, transparent 55%),
-      radial-gradient(80% 80% at 50% 100%, rgba(200, 182, 255, 0.14) 0%, transparent 60%);
-
     /* accent glows */
     --glow-turquoise: 0 0 0 1px var(--mono-turquoise-muted), 0 0 32px rgba(0, 229, 209, 0.25);
 

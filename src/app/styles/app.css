@@ -7,20 +7,42 @@
   background: linear-gradient(135deg, transparent 80%, #fb59cd40 100%);
 }
 
+/* ─── Promoting the player ─────────────────────────
+   There is exactly one player element, mounted permanently in the shell
+   footer. "Opening" it is not a different component — it's this rule: hide
+   the main view and let the footer take the space. */
+
+.app-shell[data-view='player'] {
+  & .app-main,
+  & .app-sidebar {
+    display: none;
+  }
+
+  & .app-player {
+    flex: 1;
+    min-height: 0;
+  }
+}
+
 /* ─── Short-window tiers ───────────────────────────
-   Below 300px tall the chrome is dropped entirely and PlayerView owns the
-   whole window, so the window has to be draggable from the player itself.
-   `snug` is chrome-less but still uses the *normal* player layout; `compact`
-   and `mini` change the layout too (see player.css).
+   Below 480px tall the chrome stops being affordable, so it goes and the
+   player owns the whole window — which means the window has to be draggable
+   from the player itself. `snug` is chrome-less but still uses the *normal*
+   player layout; `compact` and `mini` change the layout too (see player.css).
    Tier is set as `data-height-tier` by AppLayout (see useHeightTier). */
 
 .app-shell[data-height-tier='snug'],
 .app-shell[data-height-tier='compact'],
 .app-shell[data-height-tier='mini'] {
   & .titlebar,
-  & .app-player,
+  & .app-main,
   & .app-sidebar {
     display: none;
+  }
+
+  & .app-player {
+    flex: 1;
+    min-height: 0;
   }
 
   & .player-view {
@@ -30,7 +52,8 @@
   /* Drag regions swallow clicks — every control must opt back out. */
   & .album-art-card,
   & .playback-controls,
-  & .progress-section {
+  & .progress-section,
+  & .player-volume {
     -webkit-app-region: no-drag;
   }
 }
@@ -52,11 +75,9 @@
   overflow: hidden;
 }
 
-.app-body {
-  display: flex;
-  flex: 1;
+.app-player {
+  min-width: 0;
   overflow: hidden;
-  width: 100%;
 }
 
 /* The view owns its own scrolling: .app-main just supplies a definite height
@@ -67,6 +88,12 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
+}
+
+/* Keep the single player mounted without reserving an empty transport bar. */
+.app-shell[data-height-tier='normal']:not([data-view='player'])
+  .app-player:has(.player-view[data-empty]) {
+  display: none;
 }
 
 .titlebar {
@@ -208,219 +235,6 @@
     min-width: 0;
   }
 }
-
-.player-bar {
- container-type: inline-size;
- container-name: player-bar;
- min-height: 72px;
- background: var(--bg-raised);
- border-top: 1px solid var(--border);
- display: grid;
- align-items: center;
- padding: var(--sp-2) var(--sp-4);
- gap: var(--sp-4);
- grid-template-columns: minmax(160px, 22%) auto 1fr auto;
- /* track | controls | progress | volume */
- cursor: pointer;
- transition: opacity var(--duration) var(--ease), transform var(--duration) var(--ease);
-}
-
-.player-bar-track {
- display: flex;
- align-items: center;
- gap: var(--sp-2);
- min-width: 0;
-}
-
-.player-bar-art {
- width: 40px;
- aspect-ratio: 1;
- background: var(--bg-hover);
- border-radius: var(--radius);
- overflow: hidden;
- display: flex;
- align-items: center;
- justify-content: center;
-
- & img {
-   width: 100%;
-   height: 100%;
-   object-fit: cover;
- }
-
- & .art-placeholder {
-   font-size: var(--text-xl);
-   opacity: 0.5;
- }
-}
-
-.player-bar-info {
- flex: 1 1 auto;
- min-width: 0;
- display: flex;
- flex-direction: column;
- gap: 2px;
-}
-
-.player-bar-title {
- font-size: var(--text-sm);
- font-weight: var(--font-medium);
- color: var(--text);
- white-space: nowrap;
- overflow: hidden;
- text-overflow: ellipsis;
- display: block;
-}
-
-.player-bar-artist {
- font-size: var(--text-xs);
- color: var(--text-muted);
- white-space: nowrap;
- overflow: hidden;
- text-overflow: ellipsis;
- display: block;
-}
-
-.player-bar-controls {
- display: flex;
- align-items: center;
- gap: var(--sp-2);
-}
-
-.player-bar-progress {
- display: flex;
- align-items: center;
- gap: var(--sp-2);
- min-width: 0;
-}
-
-.player-bar-time {
- font-size: var(--text-xs);
- font-family: var(--font-mono);
- color: var(--text-muted);
- min-width: 40px;
- flex: 0 0 auto;
-}
-
-.player-bar-volume {
- display: flex;
- align-items: center;
- gap: var(--sp-2);
- min-width: 120px;
-
- & .volume-slider {
-   width: 80px;
- }
-}
-
-.player-bar-hidden {
- opacity: 0;
- transform: translateY(10px);
- pointer-events: none;
-}
-
-/* ─── Player-bar responsive breakpoints ─────────────────── */
-
-@container (max-width: 720px) {
- .player-bar-volume { display: none; }
-}
-
-@container (max-width: 520px) {
- .player-bar { grid-template-columns: minmax(120px, 30%) auto 1fr; }
- .player-bar-progress .player-bar-time { display: none; }
-}
-
-@container (max-width: 380px) {
- .player-bar {
-   grid-template-columns: 1fr auto;
-   grid-auto-rows: auto;
-   min-height: 100px;
- }
-
- .player-bar-track    { grid-column: 1; grid-row: 1; }
- .player-bar-controls { grid-column: 2; grid-row: 1; }
- .player-bar-progress { grid-column: 1 / -1; grid-row: 2; }
- .player-bar-controls > button { width: 32px; height: 32px; font-size: 14px; }
-}
-
-.expanded-player {
- position: fixed;
- bottom: 0;
- left: 0;
- right: 0;
- top: 0;
- z-index: 100;
- display: none;
- flex-direction: column;
-
- &.animating {
-   display: flex;
- }
-
- &.expanded-player-visible {
-   display: flex;
-   animation: fadeIn 300ms ease-out forwards;
-
-   & .expanded-player-content {
-     animation: slideUp 300ms ease-out forwards;
-   }
- }
-}
-
-.expanded-player-backdrop {
- position: absolute;
- inset: 0;
- background: rgba(0, 0, 0, 0.8);
-}
-
-.expanded-player-content {
- position: relative;
- flex: 1;
- display: flex;
- flex-direction: column;
- background: var(--bg);
-}
-
-.expanded-player-close {
- position: absolute;
- top: var(--sp-4);
- left: var(--sp-4);
- width: 40px;
- height: 40px;
- border-radius: var(--radius-full);
- background: var(--bg-raised);
- border: 1px solid var(--border);
- color: var(--text);
- font-size: var(--text-lg);
- cursor: pointer;
- z-index: 10;
- display: flex;
- align-items: center;
- justify-content: center;
- transition: all var(--duration-fast) var(--ease);
-
- &:hover {
-   background: var(--bg-hover);
-   transform: rotate(180deg);
- }
-}
-
-@keyframes fadeIn {
- from { opacity: 0; }
- to { opacity: 1; }
-}
-
-@keyframes slideUp {
- from {
-   opacity: 0;
-   transform: translateY(20px);
- }
- to {
-   opacity: 1;
-   transform: translateY(0);
- }
-}
-
 
 /* ─── Ambient wash ─────────────────────────────────
    A page-wide gradient tinted by the current album art. `useAmbientPalette`

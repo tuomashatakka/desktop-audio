@@ -1,32 +1,31 @@
 import { render, screen, act } from '@testing-library/react'
-import { UIProvider, useUI, type ViewType } from '../../src/app/contexts/UIContext'
+import { UIProvider, useUI } from '../../src/app/contexts/UIContext'
+
 
 function TestConsumer () {
   const {
     currentView,
+    previousView,
     sidebarOpen,
     selectedFolderPath,
     editingTrackId,
-    playerExpanded,
     setView,
     toggleSidebar,
     selectFolder,
     setEditingTrack,
-    togglePlayerExpanded,
   } = useUI()
 
   return (
     <div>
       <span data-testid='view'>{currentView}</span>
+      <span data-testid='previous-view'>{previousView ?? 'null'}</span>
       <span data-testid='sidebar'>{sidebarOpen.toString()}</span>
       <span data-testid='folder'>{selectedFolderPath ?? 'null'}</span>
       <span data-testid='editing'>{editingTrackId ?? 'null'}</span>
-      <span data-testid='expanded'>{playerExpanded.toString()}</span>
       <button onClick={() => setView('player')}>setView</button>
       <button onClick={toggleSidebar}>toggleSidebar</button>
       <button onClick={() => selectFolder('/test/path')}>selectFolder</button>
       <button onClick={() => setEditingTrack('track-1')}>setEditingTrack</button>
-      <button onClick={togglePlayerExpanded}>togglePlayerExpanded</button>
     </div>
   )
 }
@@ -40,13 +39,13 @@ describe('UIContext', () => {
     )
 
     expect(screen.getByTestId('view')).toHaveTextContent('library')
+    expect(screen.getByTestId('previous-view')).toHaveTextContent('null')
     expect(screen.getByTestId('sidebar')).toHaveTextContent('false')
     expect(screen.getByTestId('folder')).toHaveTextContent('null')
     expect(screen.getByTestId('editing')).toHaveTextContent('null')
-    expect(screen.getByTestId('expanded')).toHaveTextContent('false')
   })
 
-  it('setView updates current view', async () => {
+  it('setView updates the current and previous views', async () => {
     render(
       <UIProvider>
         <TestConsumer />
@@ -58,6 +57,7 @@ describe('UIContext', () => {
     })
 
     expect(screen.getByTestId('view')).toHaveTextContent('player')
+    expect(screen.getByTestId('previous-view')).toHaveTextContent('library')
   })
 
   it('toggleSidebar toggles sidebar state', async () => {
@@ -103,22 +103,7 @@ describe('UIContext', () => {
 
     expect(screen.getByTestId('editing')).toHaveTextContent('track-1')
     expect(screen.getByTestId('view')).toHaveTextContent('tag-editor')
-  })
-
-  it('togglePlayerExpanded toggles player expanded state', async () => {
-    render(
-      <UIProvider>
-        <TestConsumer />
-      </UIProvider>
-    )
-
-    expect(screen.getByTestId('expanded')).toHaveTextContent('false')
-
-    await act(async () => {
-      screen.getByText('togglePlayerExpanded').click()
-    })
-
-    expect(screen.getByTestId('expanded')).toHaveTextContent('true')
+    expect(screen.getByTestId('previous-view')).toHaveTextContent('library')
   })
 
   it('throws error when useUI is used outside provider', () => {

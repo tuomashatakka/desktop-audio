@@ -6,7 +6,7 @@ import { useHost } from '../data'
 export function useKeyboardShortcuts () {
   const { isPlaying, currentTrack, volume, pause, resume, setVolume, playNext, playPrevious } = useAudio()
   const { filteredTracks } = useLibrary()
-  const { currentView, setView, playerExpanded, togglePlayerExpanded } = useUI()
+  const { currentView, previousView, setView } = useUI()
   const host = useHost()
 
   // eslint-disable-next-line complexity
@@ -47,10 +47,8 @@ export function useKeyboardShortcuts () {
         }
         break
       case 'Escape':
-        if (playerExpanded)
-          togglePlayerExpanded()
-        else if (currentView === 'player')
-          setView('library')
+        if (currentView === 'player')
+          setView(previousView ?? 'library')
         e.preventDefault()
         break
       case 'AltLeft':
@@ -59,7 +57,7 @@ export function useKeyboardShortcuts () {
         document.querySelector<HTMLElement>('.titlebar-controls button')?.focus()
         break
     }
-  }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, filteredTracks, setVolume, volume, playerExpanded, togglePlayerExpanded, currentView, setView ])
+  }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, filteredTracks, setVolume, volume, currentView, previousView, setView ])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)

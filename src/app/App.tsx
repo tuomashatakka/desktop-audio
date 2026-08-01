@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react'
 import { UIProvider, SettingsProvider, LibraryProvider, AudioProvider, useUI, useAudio, useSettings, useLibrary } from './contexts'
 import { LibraryView } from './views/LibraryView'
-import { PlayerView } from './views/PlayerView'
 import { SettingsView } from './views/SettingsView'
 import { TagEditorView } from './views/TagEditorView'
-import { PlayerBar } from './components/composite/PlayerBar'
+import { Player } from './components/composite/Player'
 import { useKeyboardShortcuts, useAmbientPalette } from './hooks'
-import { AppLayout, Titlebar, LibrarySidebar, ExpandedPlayerPortal } from './layout'
+import { AppLayout, Titlebar, LibrarySidebar } from './layout'
 
 
 function AppContent () {
   const { currentView } = useUI()
-  const { currentTrack } = useAudio()
   const { theme } = useSettings()
   const { filteredTracks } = useLibrary()
   const { setCurrentQueue } = useAudio()
@@ -28,12 +26,11 @@ function AppContent () {
     setCurrentQueue(filteredTracks)
   }, [ filteredTracks, setCurrentQueue ])
 
+  // 'player' has no entry: the player is mounted permanently in the shell
+  // footer and CSS promotes it to fill the window. Falling through to the
+  // library keeps that view's scroll position while it sits behind the player.
   const renderView = () => {
     switch (currentView) {
-      case 'library':
-        return <LibraryView />
-      case 'player':
-        return <PlayerView />
       case 'settings':
         return <SettingsView />
       case 'tag-editor':
@@ -47,19 +44,8 @@ function AppContent () {
     <AppLayout
       titlebar={<Titlebar />}
       sidebar={currentView === 'library' ? <LibrarySidebar /> : undefined}
-      main={
-        <div className='view-content'>
-          {renderView()}
-        </div>
-      }
-      player={
-        currentTrack
-          ? <>
-            <PlayerBar />
-            <ExpandedPlayerPortal />
-          </>
-          : undefined
-      }
+      main={renderView()}
+      player={<Player />}
     />
   )
 }
