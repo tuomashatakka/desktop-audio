@@ -17,6 +17,44 @@ export type RepeatMode = 'none' | 'one' | 'all'
 /** Built-in theme name; `custom` activates {@link CustomTheme} overrides. */
 export type Theme = 'dark' | 'light' | 'custom'
 
+/** Selectable UI typeface. Only Montserrat ships with the app. */
+export type UiFont = 'montserrat' | 'poppins' | 'helvetica' | 'system'
+
+/**
+ * Font stacks per {@link UiFont}. `poppins` and `helvetica` are resolved from
+ * the user's installed fonts — neither is bundled, so each falls back through
+ * the same chain the system default uses rather than to a stand-in that looks
+ * nothing like the request.
+ */
+export const UI_FONT_STACKS: Record<UiFont, string> = {
+  montserrat: '"Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif',
+  poppins:    '"Poppins", "Montserrat", system-ui, -apple-system, sans-serif',
+  helvetica:  '"Helvetica Neue", Helvetica, Arial, system-ui, sans-serif',
+  system:     'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+}
+
+/**
+ * Headings use a separate stack. At the default setting that keeps Sofia Pro,
+ * the display face the app ships with — picking another UI font is a request
+ * to change the type, not a reason to lose the pairing you never asked about.
+ */
+export const UI_DISPLAY_STACKS: Record<UiFont, string> = {
+  ...UI_FONT_STACKS,
+  montserrat: '"Sofia Pro", "Montserrat", system-ui, sans-serif',
+}
+
+export const UI_FONT_LABELS: Record<UiFont, string> = {
+  montserrat: 'Montserrat',
+  poppins:    'Poppins',
+  helvetica:  'Helvetica',
+  system:     'System default',
+}
+
+/** Multiplier on the root font size; every type token is relative to it. */
+export const MIN_FONT_SCALE = 0.8
+
+export const MAX_FONT_SCALE = 1.4
+
 /**
  * User-defined CSS variable overrides applied at runtime when the
  * active theme is `custom`. Importable/exportable as JSON.
@@ -47,8 +85,19 @@ interface Settings {
   readonly defaultDensity: 'compact' | 'normal' | 'relaxed'
   readonly volume:         number
   readonly repeatMode:     RepeatMode
+  readonly shuffle:        boolean
   readonly compactSize:    WindowSize
   readonly expandedSize:   WindowSize
+  readonly uiFont:         UiFont
+  readonly fontScale:      number
+
+  /**
+   * Accent is stored per built-in theme rather than once: the hue that reads
+   * as a highlight on an near-black surface is usually washed out on a light
+   * one, so picking a single value forces a compromise on one of them.
+   */
+  readonly accentDark:  string
+  readonly accentLight: string
 }
 
 /** Settings plus the action handlers exposed to consumers. */
@@ -62,14 +111,25 @@ interface SettingsContextValue extends Settings {
   readonly setDefaultDensity: (density: 'compact' | 'normal' | 'relaxed') => void
   readonly setVolume:         (volume: number) => void
   readonly setRepeatMode:     (mode: RepeatMode) => void
+  readonly setShuffle:        (shuffle: boolean) => void
   readonly setCompactSize:    (size: WindowSize) => void
   readonly setExpandedSize:   (size: WindowSize) => void
+  readonly setUiFont:         (font: UiFont) => void
+  readonly setFontScale:      (scale: number) => void
+  readonly setAccent:         (theme: 'dark' | 'light', color: string) => void
+
+  /** The accent that applies to the theme currently in effect. */
+  readonly accent: string
 }
 
 const STORAGE_KEY = 'desktop-audio-settings'
 
 /** Platform-specific default music directory name (used as hint in settings) */
 const DEFAULT_MUSIC_DIR = 'Music'
+
+/** Matches `--mono-turquoise` / a darkened variant of it in `tokens.css`. */
+const DEFAULT_ACCENT_DARK  = '#00e5d1'
+const DEFAULT_ACCENT_LIGHT = '#00a595'
 
 const defaultSettings: Settings = {
   libraryPaths:   [ DEFAULT_MUSIC_DIR ],
@@ -78,8 +138,13 @@ const defaultSettings: Settings = {
   defaultDensity: 'normal',
   volume:         0.8,
   repeatMode:     'none',
+  shuffle:        false,
   compactSize:    { width: 560, height: 240 },
   expandedSize:   { width: 1200, height: 800 },
+  uiFont:         'montserrat',
+  fontScale:      1,
+  accentDark:     DEFAULT_ACCENT_DARK,
+  accentLight:    DEFAULT_ACCENT_LIGHT,
 }
 
 const DEFAULT_CUSTOM_THEME: CustomTheme = {
@@ -119,6 +184,7 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
   const host = useHost()
 
   useEffect(() => {
+
     /** Hydrate settings on mount and resolve the default music dir if needed. */
     const init = async () => {
       const loaded = await loadSettings()
@@ -202,6 +268,26 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
       ({ ...s, repeatMode: mode }))
   }, [])
 
+  const setShuffle = useCallback((shuffle: boolean) => {
+    setSettings(s =>
+      ({ ...s, shuffle }))
+  }, [])
+
+  const setUiFont = useCallback((uiFont: UiFont) => {
+    setSettings(s =>
+      ({ ...s, uiFont }))
+  }, [])
+
+  const setFontScale = useCallback((scale: number) => {
+    setSettings(s =>
+      ({ ...s, fontScale: Math.max(MIN_FONT_SCALE, Math.min(MAX_FONT_SCALE, scale)) }))
+  }, [])
+
+  const setAccent = useCallback((theme: 'dark' | 'light', color: string) => {
+    setSettings(s =>
+      theme === 'light' ? { ...s, accentLight: color } : { ...s, accentDark: color })
+  }, [])
+
   const setCompactSize = useCallback((compactSize: WindowSize) => {
     setSettings(s =>
       ({ ...s, compactSize }))
@@ -216,6 +302,7 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
     <SettingsContext.Provider
       value={{
         ...settings,
+        accent: settings.theme === 'light' ? settings.accentLight : settings.accentDark,
         addLibraryPath,
         removeLibraryPath,
         setTheme,
@@ -225,8 +312,12 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
         setDefaultDensity,
         setVolume,
         setRepeatMode,
+        setShuffle,
         setCompactSize,
         setExpandedSize,
+        setUiFont,
+        setFontScale,
+        setAccent,
       }}
     >
       {children}
@@ -255,6 +346,18 @@ export function useSettings () {
     throw new Error('useSettings must be used within SettingsProvider')
   }
   return context
+}
+
+/**
+ * Settings if a provider is above, `null` otherwise.
+ *
+ * For consumers that read a preference but don't depend on one — the audio
+ * engine wants to know about shuffle and repeat, yet playback is perfectly
+ * meaningful without a settings store, and forcing the provider on it would
+ * make {@link AudioProvider} untestable in isolation.
+ */
+export function useOptionalSettings () {
+  return useContext(SettingsContext)
 }
 
 export { DEFAULT_CUSTOM_THEME }

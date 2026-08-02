@@ -147,8 +147,27 @@
     border-bottom: 1px solid var(--border);
   }
 
-  /* Standalone context-menu window: keep the menu above its dismiss surface. */
-  .context-menu-window { position: relative; isolation: isolate; }
+  /*
+   * Standalone context-menu window: keep the menu above its dismiss surface.
+   *
+   * The window itself is transparent (frameless windows show their own
+   * corners otherwise), so the *panel* is what has to be opaque — an
+   * unpainted menu let the desktop straight through. It reads its colours
+   * from the tokens like everything else, and the theme is pushed onto this
+   * document's root by `ContextMenuApp`.
+   */
+  #context-menu-root { height: 100%; }
+  .context-menu-window {
+    position: relative;
+    isolation: isolate;
+    height: 100%;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow-lg);
+  }
+
   .context-menu-window .context-menu-list { position: relative; z-index: 1; }
   .context-menu-dismiss { position: fixed; inset: 0; z-index: 0; }
   .context-menu-list { padding-block: var(--sp-1); }

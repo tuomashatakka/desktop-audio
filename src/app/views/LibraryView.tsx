@@ -30,7 +30,7 @@ export function LibraryView () {
   const { setEditingTrack, selectedFolderPath, selectedPlaylistId, selectFolder } = useUI()
   const { filteredTracks, playlists, addPlaylist, selectTrack, isLoading } = useLibrary()
   const { play, currentTrack, isPlaying } = useAudio()
-  const { libraryPaths } = useSettings()
+  const { libraryPaths, theme } = useSettings()
   const host = useHost()
 
   useLibraryScanner()
@@ -50,14 +50,24 @@ export function LibraryView () {
 
   const handleContextMenu = useCallback((track: Track, rect: DOMRect) => {
     contextTrackRef.current = track
+
+    // The menu renders in its own window with its own document, so the theme
+    // has to be handed to it. The accent is read back off the root rather
+    // than from settings: that way a custom theme's accent comes along too.
+    const accent = getComputedStyle(document.documentElement)
+      .getPropertyValue('--accent')
+      .trim()
+
     host.showContextMenu(
       CONTEXT_MENU_ITEMS,
       window.screenX + rect.left,
       window.screenY + rect.bottom + 4,
       MENU_WIDTH,
       MENU_HEIGHT,
+      theme,
+      accent || undefined,
     )
-  }, [ host ])
+  }, [ host, theme ])
 
   useEffect(() =>
     host.onContextMenuAction((index: number) => {

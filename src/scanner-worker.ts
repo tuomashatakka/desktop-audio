@@ -10,6 +10,7 @@ import { workerData, parentPort } from 'node:worker_threads'
 import path from 'node:path'
 import { readdir, stat } from 'node:fs/promises'
 import Database from 'better-sqlite3'
+import { migrate, upsertSql, TRACK_COLUMN_NAMES, MTIME_COLUMN } from './track-schema'
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -18,21 +19,19 @@ interface WorkerData {
   dbPath: string
 }
 
-interface ScannedTrack {
-  id:           string
-  path:         string
-  title:        string
-  artist:       string
-  album:        string
-  duration:     number
-  format:       string
-  size:         number
-  cover_color:  string
-  album_art:    string | null
-  year:         number | null
-  genre:        string | null
-  track_number: number | null
-  mtime_ms:     number
+/**
+ * A row as it goes into SQLite: snake_case column names, `null` rather than
+ * `undefined` for absent tags. The column list lives in `track-schema.ts`;
+ * this index signature is the loose in-worker view of it.
+ */
+type ScannedTrack = Record<string, string | number | null>
+
+/** Absent tags bind as SQL NULL, so every column is always present. */
+function row (values: Record<string, string | number | null | undefined>): ScannedTrack {
+  const out: ScannedTrack = {}
+  for (const name of [ ...TRACK_COLUMN_NAMES, MTIME_COLUMN ])
+    out[name] = values[name] ?? null
+  return out
 }
 
 type MainMessage =
@@ -96,6 +95,39 @@ const encodeAlbumArt = (picture: { format: string; data: Uint8Array } | undefine
   return `data:${picture.format};base64,${Buffer.from(picture.data).toString('base64')}`
 }
 
+/** Tags may carry several comment frames; keep them all, one per line. */
+const commentText = (comments: readonly { text?: string }[] | undefined): string | undefined => {
+  const text = comments
+    ?.map(c =>
+      c.text?.trim())
+    .filter(Boolean)
+    .join('\n')
+  return text || undefined
+}
+
+/**
+ * Prefer plain lyrics; fall back to flattening a synchronized (LRC-style)
+ * frame, since a timestamped-only tag is still the song's words.
+ */
+const lyricsText = (
+  lyrics: readonly { text?: string; syncText?: readonly { text?: string }[] }[] | undefined
+): string | undefined => {
+  for (const entry of lyrics ?? []) {
+    const plain = entry.text?.trim()
+    if (plain)
+      return plain
+
+    const synced = entry.syncText
+      ?.map(line =>
+        line.text?.trim())
+      .filter(Boolean)
+      .join('\n')
+    if (synced)
+      return synced
+  }
+  return undefined
+}
+
 const processAudioFile = async (
   fullPath: string,
   fileSize: number,
@@ -116,35 +148,48 @@ const processAudioFile = async (
 
   try {
     const meta          = await mm.parseFile(fullPath, { duration: true })
-    const resolvedTitle = meta.common.title || fallback.title
-    const albumArt      = encodeAlbumArt(meta.common.picture?.[0])
-    const resolvedYear  = meta.common.year ?? year
-    const resolvedTn    = meta.common.track?.no ?? trackNumber
-    const genre         = meta.common.genre?.[0]
+    const common        = meta.common
+    const resolvedTitle = common.title || fallback.title
 
-    console.groupCollapsed(fullPath)
-    console.table(meta.common)
-    console.groupEnd()
-
-    return {
+    return row({
       id:           fullPath,
       path:         fullPath,
       title:        resolvedTitle,
-      artist:       meta.common.artist || fallback.artist,
-      album:        meta.common.album || album,
+      artist:       common.artist || fallback.artist,
+      album:        common.album || album,
       duration:     Math.round(meta.format.duration ?? 0),
       format,
       size:         fileSize,
       cover_color:  generateCoverColor(resolvedTitle),
       mtime_ms:     mtimeMs,
-      album_art:    albumArt ?? null,
-      year:         resolvedYear ?? null,
-      genre:        genre ?? null,
-      track_number: resolvedTn ?? null,
-    }
+      album_art:    encodeAlbumArt(common.picture?.[0]),
+      year:         common.year ?? year,
+      genre:        common.genre?.[0],
+      track_number: common.track?.no ?? trackNumber,
+
+      album_artist: common.albumartist,
+      composer:     common.composer?.[0],
+      track_total:  common.track?.of ?? undefined,
+      disc_number:  common.disk?.no ?? undefined,
+      disc_total:   common.disk?.of ?? undefined,
+      bpm:          common.bpm,
+      comment:      commentText(common.comment),
+      lyrics:       lyricsText(common.lyrics),
+      publisher:    common.label?.[0],
+      copyright:    common.copyright,
+      isrc:         common.isrc?.[0],
+      encoded_by:   common.encodedby,
+      language:     common.language,
+      mood:         common.mood,
+      grouping:     common.grouping,
+
+      bitrate:     meta.format.bitrate ? Math.round(meta.format.bitrate) : undefined,
+      sample_rate: meta.format.sampleRate,
+      channels:    meta.format.numberOfChannels,
+    })
   }
   catch {
-    return {
+    return row({
       id:           fullPath,
       path:         fullPath,
       title:        fallback.title,
@@ -155,11 +200,9 @@ const processAudioFile = async (
       size:         fileSize,
       cover_color:  generateCoverColor(fallback.title),
       mtime_ms:     mtimeMs,
-      album_art:    null,
-      year:         year ?? null,
-      genre:        null,
-      track_number: trackNumber ?? null,
-    }
+      year,
+      track_number: trackNumber,
+    })
   }
 }
 
@@ -171,25 +214,9 @@ const db = new Database(dbPath)
 db.pragma('journal_mode = WAL')
 db.pragma('synchronous = NORMAL')
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS tracks (
-    id           TEXT PRIMARY KEY,
-    path         TEXT NOT NULL,
-    title        TEXT NOT NULL,
-    artist       TEXT NOT NULL,
-    album        TEXT NOT NULL,
-    duration     INTEGER NOT NULL,
-    format       TEXT NOT NULL,
-    size         INTEGER NOT NULL,
-    cover_color  TEXT NOT NULL,
-    album_art    TEXT,
-    year         INTEGER,
-    genre        TEXT,
-    track_number INTEGER,
-    mtime_ms     INTEGER NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_tracks_path ON tracks(path);
-`)
+// Creates the table on a fresh install and back-fills columns added by a
+// newer build on an existing one.
+migrate(db)
 
 const stmtGetMtime = db.prepare<[string], { mtime_ms: number }>(
   'SELECT mtime_ms FROM tracks WHERE path = ?'
@@ -199,25 +226,7 @@ const stmtGetFull = db.prepare<[string], ScannedTrack>(
   'SELECT * FROM tracks WHERE path = ?'
 )
 
-const stmtUpsert = db.prepare(`
-  INSERT INTO tracks
-    (id, path, title, artist, album, duration, format, size, cover_color, album_art, year, genre, track_number, mtime_ms)
-  VALUES
-    (@id, @path, @title, @artist, @album, @duration, @format, @size, @cover_color, @album_art, @year, @genre, @track_number, @mtime_ms)
-  ON CONFLICT(id) DO UPDATE SET
-    title        = excluded.title,
-    artist       = excluded.artist,
-    album        = excluded.album,
-    duration     = excluded.duration,
-    format       = excluded.format,
-    size         = excluded.size,
-    cover_color  = excluded.cover_color,
-    album_art    = excluded.album_art,
-    year         = excluded.year,
-    genre        = excluded.genre,
-    track_number = excluded.track_number,
-    mtime_ms     = excluded.mtime_ms
-`)
+const stmtUpsert = db.prepare(upsertSql())
 
 // ─── Logging ──────────────────────────────────────────────────────────────────
 

@@ -32,10 +32,18 @@ const audio = {
   playPrevious: vi.fn(),
 }
 
+const settings = {
+  shuffle: false,
+  setShuffle: vi.fn(),
+  repeatMode: 'none' as const,
+  setRepeatMode: vi.fn(),
+}
+
 vi.mock('../../../src/app/contexts', () => ({
-  useUI: () => ({ setView }),
+  useUI: () => ({ setView, currentView: 'player' }),
   useAudio: () => audio,
   useLibrary: () => ({ filteredTracks: [ track ] }),
+  useSettings: () => settings,
 }))
 
 vi.mock('../../../src/app/hooks', () => ({
@@ -78,6 +86,28 @@ describe('Player', () => {
     expect(screen.getByRole('button', { name: 'Pause' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Mute' })).toBeEnabled()
     expect(screen.getByRole('slider', { name: 'Volume' })).toHaveValue('0.8')
+  })
+
+  it('names the playback modes by their current state, not their icon', () => {
+    render(<Player />)
+
+    expect(screen.getByRole('button', { name: 'Shuffle off' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Repeat off' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Shuffle off' }))
+    expect(settings.setShuffle).toHaveBeenCalledWith(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Repeat off' }))
+    expect(settings.setRepeatMode).toHaveBeenCalledWith('all')
+  })
+
+  it('swaps the transport for lyrics on demand', () => {
+    render(<Player />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show lyrics' }))
+
+    expect(screen.getByRole('region', { name: 'Lyrics' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show playback controls' })).toBeInTheDocument()
   })
 
   it('keeps the same tree in its empty state and disables playback actions', () => {

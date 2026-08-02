@@ -50,6 +50,47 @@ cache-first:
 - `isLoading` therefore means "a scan is running", not "there's nothing to
   show". Skeletons are for an empty list only.
 
+## Track metadata & the tag editor
+
+`src/track-schema.ts` is the single description of the `tracks` table. The
+scanner worker, the db writer and `library:load` in `main.ts` all derive their
+DDL, their upsert statements and the snake_case ↔ camelCase mapping from it —
+**adding a tag field is one line there plus one in `TrackFields`**
+(`app/services/types.ts`). `migrate()` back-fills columns on an existing DB via
+`PRAGMA table_info`, so an old library file survives an upgrade.
+
+`models/Track` generates its accessors from a field list rather than declaring
+thirty getter/setter pairs; the class is merged with an interface so the
+compiler knows about properties that only exist at runtime. Assigning any of
+them marks the model dirty → debounced `flush()` → `upsertTrack`.
+
+**Tag edits are written to the app's database, not into the audio file.**
+Nothing in the tree can write ID3/Vorbis frames. The scanner cooperates: a
+renderer-side write leaves `mtime_ms` untouched (`upsertDtoSql`), so the next
+scan sees an unchanged file, serves the stored row, and the edit survives.
+Touch the file on disk and the re-parse wins.
+
+The editor shows `PRIMARY_TAG_FIELDS` up front and `EXTENDED_TAG_FIELDS` behind
+a `<details>`; both lists are ordered as they appear on screen. Artwork is a
+data URL either way, whether it came from a picture frame or the file picker.
+
+## Appearance settings
+
+`useAppearance` writes three things onto the document root, because they have
+to reach `@layer tokens` which nothing renders:
+
+- `--font` / `--font-display` from the chosen `UiFont`. Only Montserrat and
+  Sofia Pro ship with the app; Poppins and Helvetica resolve against installed
+  system fonts. The default keeps Sofia Pro for headings (`UI_DISPLAY_STACKS`).
+- root `font-size` from `fontScale`. Every `--text-*` token is in **rem** for
+  this reason; the spacing scale stays in px so only type moves.
+- `--accent` per built-in theme (`accentDark` / `accentLight`), plus a derived
+  `--accent-hover` and a luminance-picked `--accent-contrast`. Skipped entirely
+  when `theme === 'custom'` — that theme owns its own accent.
+
+It is mounted in `AppContent`, above `useThemeApply` in `SettingsView`, so it
+runs *after* it on any commit that changes both. Don't move it deeper.
+
 ## Track table layout
 
 `TrackTable` has exactly one scroll container (`.track-scroll`). Everything
@@ -62,6 +103,11 @@ that stays put is `position: sticky` inside it:
 - Ancestors (`.app-main`, `.view-content`) are `overflow: hidden` for views
   that scroll internally — `.view-content:has(> .library)`. Document-style
   views (settings, tag editor) still scroll in `.view-content`.
+- Every grouping mode (album / artist / path) collapses via one `GroupToggle`
+  button next to the heading, keyed by group in a `collapsedGroups` set — not
+  `<details>`. Album groups put artwork outside the heading and path groups put
+  an interactive breadcrumb trail inside it, and neither survives a
+  `<summary>`. A collapsed group renders no rows at all.
 - Scrolling down collapses `.view-header` (`data-header-hidden` on `.library`,
   driven by TrackTable's `onScroll`); the column header then rides up and pins
   at the top of the view. The collapse is a `1fr → 0fr` grid row on
@@ -115,6 +161,48 @@ The mini/compact title marquees with `translateX(min(0px, calc(100cqw - 100%)))`
 box and `100%` is the text. A title that fits yields a positive value, `min()`
 clamps it to zero, and the animation runs without moving. No JS measurement,
 no `.is-overflowing` class.
+
+## Player transport & lyrics
+
+Shuffle and repeat live in `SettingsContext` (persisted) and are *read* by
+`AudioContext` through `useOptionalSettings` — playback stays usable, and
+testable, without a settings provider above it. `pickTrack()` is the one place
+that knows what next/previous mean under shuffle and repeat; the `ended`
+handler goes through `advanceRef` so it never closes over stale modes.
+
+Shuffle ignores direction: "previous" in a shuffled queue is another arbitrary
+track, because the engine keeps no play history.
+
+The lyrics panel replaces the progress bar and transport, and only in the
+full-window player at the `normal` height tier — the footer bar and the mini
+tiers have nowhere to put a column of text, so the toggle is hidden there
+rather than being a control that does nothing. Lyrics come from the file's
+tags (`common.lyrics`, synced frames flattened); there is no fetching.
+
+The footer bar has **no volume slider** — the system volume and the full player
+both already own that, and the width is better spent on the progress bar. The
+`.player-volume` element still renders; the bar-mode rules hide it.
+
+## Animation
+
+Two motions, two mechanisms, both in `layout.css`:
+
+- **Sidebar toggle** — `:root { interpolate-size: allow-keywords }` makes the
+  slot's intrinsic `width: auto` a transition endpoint, so it slides to `0`
+  without the open width ever being restated in CSS (the user drags it; it's an
+  inline width on `.library-sidebar`). It can no longer be `display: none`.
+- **Now-playing promote** — `UIContext.setView` wraps the state update in
+  `document.startViewTransition` + `flushSync`. `view-transition-name: player`
+  and `player-art` are what make it a morph rather than a cross-fade. Falls
+  back to an instant switch with no transition API or under reduced motion.
+
+## Context menu window
+
+The menu is a separate frameless `BrowserWindow`, so it inherits nothing —
+`contextmenu:show` carries `theme` and `accent` alongside the items, and
+`ContextMenuApp` stamps them onto *its* document root. The window stays
+transparent (frameless windows show their own corners otherwise); the
+`.context-menu-window` panel is what's painted opaque.
 
 ## Also see
 

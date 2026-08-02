@@ -1,6 +1,14 @@
-import { parentPort } from 'node:worker_threads'
+/**
+ * DB writer — the only path renderer-originated model edits take to disk.
+ *
+ * Runs on its own worker thread so a tag save never blocks the main process,
+ * and shares the schema (and therefore the database) with the scanner via
+ * `track-schema.ts`.
+ */
+import { parentPort, workerData } from 'node:worker_threads'
 import path from 'node:path'
 import fs from 'node:fs'
+import { migrate, upsertDtoSql, dtoToParams } from './track-schema'
 
 
 interface WriteMessage {
@@ -10,12 +18,28 @@ interface WriteMessage {
   id?:      string
 }
 
-// Lazy-load sqlite
-function getDB (): unknown {
+interface SqliteDatabase {
+  exec (sql: string): unknown
+  prepare (sql: string): { run (params?: unknown): unknown; all (): unknown[] }
+}
+
+// eslint-disable-next-line functional/no-let
+let db: SqliteDatabase | null = null
+
+/**
+ * The path is handed over as `workerData` by the spawning process. It used to
+ * be re-derived from `$HOME` here, which pointed at a *different* file than
+ * the one `main.ts` and the scanner open — so every edit was written to a
+ * database nothing ever read back.
+ */
+function getDB (): SqliteDatabase | null {
   if (db)
     return db
 
-  const dbPath = process.env.DB_PATH || path.join(process.env.HOME || '', 'Library/Application Support/desktop-audio/library.db')
+  const dbPath = (workerData as { dbPath?: string } | undefined)?.dbPath ??
+    process.env.DB_PATH ??
+    path.join(process.env.HOME || '', 'Library/Application Support/library.db')
+
   const dir = path.dirname(dbPath)
   if (!fs.existsSync(dir))
     fs.mkdirSync(dir, { recursive: true })
@@ -23,8 +47,8 @@ function getDB (): unknown {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
-    db = new Database(dbPath)
-    initSchema(db)
+    db = new Database(dbPath) as SqliteDatabase
+    migrate(db)
   }
   catch (e) {
     console.error('[db-writer] Failed to open DB:', e)
@@ -34,64 +58,38 @@ function getDB (): unknown {
   return db
 }
 
-// eslint-disable-next-line functional/no-let
-let db: unknown = null
-
-function initSchema (db: unknown): void {
-  (db as { exec: (sql: string) => void }).exec(`
-    CREATE TABLE IF NOT EXISTS tracks (
-      id TEXT PRIMARY KEY,
-      path TEXT UNIQUE NOT NULL,
-      title TEXT NOT NULL,
-      artist TEXT NOT NULL,
-      album TEXT NOT NULL,
-      duration REAL NOT NULL,
-      format TEXT NOT NULL,
-      size INTEGER NOT NULL,
-      cover_color TEXT NOT NULL,
-      album_art TEXT,
-      year INTEGER,
-      genre TEXT,
-      track_number INTEGER
-    )
-  `)
-}
-
 function upsert (kind: string, payload: Record<string, unknown>): void {
-  const db = getDB()
-  if (!db)
+  const database = getDB()
+  if (!database || kind !== 'track')
     return
 
-  if (kind === 'track') {
-    const stmt = (db as { prepare: (sql: string) => { run: (payload: Record<string, unknown>) => void }}).prepare(`
-      INSERT OR REPLACE INTO tracks
-      (id, path, title, artist, album, duration, format, size, cover_color, album_art, year, genre, track_number)
-      VALUES (@id, @path, @title, @artist, @album, @duration, @format, @size, @coverColor, @albumArt, @year, @genre, @trackNumber)
-    `)
-    stmt.run(payload)
-  }
+  // `dtoToParams` also drops anything that isn't a column — a model payload
+  // carries a few extra getters, and better-sqlite3 rejects stray named
+  // parameters outright.
+  database.prepare(upsertDtoSql()).run(dtoToParams(payload))
 }
 
 function deleteModel (kind: string, id: string): void {
-  const db = getDB()
-  if (!db)
+  const database = getDB()
+  if (!database || kind !== 'track')
     return
 
-  if (kind === 'track') {
-    (db as { prepare: (sql: string) => { run: (id: string) => void }}).prepare('DELETE FROM tracks WHERE id = ?').run(id)
-  }
+  database.prepare('DELETE FROM tracks WHERE id = ?').run(id)
 }
 
 parentPort?.on('message', (msg: WriteMessage) => {
   try {
     if (msg.type === 'upsert' && msg.payload) {
       upsert(msg.kind, msg.payload)
+      parentPort?.postMessage({ type: 'done' })
     }
     else if (msg.type === 'delete' && msg.id) {
       deleteModel(msg.kind, msg.id)
+      parentPort?.postMessage({ type: 'done' })
     }
   }
   catch (err) {
     console.error('[db-writer] Error:', err)
+    parentPort?.postMessage({ type: 'error', message: String(err) })
   }
 })

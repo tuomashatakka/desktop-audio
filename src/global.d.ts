@@ -27,7 +27,7 @@ interface ElectronAPI {
   onMediaPrev:      (cb: () => void) => () => void
 
   // Context menu
-  showContextMenu:     (items: unknown[], x: number, y: number, w: number, h: number) => void
+  showContextMenu:     (items: unknown[], x: number, y: number, w: number, h: number, theme?: string, accent?: string) => void
   hideContextMenu:     () => void
   onContextMenuAction: (cb: (index: number) => void) => () => void
 

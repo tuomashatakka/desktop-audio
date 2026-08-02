@@ -1,28 +1,225 @@
-import { useState } from 'react'
-import type { FormEvent } from 'react'
+/**
+ * TagEditorView — edits every tag the library stores for a track.
+ *
+ * Two things worth knowing before changing this:
+ *
+ * 1. Saving writes to the app's own database, **not** into the audio file.
+ *    Nothing in the dependency tree can write ID3/Vorbis frames, so the tags
+ *    shown across the app are the edited ones while the file on disk is
+ *    untouched. The scanner cooperates: an edit leaves `mtime_ms` alone, so
+ *    the next scan sees an unchanged file, serves the stored row, and the
+ *    edit survives.
+ * 2. Only the seven fields in `PRIMARY_TAG_FIELDS` are shown up front. The
+ *    rest — and there are a lot of them — live behind a disclosure, because a
+ *    twenty-field wall is not a form anyone reads.
+ */
+import { useState, useRef } from 'react'
+import type { FormEvent, ChangeEvent } from 'react'
 import { useUI, useLibrary } from '../contexts'
 import type { Track } from '../models'
+import type { TagField, TrackDTO } from '../services/types'
+import { PRIMARY_TAG_FIELDS, EXTENDED_TAG_FIELDS } from '../services/types'
+import { useData } from '../data'
 import { Button, Input } from '../components/atomic'
 import { formatTime, isoDuration } from '../utils/time'
 
 
+/** Label and input type per editable field. Numeric fields parse on save. */
+const FIELD_META: Record<TagField, { label: string; type: 'text' | 'number' | 'multiline' }> = {
+  title:       { label: 'Title', type: 'text' },
+  artist:      { label: 'Artist', type: 'text' },
+  album:       { label: 'Album', type: 'text' },
+  albumArtist: { label: 'Album Artist', type: 'text' },
+  year:        { label: 'Year', type: 'number' },
+  genre:       { label: 'Genre', type: 'text' },
+  trackNumber: { label: 'Track No.', type: 'number' },
+  composer:    { label: 'Composer', type: 'text' },
+  trackTotal:  { label: 'Track Total', type: 'number' },
+  discNumber:  { label: 'Disc No.', type: 'number' },
+  discTotal:   { label: 'Disc Total', type: 'number' },
+  bpm:         { label: 'BPM', type: 'number' },
+  publisher:   { label: 'Publisher', type: 'text' },
+  copyright:   { label: 'Copyright', type: 'text' },
+  isrc:        { label: 'ISRC', type: 'text' },
+  encodedBy:   { label: 'Encoded By', type: 'text' },
+  language:    { label: 'Language', type: 'text' },
+  mood:        { label: 'Mood', type: 'text' },
+  grouping:    { label: 'Grouping', type: 'text' },
+  comment:     { label: 'Comment', type: 'multiline' },
+  lyrics:      { label: 'Lyrics', type: 'multiline' },
+}
+
+/** Every editable field as a string, which is what form controls deal in. */
+type FormState = Record<TagField, string>
+
+const ALL_FIELDS: readonly TagField[] = [ ...PRIMARY_TAG_FIELDS, ...EXTENDED_TAG_FIELDS ]
+
+function readForm (track: Track): FormState {
+  const source = track as unknown as Record<string, unknown>
+  const state = {} as FormState
+
+  for (const field of ALL_FIELDS) {
+    const value = source[field]
+    state[field] = value === undefined || value === null ? '' : String(value)
+  }
+  return state
+}
+
+/** Empty string means "no tag", not "the number zero" — hence the blank check. */
+function parseField (field: TagField, value: string): string | number | undefined {
+  const trimmed = value.trim()
+  if (!trimmed)
+    return undefined
+
+  if (FIELD_META[field].type !== 'number')
+    return trimmed
+
+  const parsed = Number(trimmed)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function TagInputs ({ fields, form, onChange }: {
+  readonly fields:   readonly TagField[]
+  readonly form:     FormState
+  readonly onChange: (field: TagField, value: string) => void
+}) {
+  return (
+    <>
+      {fields.map(field => {
+        const { label, type } = FIELD_META[field]
+
+        if (type === 'multiline')
+          return (
+            <label key={field} className='field'>
+              <span>{label}</span>
+
+              <textarea
+                rows={field === 'lyrics' ? 10 : 3}
+                value={form[field]}
+                onChange={event =>
+                  onChange(field, event.target.value)}
+              />
+            </label>
+          )
+
+        return (
+          <Input
+            key={field}
+            label={label}
+            type={type}
+            value={form[field]}
+            onChange={event =>
+              onChange(field, event.target.value)}
+          />
+        )
+      })}
+    </>
+  )
+}
+
+/** Artwork preview plus its replace/remove controls. */
+function ArtworkField ({ art, color, album, onPick, onClear }: {
+  readonly art?:    string
+  readonly color?:  string
+  readonly album:   string
+  readonly onPick:  (dataUrl: string) => void
+  readonly onClear: () => void
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file)
+      return
+
+    // Artwork is stored inline as a data URL, the same shape the scanner
+    // produces from an embedded picture frame — so nothing downstream has to
+    // care whether the image came from a tag or from this picker.
+    const reader = new FileReader()
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string')
+        onPick(reader.result)
+    })
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div className='artwork-field'>
+      <figure className='art-preview' style={{ backgroundColor: color }}>
+        {art
+          ? <img src={art} alt={`Album artwork for ${album}`} />
+          : <span aria-hidden='true'>♫</span>
+        }
+      </figure>
+
+      <menu className='artwork-actions'>
+        <li>
+          <Button type='button'
+            variant='secondary'
+            size='sm'
+            onClick={() =>
+              fileRef.current?.click()}>
+            {art ? 'Replace' : 'Add artwork'}
+          </Button>
+        </li>
+
+        <li>
+          <Button type='button' variant='ghost' size='sm' disabled={!art} onClick={onClear}>
+            Remove
+          </Button>
+        </li>
+      </menu>
+
+      <input
+        ref={fileRef}
+        type='file'
+        accept='image/*'
+        aria-label='Choose album artwork'
+        hidden
+        onChange={handleFile}
+      />
+    </div>
+  )
+}
+
 interface TagEditorFormProps {
   readonly track:   Track
   readonly onClose: () => void
+  readonly onSaved: () => void
 }
 
-function TagEditorForm ({ track, onClose }: TagEditorFormProps) {
-  const [ formData, setFormData ] = useState({
-    title:  track.title,
-    artist: track.artist,
-    album:  track.album,
-  })
+function TagEditorForm ({ track, onClose, onSaved }: TagEditorFormProps) {
+  const data = useData()
+  const [ form, setForm ] = useState<FormState>(() =>
+    readForm(track))
+  const [ art, setArt ] = useState<string | undefined>(track.albumArt)
+  const [ status, setStatus ] = useState<string | null>(null)
 
-  const handleSave = (event: FormEvent<HTMLFormElement>) => {
+  const setField = (field: TagField, value: string) =>
+    setForm(current =>
+      ({ ...current, [field]: value }))
+
+  const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    console.log('Saving metadata:', formData)
-    alert('Metadata saved (demo)')
-    onClose()
+
+    // Assigning through the model's setters is what marks it dirty and, in
+    // turn, schedules the write — mutating a copy would update the screen and
+    // persist nothing.
+    const target = track as unknown as Record<string, unknown>
+    for (const field of ALL_FIELDS)
+      target[field] = parseField(field, form[field])
+    target.albumArt = art
+
+    try {
+      await data.upsertTrack(track.toDTO() as TrackDTO)
+      setStatus('Saved')
+      onSaved()
+    }
+    catch (error) {
+      console.error('Failed to save tags:', error)
+      setStatus('Could not save — see the console for details')
+    }
   }
 
   return (
@@ -34,37 +231,25 @@ function TagEditorForm ({ track, onClose }: TagEditorFormProps) {
 
       <form onSubmit={handleSave}>
         <div className='editor-layout'>
-          <figure className='art-preview' style={{ backgroundColor: track.coverColor }}>
-            {track.albumArt
-              ? <img src={track.albumArt} alt={`Album artwork for ${track.album}`} />
-              : <span aria-hidden='true'>♫</span>
-            }
-          </figure>
+          <ArtworkField
+            art={art}
+            color={track.coverColor}
+            album={track.album}
+            onPick={setArt}
+            onClear={() =>
+              setArt(undefined)}
+          />
 
           <div className='form-stack'>
-            <Input
-              label='Title'
-              value={formData.title}
-              onChange={event =>
-                setFormData(current =>
-                  ({ ...current, title: event.target.value }))}
-            />
+            <TagInputs fields={PRIMARY_TAG_FIELDS} form={form} onChange={setField} />
 
-            <Input
-              label='Artist'
-              value={formData.artist}
-              onChange={event =>
-                setFormData(current =>
-                  ({ ...current, artist: event.target.value }))}
-            />
+            <details className='tag-extended'>
+              <summary>More tags</summary>
 
-            <Input
-              label='Album'
-              value={formData.album}
-              onChange={event =>
-                setFormData(current =>
-                  ({ ...current, album: event.target.value }))}
-            />
+              <div className='form-stack'>
+                <TagInputs fields={EXTENDED_TAG_FIELDS} form={form} onChange={setField} />
+              </div>
+            </details>
 
             <dl className='file-info'>
               <div>
@@ -81,11 +266,43 @@ function TagEditorForm ({ track, onClose }: TagEditorFormProps) {
                 <dt>Duration</dt>
                 <dd><time dateTime={isoDuration(track.duration)}>{formatTime(track.duration)}</time></dd>
               </div>
+
+              {track.bitrate !== undefined &&
+                <div>
+                  <dt>Bitrate</dt>
+
+                  <dd>
+                    {Math.round(track.bitrate / 1000)}
+                    {' '}
+                    kbps
+                  </dd>
+                </div>
+              }
+
+              {track.sampleRate !== undefined &&
+                <div>
+                  <dt>Sample rate</dt>
+
+                  <dd>
+                    {track.sampleRate}
+                    {' '}
+                    Hz
+                  </dd>
+                </div>
+              }
+
+              {track.channels !== undefined &&
+                <div>
+                  <dt>Channels</dt>
+                  <dd>{track.channels}</dd>
+                </div>
+              }
             </dl>
           </div>
         </div>
 
         <footer className='footer-actions'>
+          {status && <p className='status-note' role='status'>{status}</p>}
           <Button type='button' variant='ghost' onClick={onClose}>Cancel</Button>
           <Button type='submit' variant='primary'>Save Changes</Button>
         </footer>
@@ -96,7 +313,7 @@ function TagEditorForm ({ track, onClose }: TagEditorFormProps) {
 
 export function TagEditorView () {
   const { setView, editingTrackId } = useUI()
-  const { registry } = useLibrary()
+  const { registry, setTracks } = useLibrary()
   const tracks = registry.getAllTracks()
   const track = tracks.find(candidate =>
     candidate.id === editingTrackId) || tracks[0]
@@ -115,6 +332,11 @@ export function TagEditorView () {
       track={track}
       onClose={() =>
         setView('library')}
+      onSaved={() =>
+        // The models were edited in place, so nothing downstream has changed
+        // identity. Republishing them is what tells React to re-render the
+        // library with the new titles.
+        setTracks(registry.getAllTracks())}
     />
   )
 }

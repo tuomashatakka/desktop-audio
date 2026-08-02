@@ -9,6 +9,8 @@
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import type { Track } from './LibraryContext'
+import { useOptionalSettings } from './SettingsContext'
+import type { RepeatMode } from './SettingsContext'
 import { useHost, useData } from '../data'
 import { noop } from '../utils/noop'
 
@@ -39,6 +41,49 @@ interface AudioContextValue extends AudioState {
 
   /** Ensure audio context is ready (resumes if suspended). Call after user gesture. */
   readonly ensureReady: () => Promise<void>
+}
+
+/** Direction of travel through the queue, as asked for by the transport. */
+type Step = 1 | -1
+
+/**
+ * The track a step lands on, given shuffle and repeat.
+ *
+ * Shuffle ignores direction — "previous" in a shuffled queue is another
+ * arbitrary track, not a history stack, and pretending otherwise would need
+ * play history this engine doesn't keep. Repeat `all` wraps at either end;
+ * repeat `none` stops there by returning `null`. Repeat `one` is handled by
+ * the caller, since it re-seeks rather than picking anything.
+ */
+function pickTrack (
+  tracks: readonly Track[],
+  current: Track | null,
+  step: Step,
+  shuffle: boolean,
+  repeat: RepeatMode
+): Track | null {
+  if (tracks.length === 0)
+    return null
+
+  const index = current
+    ? tracks.findIndex(t =>
+      t.id === current.id)
+    : -1
+
+  if (shuffle) {
+    const pool = tracks.filter((_, i) =>
+      i !== index)
+    return pool[Math.floor(Math.random() * pool.length)] ?? tracks[0] ?? null
+  }
+
+  const next = index + step
+  if (next >= 0 && next < tracks.length)
+    return tracks[next]
+
+  if (repeat === 'all')
+    return step > 0 ? tracks[0] : tracks[tracks.length - 1]
+
+  return null
 }
 
 /** Decode an audio file and compute per-bar RMS amplitudes for the waveform. */
@@ -103,6 +148,12 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     waveformBars: null,
   })
 
+  // Playback preferences are read, never written, from here — the toggles in
+  // the player write straight to settings, which is where they persist.
+  const settings = useOptionalSettings()
+  const repeatMode = settings?.repeatMode ?? 'none'
+  const shuffle = settings?.shuffle ?? false
+
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const analyzerRef = useRef<AnalyserNode | null>(null)
   const audioContextRef = useRef<globalThis.AudioContext | null>(null)
@@ -117,6 +168,9 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   const seekRef = useRef<(time: number) => void>(noop)
   const playNextRef = useRef<(tracks: readonly Track[]) => void>(noop)
   const playPreviousRef = useRef<(tracks: readonly Track[]) => void>(noop)
+
+  /** What to do when a track runs out. Reassigned every render, see below. */
+  const advanceRef = useRef<() => void>(noop)
 
   // Track the current playlist being played
   const currentQueueRef = useRef<Track[]>([])
@@ -184,9 +238,10 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
         ({ ...s, duration: audio.duration }))
     }
 
+    // Registered once, so it defers to a ref rather than closing over the
+    // repeat/shuffle values that were current when the effect first ran.
     const handleEnded = () => {
-      setState(s =>
-        ({ ...s, isPlaying: false, currentTime: 0 }))
+      advanceRef.current()
     }
 
     const handleLoadStart = () => {
@@ -416,35 +471,47 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
 
   const playNext = useCallback(
     (tracks: readonly Track[]) => {
-      if (!state.currentTrack || tracks.length === 0)
-        return
-
-      const currentIndex = tracks.findIndex(t =>
-        t.id === state.currentTrack?.id)
-      const nextIndex = currentIndex + 1
-
-      if (nextIndex < tracks.length) {
-        play(tracks[nextIndex])
-      }
+      const next = pickTrack(tracks, state.currentTrack, 1, shuffle, repeatMode)
+      if (next)
+        play(next)
     },
-    [ state.currentTrack, play ]
+    [ state.currentTrack, play, shuffle, repeatMode ]
   )
 
   const playPrevious = useCallback(
     (tracks: readonly Track[]) => {
-      if (!state.currentTrack || tracks.length === 0)
-        return
-
-      const currentIndex = tracks.findIndex(t =>
-        t.id === state.currentTrack?.id)
-      const prevIndex = currentIndex - 1
-
-      if (prevIndex >= 0) {
-        play(tracks[prevIndex])
-      }
+      const previous = pickTrack(tracks, state.currentTrack, -1, shuffle, repeatMode)
+      if (previous)
+        play(previous)
     },
-    [ state.currentTrack, play ]
+    [ state.currentTrack, play, shuffle, repeatMode ]
   )
+
+  /**
+   * End-of-track advance. Repeat `one` restarts the same file rather than
+   * going back through `play()` — no re-read, no waveform re-decode, and the
+   * loop is gapless as far as the element is concerned.
+   */
+  advanceRef.current = () => {
+    const audio = audioRef.current
+
+    if (repeatMode === 'one' && audio) {
+      audio.currentTime = 0
+      audio.play().catch(console.error)
+      setState(s =>
+        ({ ...s, currentTime: 0, isPlaying: true }))
+      return
+    }
+
+    const next = pickTrack(currentQueueRef.current, state.currentTrack, 1, shuffle, repeatMode)
+    if (next) {
+      play(next)
+      return
+    }
+
+    setState(s =>
+      ({ ...s, isPlaying: false, currentTime: 0 }))
+  }
 
   // Ensure audio context is ready (resume if suspended due to autoplay policy)
   const ensureReady = useCallback(async () => {

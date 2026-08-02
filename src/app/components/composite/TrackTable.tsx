@@ -267,6 +267,35 @@ interface GroupBlock {
   readonly tracks:   readonly Track[]
 }
 
+/**
+ * The disclosure control for a group heading.
+ *
+ * Every grouping mode gets the same button rather than `<details>`: album
+ * groups put the artwork outside the heading and path groups put an
+ * interactive breadcrumb trail inside it, and neither survives being stuffed
+ * into a `<summary>` — nesting interactive content there nests buttons in the
+ * accessibility tree. One button next to the heading works for all three.
+ */
+function GroupToggle ({ open, controls, label, onToggle }: {
+  readonly open:     boolean
+  readonly controls: string
+  readonly label:    string
+  readonly onToggle: () => void
+}) {
+  return (
+    <button
+      type='button'
+      className='group-toggle'
+      aria-expanded={open}
+      aria-controls={controls}
+      aria-label={`${open ? 'Collapse' : 'Expand'} ${label}`}
+      onClick={onToggle}
+    >
+      <span aria-hidden='true'>▸</span>
+    </button>
+  )
+}
+
 function groupLabel (track: Track, grouping: Grouping, path: string): string {
   if (grouping === 'album')
     return track.album || 'Unknown Album'
@@ -321,6 +350,20 @@ export function TrackTable ({
 
   const [ menuAnchor, setMenuAnchor ] = useState<HTMLElement | null>(null)
   const [ focusedIndex, setFocusedIndex ] = useState(0)
+
+  // Collapsed rather than expanded state: groups default to open, and a set
+  // of exceptions survives regrouping and re-sorting without having to be
+  // rebuilt every time the group list changes.
+  const [ collapsedGroups, setCollapsedGroups ] = useState<ReadonlySet<string>>(new Set())
+
+  const toggleGroup = useCallback((key: string) => {
+    setCollapsedGroups(current => {
+      const next = new Set(current)
+      if (!next.delete(key))
+        next.add(key)
+      return next
+    })
+  }, [])
 
   const groups = useMemo(() =>
     buildGroups(sorted, grouping), [ sorted, grouping ])
@@ -545,31 +588,60 @@ export function TrackTable ({
 
           : <div className='track-body grouped'>
             {groups.map((g, groupIndex) => {
-              const rows = g.tracks.map((t, i) =>
-                renderRow(t, indexOf(t, i)))
               const headingId = `track-group-${grouping}-${groupIndex}`
+              const rowsId = `${headingId}-rows`
+              const collapsed = collapsedGroups.has(g.key)
+
+              // A collapsed group renders no rows at all rather than hiding
+              // them: with a large library that is the difference between a
+              // few hundred DOM nodes and a few thousand.
+              const rows = collapsed
+                ? null
+                : g.tracks.map((t, i) =>
+                  renderRow(t, indexOf(t, i)))
+
+              const toggle =
+                <GroupToggle
+                  open={!collapsed}
+                  controls={rowsId}
+                  label={g.label}
+                  onToggle={() =>
+                    toggleGroup(g.key)}
+                />
 
               if (grouping === 'album')
                 return (
-                  <section key={g.key} className='track-group album' aria-labelledby={headingId}>
+                  <section
+                    key={g.key}
+                    className='track-group album'
+                    data-collapsed={collapsed || undefined}
+                    aria-labelledby={headingId}
+                  >
                     <AlbumArt src={g.tracks[0].albumArt} color={g.tracks[0].coverColor} />
 
                     <header>
+                      {toggle}
                       <h3 id={headingId}>{g.label}</h3>
                       <small>{g.subtitle}</small>
                     </header>
 
-                    <div className='group-rows'>{rows}</div>
+                    <div className='group-rows' id={rowsId} hidden={collapsed}>{rows}</div>
                   </section>
                 )
 
-              // Path groups get a clickable trail instead of a heading, so the
-              // collapse affordance is dropped here — interactive content
-              // inside <summary> would nest buttons.
+              // Path groups head with a clickable trail rather than a plain
+              // heading, so the folder they represent stays navigable.
               if (grouping === 'path')
                 return (
-                  <section key={g.key} className='track-group' aria-label={g.key}>
+                  <section
+                    key={g.key}
+                    className='track-group'
+                    data-collapsed={collapsed || undefined}
+                    aria-label={g.key}
+                  >
                     <header>
+                      {toggle}
+
                       <Breadcrumbs
                         path={g.key}
                         roots={roots}
@@ -581,19 +653,25 @@ export function TrackTable ({
                       <small>{g.subtitle}</small>
                     </header>
 
-                    <div className='group-rows'>{rows}</div>
+                    <div className='group-rows' id={rowsId} hidden={collapsed}>{rows}</div>
                   </section>
                 )
 
               return (
-                <details key={g.key} className='track-group' open>
-                  <summary>
-                    <span className='group-title'>{g.label}</span>
+                <section
+                  key={g.key}
+                  className='track-group'
+                  data-collapsed={collapsed || undefined}
+                  aria-labelledby={headingId}
+                >
+                  <header>
+                    {toggle}
+                    <h3 className='group-title' id={headingId}>{g.label}</h3>
                     <small>{g.subtitle}</small>
-                  </summary>
+                  </header>
 
-                  <div className='group-rows'>{rows}</div>
-                </details>
+                  <div className='group-rows' id={rowsId} hidden={collapsed}>{rows}</div>
+                </section>
               )
             })}
           </div>

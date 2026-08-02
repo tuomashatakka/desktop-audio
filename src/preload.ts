@@ -79,9 +79,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
 
-  // Context menu
-  showContextMenu: (items: SerializableMenuItem[], x: number, y: number, width: number, height: number) =>
-    ipcRenderer.send('contextmenu:show', { items, x, y, width, height }),
+  // Context menu — `theme`/`accent` ride along so the separate menu window
+  // can paint itself in the app's current theme instead of guessing.
+  showContextMenu: (
+    items: SerializableMenuItem[],
+    x: number, y: number, width: number, height: number,
+    theme?: string, accent?: string
+  ) =>
+    ipcRenderer.send('contextmenu:show', { items, x, y, width, height, theme, accent }),
   hideContextMenu: () =>
     ipcRenderer.send('contextmenu:hide'),
   onContextMenuAction: (cb: (index: number) => void) => {
@@ -105,11 +110,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
 
-  // Write IPC
-  upsertModel: (kind: string, payload: Record<string, unknown>) => {
-    ipcRenderer.send('models:upsert', kind, payload)
-  },
-  deleteModel: (kind: string, id: string) => {
-    ipcRenderer.send('models:delete', kind, id)
-  },
+  // Write IPC — `invoke`, not `send`: both channels are registered with
+  // `ipcMain.handle`, so a fire-and-forget send never reaches a handler.
+  upsertModel: (kind: string, payload: Record<string, unknown>) =>
+    ipcRenderer.invoke('models:upsert', kind, payload),
+  deleteModel: (kind: string, id: string) =>
+    ipcRenderer.invoke('models:delete', kind, id),
 })

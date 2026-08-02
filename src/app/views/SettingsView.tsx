@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import type { ChangeEvent } from 'react'
-import { useSettings } from '../contexts'
-import type { RepeatMode, Theme, CustomTheme } from '../contexts'
+import { useSettings, UI_FONT_LABELS, MIN_FONT_SCALE, MAX_FONT_SCALE } from '../contexts'
+import type { RepeatMode, Theme, CustomTheme, UiFont } from '../contexts'
 import { useData } from '../data'
 import { useThemeApply } from '../hooks'
 import { Button } from '../components/atomic'
@@ -38,10 +38,12 @@ const SETTINGS_SECTIONS = [
 export function SettingsView () {
   const {
     libraryPaths, theme, customTheme, defaultDensity,
-    volume, repeatMode,
+    volume, repeatMode, shuffle,
+    uiFont, fontScale, accentDark, accentLight,
     addLibraryPath, removeLibraryPath,
     setTheme, setCustomTheme, exportTheme, importTheme, setDefaultDensity,
-    setVolume, setRepeatMode,
+    setVolume, setRepeatMode, setShuffle,
+    setUiFont, setFontScale, setAccent,
   } = useSettings()
   const data = useData()
   const themeFileRef = useRef<HTMLInputElement>(null)
@@ -176,6 +178,80 @@ export function SettingsView () {
             </select>
           </label>
 
+          <label className='field'>
+            <span>UI Font</span>
+
+            <select
+              value={uiFont}
+              onChange={event =>
+                setUiFont(event.target.value as UiFont)}
+            >
+              {(Object.keys(UI_FONT_LABELS) as UiFont[]).map(font =>
+                <option key={font} value={font}>{UI_FONT_LABELS[font]}</option>
+              )}
+            </select>
+          </label>
+
+          <p className='section-description'>
+            Montserrat ships with the app. Poppins and Helvetica are used only
+            if they are installed on this system.
+          </p>
+
+          <label className='field'>
+            <span>Font Size</span>
+
+            <span className='volume-setting'>
+              <input
+                id='settings-font-scale'
+                type='range'
+                className='slider'
+                min={MIN_FONT_SCALE}
+                max={MAX_FONT_SCALE}
+                step={0.05}
+                value={fontScale}
+                onChange={event =>
+                  setFontScale(Number(event.target.value))}
+              />
+
+              <output htmlFor='settings-font-scale' className='volume-value'>
+                {Math.round(fontScale * 100)}
+                %
+              </output>
+            </span>
+          </label>
+
+          {/* Two swatches, not one: an accent tuned for a near-black surface
+              rarely holds up on a light one, and vice versa. */}
+          <fieldset className='field accent-picker'>
+            <legend>Accent Colour</legend>
+
+            <label>
+              <span>Dark theme</span>
+
+              <input
+                type='color'
+                value={accentDark}
+                onChange={event =>
+                  setAccent('dark', event.target.value)}
+              />
+
+              <span className='color-value'>{accentDark}</span>
+            </label>
+
+            <label>
+              <span>Light theme</span>
+
+              <input
+                type='color'
+                value={accentLight}
+                onChange={event =>
+                  setAccent('light', event.target.value)}
+              />
+
+              <span className='color-value'>{accentLight}</span>
+            </label>
+          </fieldset>
+
           <div className='theme-editor' hidden={theme !== 'custom'}>
             <h3>Custom Theme Colors</h3>
 
@@ -262,6 +338,17 @@ export function SettingsView () {
               <option value='one'>Repeat One</option>
               <option value='all'>Repeat All</option>
             </select>
+          </label>
+
+          <label className='field checkbox-field'>
+            <input
+              type='checkbox'
+              checked={shuffle}
+              onChange={event =>
+                setShuffle(event.target.checked)}
+            />
+
+            <span>Shuffle</span>
           </label>
         </section>
 

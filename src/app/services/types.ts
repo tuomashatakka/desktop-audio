@@ -6,24 +6,76 @@
  * model classes in `../models`.
  */
 
-/** Serialized track metadata as it travels over IPC and persists in SQLite/IDB. */
-export interface Track {
-  readonly id:           string
-  readonly path:         string
-  readonly title:        string
-  readonly artist:       string
-  readonly album:        string
-  readonly duration:     number
-  readonly format:       string
-  readonly size:         number
-  readonly coverColor:   string
-  readonly albumArt?:    string
-  readonly year?:        number
-  readonly genre?:       string
-  readonly trackNumber?: number
+/**
+ * Every tag field the app stores for a track, in mutable form.
+ *
+ * The field names are the camelCase of the `tracks` columns declared in
+ * `src/track-schema.ts` — that file is the source of truth for the storage
+ * side, this one for the type side. Adding a tag means touching both.
+ *
+ * Most consumers want the frozen view: see {@link Track}.
+ */
+export interface TrackFields {
+  id:           string
+  path:         string
+  title:        string
+  artist:       string
+  album:        string
+  duration:     number
+  format:       string
+  size:         number
+  coverColor:   string
+  albumArt?:    string
+  year?:        number
+  genre?:       string
+  trackNumber?: number
+
+  /* Extended tags — everything below is optional and often absent. */
+  albumArtist?: string
+  composer?:    string
+  trackTotal?:  number
+  discNumber?:  number
+  discTotal?:   number
+  bpm?:         number
+  comment?:     string
+  lyrics?:      string
+  publisher?:   string
+  copyright?:   string
+  isrc?:        string
+  encodedBy?:   string
+  language?:    string
+  mood?:        string
+  grouping?:    string
+
+  /* Technical properties, read from the stream rather than the tags. */
+  bitrate?:    number
+  sampleRate?: number
+  channels?:   number
 }
 
+/** Serialized track metadata as it travels over IPC and persists in SQLite/IDB. */
+export type Track = {readonly [K in keyof TrackFields]: TrackFields[K] }
+
 export type TrackDTO = Track
+
+/**
+ * The editable subset of {@link TrackFields}, in display order.
+ *
+ * `primary` is what the tag editor shows up front; `extended` lives behind a
+ * disclosure. Order here *is* the order on screen, so this list is the one
+ * place to reorder or regroup the form.
+ */
+export const PRIMARY_TAG_FIELDS = [
+  'title', 'artist', 'album', 'albumArtist', 'year', 'genre', 'trackNumber',
+] as const
+
+export const EXTENDED_TAG_FIELDS = [
+  'composer', 'trackTotal', 'discNumber', 'discTotal', 'bpm', 'publisher',
+  'copyright', 'isrc', 'encodedBy', 'language', 'mood', 'grouping',
+  'comment', 'lyrics',
+] as const
+
+export type TagField = typeof PRIMARY_TAG_FIELDS[number] | typeof EXTENDED_TAG_FIELDS[number]
 
 /** Serialized folder tree node returned by the scanner. */
 export interface FolderNode {
@@ -58,6 +110,18 @@ export interface SerializableMenuItem {
   readonly icon?:      string
   readonly danger?:    boolean
   readonly separator?: boolean
+}
+
+/**
+ * What the standalone context-menu window receives when it is asked to show.
+ *
+ * It renders in a separate BrowserWindow with its own document, so it can't
+ * inherit the app's `data-theme` or accent — both travel with the items.
+ */
+export interface ContextMenuPayload {
+  readonly items:   readonly SerializableMenuItem[]
+  readonly theme:   string
+  readonly accent?: string
 }
 
 /** Snapshot pushed to the OS media session (MPRIS / SMTC / NowPlaying). */

@@ -13,3 +13,5 @@ export * from './useColumnConfig'
 export * from './useThemeApply'
 
 export * from './useAmbientPalette'
+
+export * from './useAppearance'

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { MenuList } from '../components/composite/ContextMenu'
-import type { SerializableMenuItem } from '../services/types'
+import type { SerializableMenuItem, ContextMenuPayload } from '../services/types'
 
 
 interface ContextMenuAPI {
-  onContextMenuItems:    (cb: (items: SerializableMenuItem[]) => void) => () => void
+  onContextMenuItems:    (cb: (payload: ContextMenuPayload) => void) => () => void
   sendContextMenuAction: (index: number) => void
   closeContextMenu:      () => void
 }
@@ -16,14 +16,26 @@ declare global {
 }
 
 export function ContextMenuApp () {
-  const [ items, setItems ] = useState<SerializableMenuItem[]>([])
+  const [ items, setItems ] = useState<readonly SerializableMenuItem[]>([])
 
   useEffect(() => {
     const api = window.contextMenuAPI
     if (!api)
       return
-    return api.onContextMenuItems(received =>
-      setItems(received))
+
+    return api.onContextMenuItems(payload => {
+      setItems(payload.items)
+
+      // Theme is pushed onto this window's own root, since it shares no DOM
+      // with the app. Doing it here rather than in render keeps the paint in
+      // step with the items — the window is shown as soon as they arrive.
+      const root = document.documentElement
+      root.dataset.theme = payload.theme
+      if (payload.accent)
+        root.style.setProperty('--accent', payload.accent)
+      else
+        root.style.removeProperty('--accent')
+    })
   }, [])
 
   const handleAction = (index: number) => {

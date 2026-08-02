@@ -43,8 +43,8 @@ export class ElectronHost implements HostBridge {
     return this._ipc?.onMediaPrev(cb) ?? noop
   }
 
-  showContextMenu (items: SerializableMenuItem[], x: number, y: number, w: number, h: number): void {
-    this._ipc?.showContextMenu(items, x, y, w, h)
+  showContextMenu (items: SerializableMenuItem[], x: number, y: number, w: number, h: number, theme?: string, accent?: string): void {
+    this._ipc?.showContextMenu(items, x, y, w, h, theme, accent)
   }
 
   hideContextMenu (): void {

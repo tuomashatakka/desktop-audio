@@ -1,9 +1,27 @@
-import { useUI, useAudio, useLibrary } from '../../contexts'
-import type { Track } from '../../contexts'
+import { useState } from 'react'
+import { useUI, useAudio, useLibrary, useSettings } from '../../contexts'
+import type { Track, RepeatMode } from '../../contexts'
 import { IconButton, Button } from '../atomic'
 import { WaveformProgress } from '../atomic/WaveformProgress'
 import { useWindowScale } from '../../hooks'
 import { formatTime, isoDuration } from '../../utils/time'
+
+
+/** Cycle order for the repeat button: off → whole queue → single track. */
+const REPEAT_CYCLE: Record<RepeatMode, RepeatMode> = {
+  none: 'all',
+  all:  'one',
+  one:  'none',
+}
+
+/** One glyph for all three modes; colour and the `1` badge carry the state. */
+const REPEAT_GLYPH = '↻'
+
+const REPEAT_LABEL: Record<RepeatMode, string> = {
+  none: 'Repeat off',
+  all:  'Repeat queue',
+  one:  'Repeat track',
+}
 
 
 function PlayerArtwork ({ track, onToggle }: {
@@ -30,15 +48,38 @@ function PlayerArtwork ({ track, onToggle }: {
   )
 }
 
-function PlayerTransport ({ hasTrack, isPlaying, onPrevious, onToggle, onNext }: {
+function PlayerTransport ({
+  hasTrack, isPlaying, onPrevious, onToggle, onNext,
+  shuffle, onShuffle, repeatMode, onRepeat,
+}: {
   readonly hasTrack:   boolean
   readonly isPlaying:  boolean
   readonly onPrevious: () => void
   readonly onToggle:   () => void
   readonly onNext:     () => void
+
+  readonly shuffle:    boolean
+  readonly onShuffle:  () => void
+  readonly repeatMode: RepeatMode
+  readonly onRepeat:   () => void
 }) {
   return (
     <menu className='playback-controls' aria-label='Playback'>
+      {/* Shuffle and repeat sit inside the transport rather than beside it:
+          they're modes of the same control group, and the tier rules only
+          have to shed one element to drop both. */}
+      <li className='mode shuffle'>
+        <IconButton
+          label={shuffle ? 'Shuffle on' : 'Shuffle off'}
+          type='button'
+          aria-pressed={shuffle}
+          data-active={shuffle || undefined}
+          onClick={onShuffle}
+        >
+          <span aria-hidden='true'>⤨</span>
+        </IconButton>
+      </li>
+
       <li className='prev'>
         <IconButton label='Previous' type='button' disabled={!hasTrack} onClick={onPrevious}>
           <span aria-hidden='true'>⏮</span>
@@ -65,7 +106,37 @@ function PlayerTransport ({ hasTrack, isPlaying, onPrevious, onToggle, onNext }:
           <span aria-hidden='true'>⏭</span>
         </IconButton>
       </li>
+
+      <li className='mode repeat'>
+        <IconButton
+          label={REPEAT_LABEL[repeatMode]}
+          type='button'
+          data-repeat={repeatMode}
+          data-active={repeatMode === 'none' ? undefined : true}
+          onClick={onRepeat}
+        >
+          <span aria-hidden='true'>{REPEAT_GLYPH}</span>
+          {repeatMode === 'one' && <span className='mode-badge' aria-hidden='true'>1</span>}
+        </IconButton>
+      </li>
     </menu>
+  )
+}
+
+/**
+ * The lyrics panel, which takes the place of the progress bar and transport
+ * in the full-window player. Rendered whenever it is toggled on — whether it
+ * is *visible* is the tier stylesheet's call, since the compact tiers have no
+ * room for it.
+ */
+function PlayerLyrics ({ lyrics }: { readonly lyrics?: string }) {
+  return (
+    <section className='player-lyrics' aria-label='Lyrics'>
+      {lyrics
+        ? <pre>{lyrics}</pre>
+        : <p className='status-message'>No lyrics in this file&apos;s tags</p>
+      }
+    </section>
   )
 }
 
@@ -119,18 +190,27 @@ function PlayerVolume ({ hasTrack, volume, onChange }: {
  * that system.
  */
 export function Player () {
-  const { setView } = useUI()
+  const { setView, currentView } = useUI()
   const {
     currentTrack, isPlaying, currentTime, duration, volume, waveformBars,
     pause, resume, seek, setVolume, playNext, playPrevious,
   } = useAudio()
   const { filteredTracks } = useLibrary()
+  const { shuffle, setShuffle, repeatMode, setRepeatMode } = useSettings()
   const toggleWindowScale = useWindowScale()
+
+  const [ showLyrics, setShowLyrics ] = useState(false)
+
+  // Lyrics only make sense in the full-window player; the footer bar and the
+  // mini tiers have nowhere to put them, so the panel isn't in their DOM at
+  // all rather than being hidden after the fact.
+  const lyricsOpen = showLyrics && currentView === 'player'
 
   return (
     <article
       className='player-view'
       data-empty={currentTrack ? undefined : ''}
+      data-lyrics={lyricsOpen ? '' : undefined}
       aria-label={currentTrack ? `Now playing: ${currentTrack.title}` : 'Player'}
     >
       {currentTrack?.albumArt &&
@@ -163,6 +243,21 @@ export function Player () {
           <p className='track-album'>{currentTrack?.album}</p>
         </hgroup>
 
+        <IconButton
+          label={showLyrics ? 'Show playback controls' : 'Show lyrics'}
+          type='button'
+          className='lyrics-toggle'
+          aria-pressed={showLyrics}
+          disabled={!currentTrack}
+          onClick={() =>
+            setShowLyrics(current =>
+              !current)}
+        >
+          <span aria-hidden='true'>☰</span>
+        </IconButton>
+
+        {lyricsOpen && <PlayerLyrics lyrics={currentTrack?.lyrics} />}
+
         <section className='progress-section' aria-label='Playback position'>
           <WaveformProgress
             currentTime={currentTime}
@@ -190,6 +285,12 @@ export function Player () {
           onToggle={isPlaying ? pause : resume}
           onNext={() =>
             playNext(filteredTracks)}
+          shuffle={shuffle}
+          onShuffle={() =>
+            setShuffle(!shuffle)}
+          repeatMode={repeatMode}
+          onRepeat={() =>
+            setRepeatMode(REPEAT_CYCLE[repeatMode])}
         />
 
         <PlayerVolume

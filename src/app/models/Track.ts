@@ -1,152 +1,50 @@
 import { Model } from './Model'
-import type { TrackDTO } from '../services/types'
+import type { TrackDTO, TrackFields } from '../services/types'
 
+
+/**
+ * Every persisted field, in DTO order. The accessors below are generated from
+ * this list rather than written out: with thirty-odd tag fields, hand-rolled
+ * getter/setter pairs are a hundred lines of identical code and a guaranteed
+ * place for a typo to hide.
+ */
+const FIELDS = [
+  'path', 'title', 'artist', 'album', 'duration', 'format', 'size',
+  'coverColor', 'albumArt', 'year', 'genre', 'trackNumber',
+  'albumArtist', 'composer', 'trackTotal', 'discNumber', 'discTotal', 'bpm',
+  'comment', 'lyrics', 'publisher', 'copyright', 'isrc', 'encodedBy',
+  'language', 'mood', 'grouping', 'bitrate', 'sampleRate', 'channels',
+] as const satisfies readonly Exclude<keyof TrackFields, 'id'>[]
+
+type Field = typeof FIELDS[number]
+
+/**
+ * Declares the generated accessors to the type system. See {@link FIELDS}.
+ *
+ * Merging an interface into the class is the point here, not an accident:
+ * the accessors are installed on the prototype at module load, so this is the
+ * only way to tell the compiler about properties it can't see being defined.
+ */
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
+   @typescript-eslint/no-unsafe-declaration-merging */
+export interface Track extends Omit<TrackFields, 'id'> {}
 
 /**
  * A single audio file in the library.
  *
- * Wraps the metadata stored in the DB (title, artist, album, duration,
- * format, etc.) with dirty-tracking setters and a lazy-loaded waveform
- * cache. Convert to/from the DTO used over IPC via {@link Track.fromDTO}
- * and {@link Track#toDTO}.
+ * Wraps the metadata stored in the DB (title, artist, album, duration, the
+ * full tag set, etc.) with dirty-tracking setters and a lazy-loaded waveform
+ * cache. Convert to/from the DTO used over IPC via {@link Track.fromDTO} and
+ * {@link Track#toDTO}.
+ *
+ * Assigning any tag field marks the model dirty, which schedules a debounced
+ * write through {@link Model#flush} — that is how the tag editor persists.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Track extends Model {
-  private _title!:       string
-  private _artist!:      string
-  private _album!:       string
-  private _duration!:    number
-  private _format!:      string
-  private _size!:        number
-  private _coverColor!:  string
-  private _albumArt?:    string
-  private _year?:        number
-  private _genre?:       string
-  private _trackNumber?: number
-  private _path!:        string
-
   // Lazy waveform property
   #waveform: Float32Array | null = null
   #waveformLoading = false
-
-  get title (): string {
-    return this._title
-  }
-
-  set title (v: string) {
-    if (this._title !== v) {
-      this._title = v; this.markDirty()
-    }
-  }
-
-  get artist (): string {
-    return this._artist
-  }
-
-  set artist (v: string) {
-    if (this._artist !== v) {
-      this._artist = v; this.markDirty()
-    }
-  }
-
-  get album (): string {
-    return this._album
-  }
-
-  set album (v: string) {
-    if (this._album !== v) {
-      this._album = v; this.markDirty()
-    }
-  }
-
-  get duration (): number {
-    return this._duration
-  }
-
-  set duration (v: number) {
-    if (this._duration !== v) {
-      this._duration = v; this.markDirty()
-    }
-  }
-
-  get format (): string {
-    return this._format
-  }
-
-  set format (v: string) {
-    if (this._format !== v) {
-      this._format = v; this.markDirty()
-    }
-  }
-
-  get size (): number {
-    return this._size
-  }
-
-  set size (v: number) {
-    if (this._size !== v) {
-      this._size = v; this.markDirty()
-    }
-  }
-
-  get coverColor (): string {
-    return this._coverColor
-  }
-
-  set coverColor (v: string) {
-    if (this._coverColor !== v) {
-      this._coverColor = v; this.markDirty()
-    }
-  }
-
-  get albumArt (): string | undefined {
-    return this._albumArt
-  }
-
-  set albumArt (v: string | undefined) {
-    if (this._albumArt !== v) {
-      this._albumArt = v; this.markDirty()
-    }
-  }
-
-  get year (): number | undefined {
-    return this._year
-  }
-
-  set year (v: number | undefined) {
-    if (this._year !== v) {
-      this._year = v; this.markDirty()
-    }
-  }
-
-  get genre (): string | undefined {
-    return this._genre
-  }
-
-  set genre (v: string | undefined) {
-    if (this._genre !== v) {
-      this._genre = v; this.markDirty()
-    }
-  }
-
-  get trackNumber (): number | undefined {
-    return this._trackNumber
-  }
-
-  set trackNumber (v: number | undefined) {
-    if (this._trackNumber !== v) {
-      this._trackNumber = v; this.markDirty()
-    }
-  }
-
-  get path (): string {
-    return this._path
-  }
-
-  set path (v: string) {
-    if (this._path !== v) {
-      this._path = v; this.markDirty()
-    }
-  }
 
   get waveform (): Float32Array | null {
     return this.#waveform
@@ -166,38 +64,52 @@ export class Track extends Model {
     this.dispatchEvent('waveform')
   }
 
+  /** Hydrates without marking dirty — a fresh read is not a pending write. */
   static fromDTO (dto: TrackDTO): Track {
     const track = new Track(dto.id)
-    track._title = dto.title
-    track._artist = dto.artist
-    track._album = dto.album
-    track._duration = dto.duration
-    track._format = dto.format
-    track._size = dto.size
-    track._coverColor = dto.coverColor
-    track._albumArt = dto.albumArt
-    track._year = dto.year
-    track._genre = dto.genre
-    track._trackNumber = dto.trackNumber
-    track._path = dto.path
+    const store = track as unknown as Record<string, unknown>
+    for (const field of FIELDS)
+      store[`_${field}`] = dto[field]
     return track
   }
 
   toDTO (): TrackDTO {
-    return {
-      id:          this.id,
-      title:       this._title,
-      artist:      this._artist,
-      album:       this._album,
-      duration:    this._duration,
-      format:      this._format,
-      size:        this._size,
-      coverColor:  this._coverColor,
-      albumArt:    this._albumArt,
-      year:        this._year,
-      genre:       this._genre,
-      trackNumber: this._trackNumber,
-      path:        this._path,
-    }
+    const source = this as unknown as Record<Field, unknown>
+    const dto: Record<string, unknown> = { id: this.id }
+    for (const field of FIELDS)
+      dto[field] = source[field]
+    return dto as unknown as TrackDTO
   }
+
+  /**
+   * The persisted payload is exactly the DTO. `Model#toJSON` would otherwise
+   * reflect over *every* getter and sweep the decoded waveform into it, which
+   * is neither a column nor something worth pushing across IPC on each edit.
+   */
+  override toJSON (): Record<string, unknown> {
+    return this.toDTO() as unknown as Record<string, unknown>
+  }
+}
+
+// Backing values live on `_`-prefixed own properties, which `Model#toJSON`
+// skips — it serializes through the prototype getters instead, so the payload
+// that reaches the database is the public shape and nothing else.
+for (const field of FIELDS) {
+  const backing = `_${field}`
+
+  Object.defineProperty(Track.prototype, field, {
+    configurable: true,
+    enumerable:   false,
+
+    get (this: Record<string, unknown>) {
+      return this[backing]
+    },
+
+    set (this: Record<string, unknown> & { markDirty (): void }, value: unknown) {
+      if (this[backing] === value)
+        return
+      this[backing] = value
+      this.markDirty()
+    },
+  })
 }

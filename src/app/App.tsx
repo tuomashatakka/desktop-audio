@@ -5,18 +5,19 @@ import { LibraryToolbar } from './views/LibraryToolbar'
 import { SettingsView } from './views/SettingsView'
 import { TagEditorView } from './views/TagEditorView'
 import { Player } from './components/composite/Player'
-import { useKeyboardShortcuts, useAmbientPalette } from './hooks'
+import { useKeyboardShortcuts, useAmbientPalette, useAppearance } from './hooks'
 import { AppLayout, Titlebar, LibrarySidebar } from './layout'
 
 
 function AppContent () {
-  const { theme } = useSettings()
+  const { theme, uiFont, fontScale, accent } = useSettings()
   const { filteredTracks } = useLibrary()
   const { setCurrentQueue } = useAudio()
 
   // All hooks must be called unconditionally before any early return
   useKeyboardShortcuts()
   useAmbientPalette()
+  useAppearance({ theme, uiFont, fontScale, accent })
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)

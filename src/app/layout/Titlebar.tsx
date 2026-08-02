@@ -1,7 +1,21 @@
 import type { ReactNode } from 'react'
 import { useUI } from '../contexts'
+import type { ViewType } from '../contexts'
 import { useBridge } from '../data'
 
+
+const NAV_ITEMS: readonly { view: ViewType; icon: string }[] = [
+  { view: 'library', icon: '♫' },
+  { view: 'player', icon: '▶' },
+  { view: 'settings', icon: '⚙' },
+]
+
+const NAV_LABELS: Record<ViewType, string> = {
+  'library':    'Library',
+  'player':     'Player',
+  'settings':   'Settings',
+  'tag-editor': 'Tag Editor',
+}
 
 export function Titlebar ({ children }: { readonly children?: ReactNode }) {
   const { currentView, setView, sidebarOpen, toggleSidebar } = useUI()
@@ -36,46 +50,25 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
         <span className='logo-text'>Desktop Audio</span>
       </div>
 
+      {/* Icon-only: the label is carried by `aria-label` and the `title`
+          tooltip, so the tab strip costs the titlebar three glyphs of width
+          instead of a third of it. */}
       <nav aria-label='Primary'>
         <ul className='titlebar-nav'>
-          <li>
-            <button
-              className='nav-item'
-              aria-label='Library'
-              aria-current={currentView === 'library' ? 'page' : undefined}
-              onClick={() =>
-                setView('library')}
-            >
-              <span className='nav-icon' aria-hidden='true'>♫</span>
-              <span className='nav-label'>Library</span>
-            </button>
-          </li>
-
-          <li>
-            <button
-              className='nav-item'
-              aria-label='Player'
-              aria-current={currentView === 'player' ? 'page' : undefined}
-              onClick={() =>
-                setView('player')}
-            >
-              <span className='nav-icon' aria-hidden='true'>▶</span>
-              <span className='nav-label'>Player</span>
-            </button>
-          </li>
-
-          <li>
-            <button
-              className='nav-item'
-              aria-label='Settings'
-              aria-current={currentView === 'settings' ? 'page' : undefined}
-              onClick={() =>
-                setView('settings')}
-            >
-              <span className='nav-icon' aria-hidden='true'>⚙</span>
-              <span className='nav-label'>Settings</span>
-            </button>
-          </li>
+          {NAV_ITEMS.map(({ view, icon }) =>
+            <li key={view}>
+              <button
+                className='nav-item'
+                aria-label={NAV_LABELS[view]}
+                title={NAV_LABELS[view]}
+                aria-current={currentView === view ? 'page' : undefined}
+                onClick={() =>
+                  setView(view)}
+              >
+                <span className='nav-icon' aria-hidden='true'>{icon}</span>
+              </button>
+            </li>
+          )}
         </ul>
       </nav>
 

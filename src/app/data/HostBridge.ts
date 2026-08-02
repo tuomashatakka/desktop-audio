@@ -27,7 +27,7 @@ export interface HostBridge {
   onMediaPrev(cb: () => void): () => void
 
   // Context menu
-  showContextMenu(items: SerializableMenuItem[], x: number, y: number, w: number, h: number): void
+  showContextMenu(items: SerializableMenuItem[], x: number, y: number, w: number, h: number, theme?: string, accent?: string): void
   hideContextMenu(): void
   onContextMenuAction(cb: (i: number) => void): () => void
 

@@ -85,11 +85,12 @@ export class IpcDataSource implements DataSource {
       Promise.resolve({ duration: 0 })
   }
 
+  /** Awaits the write, so a failed save is a rejected promise and not silence. */
   async upsertTrack (track: TrackDTO): Promise<void> {
-    this._ipc?.upsertModel?.('track', track as unknown as Record<string, unknown>)
+    await this._ipc?.upsertModel?.('track', track as unknown as Record<string, unknown>)
   }
 
   async deleteTrack (trackId: string): Promise<void> {
-    this._ipc?.deleteModel?.('track', trackId)
+    await this._ipc?.deleteModel?.('track', trackId)
   }
 }

@@ -1,4 +1,28 @@
 /* shell, persistent view slots, window chrome, sidebar, and player */
+
+/* Lets `width: auto` be a transition endpoint — see `.app-sidebar`. */
+:root { interpolate-size: allow-keywords; }
+
+/*
+ * Promoting the player to the full window is a view transition, driven from
+ * `UIContext.setView`. Naming the player and its artwork is what turns the
+ * default cross-fade into a morph: the same two boxes are matched across the
+ * two states and tweened, so the bar grows into the now-playing screen
+ * instead of one fading into the other.
+ */
+.player-view { view-transition-name: player; }
+.album-art-card { view-transition-name: player-art; }
+
+::view-transition-old(player),
+::view-transition-new(player),
+::view-transition-old(player-art),
+::view-transition-new(player-art) {
+  animation-duration: var(--duration);
+  animation-timing-function: var(--ease);
+}
+
+::view-transition-group(player-art) { animation-duration: var(--duration); }
+
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -12,8 +36,29 @@
 .app-content { display: flex; flex: 1; flex-direction: column; min-width: 0; overflow: hidden; }
 .app-main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .app-player { min-width: 0; overflow: hidden; }
-.app-sidebar { display: flex; flex-shrink: 0; align-self: stretch; height: 100%; overflow: hidden; }
-.app-shell:not([data-sidebar-open]) .app-sidebar { display: none; }
+
+/*
+ * The sidebar slides rather than blinking out. It can't be `display: none`
+ * for that, and its open width isn't a constant either — the user drags it,
+ * so it lives as an inline width on `.library-sidebar` inside.
+ *
+ * `interpolate-size: allow-keywords` (set on :root below) is what makes the
+ * intrinsic `width: auto` animatable, so the slot can shrink to nothing
+ * without the width ever being restated here.
+ */
+.app-sidebar {
+  display: flex;
+  flex-shrink: 0;
+  align-self: stretch;
+  width: auto;
+  height: 100%;
+  overflow: hidden;
+  transition:
+    width var(--duration) var(--ease),
+    opacity var(--duration) var(--ease);
+}
+
+.app-shell:not([data-sidebar-open]) .app-sidebar { width: 0; opacity: 0; }
 
 /* Every primary view stays mounted; the shell attribute only changes layout. */
 .app-view { display: none; flex: 1; min-width: 0; min-height: 0; }
@@ -362,6 +407,58 @@ body::before {
 .playback-controls :is(.prev, .next) > button:hover:not(:disabled) { border-color: var(--border-hover); }
 .player-volume { display: flex; align-items: center; gap: var(--sp-2); width: min(200px, 100%); }
 
+/* Shuffle/repeat read as off until they're on — colour is the whole signal. */
+.playback-controls .mode > button { color: var(--text-muted); font-size: var(--text-lg); }
+.playback-controls .mode > button:hover:not(:disabled) { color: var(--text); }
+.playback-controls .mode > button[data-active] { color: var(--accent); }
+.playback-controls .mode > button { position: relative; }
+.mode-badge {
+  position: absolute;
+  right: var(--sp-0-5);
+  bottom: var(--sp-0-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1;
+}
+
+/*
+ * Lyrics take the place of the transport, so the two are mutually exclusive
+ * rather than stacked. Only the full-window player offers the swap — the
+ * footer bar and the mini tiers have nowhere to put a column of text, and the
+ * toggle is hidden there rather than being a control that does nothing.
+ */
+.lyrics-toggle { display: none; }
+.app-shell[data-view='player'][data-height-tier='normal'] .lyrics-toggle {
+  position: absolute;
+  z-index: 2;
+  top: var(--sp-4);
+  right: var(--sp-4);
+  display: inline-flex;
+  color: var(--text-muted);
+}
+
+.app-shell[data-view='player'][data-height-tier='normal'] .lyrics-toggle:hover:not(:disabled) { color: var(--text); }
+.app-shell[data-view='player'][data-height-tier='normal'] .lyrics-toggle[aria-pressed='true'] { color: var(--accent); }
+
+.player-view[data-lyrics] :is(.progress-section, .playback-controls, .player-volume) { display: none; }
+.player-lyrics {
+  width: min(100%, 640px);
+  min-height: 0;
+  overflow: auto;
+  padding: var(--sp-4) var(--sp-6);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-raised) 70%, transparent);
+  text-align: center;
+}
+
+.player-lyrics pre {
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: var(--text-base);
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
 .waveform-progress {
   display: flex;
   align-items: center;
@@ -454,7 +551,8 @@ body::before {
 .app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .player-info { grid-area: info; text-align: start; }
 .app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .progress-section { grid-area: progress; }
 .app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .playback-controls { grid-area: controls; }
-.app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .player-volume { display: none; }
+.app-shell:is([data-height-tier='compact'], [data-height-tier='mini'])
+  :is(.player-volume, .playback-controls .mode) { display: none; }
 
 .app-shell[data-height-tier='compact'] .player-content {
   --art-size: clamp(56px, 60cqh, 140px);
@@ -565,6 +663,13 @@ body::before {
   outline-offset: -2px;
 }
 
+/*
+ * The footer bar drops the volume slider entirely — system volume and the
+ * full player both already own that job, and the width it costs is better
+ * spent on the progress bar. It stays in the full-window player.
+ */
+.app-shell[data-height-tier='normal']:not([data-view='player']) .player-volume { display: none; }
+
 .app-shell[data-height-tier='normal']:not([data-view='player']) .player-content {
   --art-size: var(--titlebar-h);
   --play-size: 32px;
@@ -572,14 +677,17 @@ body::before {
   --title-size: var(--text-sm);
   z-index: 3;
   display: grid;
-  grid-template-columns: var(--titlebar-h) minmax(100px, 1fr) auto minmax(120px, 2fr) minmax(120px, auto);
-  grid-template-areas: 'art info controls progress volume';
+  grid-template-columns: var(--titlebar-h) minmax(100px, 1fr) auto minmax(140px, 3fr);
+  grid-template-areas: 'art info controls progress';
   align-items: center;
   justify-content: initial;
   gap: var(--sp-4);
   padding: var(--sp-2) var(--sp-4);
   pointer-events: none;
 }
+
+/* Modes don't earn their width in a 72px bar; they live in the full player. */
+.app-shell[data-height-tier='normal']:not([data-view='player']) .playback-controls .mode { display: none; }
 
 .app-shell[data-height-tier='normal']:not([data-view='player'])
   :is(.player-art, .progress-section, .playback-controls, .player-volume) { pointer-events: auto; }
@@ -611,16 +719,6 @@ body::before {
 .app-shell[data-height-tier='normal']:not([data-view='player']) .time-label:first-child { grid-column: 1; grid-row: 1; }
 .app-shell[data-height-tier='normal']:not([data-view='player']) .time-label:last-child { grid-column: 3; grid-row: 1; }
 .app-shell[data-height-tier='normal']:not([data-view='player']) .playback-controls { grid-area: controls; gap: var(--sp-2); }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .player-volume { grid-area: volume; width: auto; min-width: 120px; }
-
-@container player (max-width: 720px) {
-  .app-shell[data-height-tier='normal']:not([data-view='player']) .player-content {
-    grid-template-columns: var(--titlebar-h) minmax(100px, 1fr) auto minmax(100px, 2fr);
-    grid-template-areas: 'art info controls progress';
-  }
-
-  .app-shell[data-height-tier='normal']:not([data-view='player']) .player-volume { display: none; }
-}
 
 @container player (max-width: 520px) {
   .app-shell[data-height-tier='normal']:not([data-view='player']) .player-content {

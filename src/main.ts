@@ -13,6 +13,7 @@ import { Worker } from 'node:worker_threads'
 import started from 'electron-squirrel-startup'
 import * as mm from 'music-metadata'
 import * as mediaControls from './media-controls'
+import { rowToDto } from './track-schema'
 import type { MediaState, SerializableMenuItem } from './app/services/types'
 
 
@@ -117,14 +118,16 @@ app.on('activate', () => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function mapTrack ({ mtime_ms: _mtime, cover_color, album_art, track_number, ...rest }: Record<string, unknown>) {
-  return {
-    ...rest,
-    coverColor:  cover_color,
-    albumArt:    album_art ?? undefined,
-    trackNumber: track_number ?? undefined,
-  }
-}
+/**
+ * DB row → renderer DTO. The column list, and therefore the snake→camel
+ * mapping, comes from `track-schema.ts` so adding a tag doesn't need an edit
+ * here as well.
+ */
+const mapTrack = rowToDto
+
+/** Every process that opens the library database resolves the path this way. */
+const libraryDbPath = () =>
+  path.join(app.getPath('appData'), 'library.db')
 
 // ─── File handlers ────────────────────────────────────────────────────────────
 
@@ -190,7 +193,7 @@ const log = {
 
 // Fast startup: return all persisted tracks from SQLite without scanning
 ipcMain.handle('library:load', () => {
-  const dbPath = path.join(app.getPath('appData'), 'library.db')
+  const dbPath = libraryDbPath()
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3')
@@ -228,7 +231,7 @@ function getScanWorker (): Worker {
   if (scanWorker)
     return scanWorker
 
-  const dbPath = path.join(app.getPath('appData'), 'library.db')
+  const dbPath = libraryDbPath()
   scanWorker = new Worker(
     path.join(__dirname, 'scanner-worker.js'),
     { workerData: { dbPath }}
@@ -325,11 +328,13 @@ ipcMain.on('window:set-size', (_e, width: number, height: number) => {
 // ─── Context menu handlers ────────────────────────────────────────────────────
 
 ipcMain.on('contextmenu:show', (_event, payload: {
-  items:  SerializableMenuItem[]
-  x:      number
-  y:      number
-  width:  number
-  height: number
+  items:   SerializableMenuItem[]
+  x:       number
+  y:       number
+  width:   number
+  height:  number
+  theme?:  string
+  accent?: string
 }) => {
   if (!popoverWindow)
     return
@@ -339,7 +344,14 @@ ipcMain.on('contextmenu:show', (_event, payload: {
     width:  payload.width,
     height: payload.height,
   })
-  popoverWindow.webContents.send('contextmenu:items', payload.items)
+
+  // The menu lives in its own BrowserWindow, so it inherits nothing from the
+  // app's DOM — theme and accent have to be handed over explicitly.
+  popoverWindow.webContents.send('contextmenu:items', {
+    items:  payload.items,
+    theme:  payload.theme ?? 'dark',
+    accent: payload.accent,
+  })
   popoverWindow.show()
   popoverWindow.focus()
 })
@@ -371,7 +383,7 @@ function getDbWriter (): Worker {
   if (dbWriter)
     return dbWriter
 
-  const dbPath = path.join(app.getPath('appData'), 'library.db')
+  const dbPath = libraryDbPath()
   dbWriter = new Worker(
     path.join(__dirname, 'db-writer.js'),
     { workerData: { dbPath }}

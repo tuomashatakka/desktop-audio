@@ -27,7 +27,7 @@ declare global {
     readonly onMediaPrev:      (cb: () => void) => () => void
 
     // Context menu
-    readonly showContextMenu:      (items: SerializableMenuItem[], x: number, y: number, width: number, height: number) => void
+    readonly showContextMenu:      (items: SerializableMenuItem[], x: number, y: number, width: number, height: number, theme?: string, accent?: string) => void
     readonly hideContextMenu:      () => void
     readonly onContextMenuAction:  (cb: (index: number) => void) => () => void
 
