@@ -49,13 +49,13 @@
 @property --ambient-2 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #f090f0;
+  initial-value: #707088;
 }
 
 @property --ambient-3 {
   syntax: '<color>';
   inherits: true;
-  initial-value: #ffafb0;
+  initial-value: #8a8a9a;
 }
 
 @layer tokens {
@@ -99,7 +99,7 @@
     --border-hover: rgb(255 255 255 / 20%);
     --border-focus: var(--accent);
     --overlay: rgb(0 0 0 / 60%);
-    --shell-wash: rgb(251 89 205 / 25%);
+    --shell-wash: rgb(255 255 255 / 6%);
 
     /* type */
     --font-display: "Sofia Pro", "Montserrat", system-ui, sans-serif;
@@ -161,5 +161,6 @@
     --shadow-lg: 0 8px 24px rgb(0 0 0 / 10%), 0 2px 8px rgb(0 0 0 / 6%);
     --shadow-card: 0 12px 40px rgb(0 0 0 / 12%);
     --wf-unplayed: rgb(0 0 0 / 13%);
+    --shell-wash: rgb(0 0 0 / 4%);
   }
 }

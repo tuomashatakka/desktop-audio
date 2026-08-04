@@ -80,12 +80,24 @@ describe('Player', () => {
     expect(container.querySelectorAll('.player-view')).toHaveLength(1)
   })
 
-  it('names transport and volume controls from their actions', () => {
+  it('names transport controls from their actions', () => {
     render(<Player />)
 
     expect(screen.getByRole('button', { name: 'Pause' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Mute' })).toBeEnabled()
-    expect(screen.getByRole('slider', { name: 'Volume' })).toHaveValue('0.8')
+  })
+
+  it('has no volume control — the footer bar and system volume already own that', () => {
+    render(<Player />)
+
+    expect(screen.queryByRole('slider', { name: 'Volume' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mute' })).not.toBeInTheDocument()
+  })
+
+  it('has a close button that returns to the library', () => {
+    render(<Player />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close player' }))
+    expect(setView).toHaveBeenCalledWith('library')
   })
 
   it('names the playback modes by their current state, not their icon', () => {

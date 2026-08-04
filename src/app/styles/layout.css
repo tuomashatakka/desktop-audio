@@ -100,7 +100,7 @@
   [data-height-tier='snug'],
   [data-height-tier='compact'],
   [data-height-tier='mini']
-) :is(.album-art-card, .playback-controls, .progress-section, .player-volume) {
+) :is(.album-art-card, .playback-controls, .progress-section) {
   -webkit-app-region: no-drag;
 }
 
@@ -123,8 +123,7 @@
 .titlebar-logo { display: flex; align-items: center; gap: var(--sp-2); padding-inline: var(--sp-2); -webkit-app-region: no-drag; }
 .titlebar-context { display: flex; flex: 1; align-items: center; gap: var(--sp-3); min-width: 0; height: 100%; -webkit-app-region: no-drag; }
 .app-shell:not([data-view='library']) .titlebar-context { display: none; }
-.logo-icon { color: var(--accent); font-size: var(--text-lg); }
-.logo-text { font-size: var(--text-sm); font-weight: var(--font-semibold); }
+.logo-icon { display: flex; color: var(--accent); }
 
 .titlebar-nav { display: flex; gap: var(--sp-1); -webkit-app-region: no-drag; }
 .nav-item {
@@ -159,7 +158,7 @@
 .titlebar-btn-close:hover { color: var(--text); background: var(--danger); }
 
 @media (max-width: 900px) {
-  .logo-text, .nav-label { display: none; }
+  .nav-label { display: none; }
   .nav-item { padding-inline: var(--sp-2); }
   .titlebar-context { gap: var(--sp-1); }
 }
@@ -315,7 +314,7 @@ body::before {
   container: player / size;
 }
 
-.album-art-bg { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+.album-art-bg { position: absolute; inset: 0; z-index: 0; overflow: hidden; contain: paint; }
 .album-art-bg img {
   width: 100%;
   height: 100%;
@@ -323,6 +322,8 @@ body::before {
   filter: blur(60px) brightness(0.2);
   transform: scale(1.2);
 }
+
+[data-theme='light'] .album-art-bg img { filter: blur(60px) brightness(1.1) saturate(1.05); }
 
 .player-content {
   --art-size: clamp(80px, 40cqh, 320px);
@@ -405,7 +406,6 @@ body::before {
 }
 
 .playback-controls :is(.prev, .next) > button:hover:not(:disabled) { border-color: var(--border-hover); }
-.player-volume { display: flex; align-items: center; gap: var(--sp-2); width: min(200px, 100%); }
 
 /* Shuffle/repeat read as off until they're on — colour is the whole signal. */
 .playback-controls .mode > button { color: var(--text-muted); font-size: var(--text-lg); }
@@ -427,20 +427,21 @@ body::before {
  * footer bar and the mini tiers have nowhere to put a column of text, and the
  * toggle is hidden there rather than being a control that does nothing.
  */
-.lyrics-toggle { display: none; }
-.app-shell[data-view='player'][data-height-tier='normal'] .lyrics-toggle {
+.player-actions { display: none; }
+.app-shell[data-view='player'][data-height-tier='normal'] .player-actions {
   position: absolute;
   z-index: 2;
   top: var(--sp-4);
   right: var(--sp-4);
-  display: inline-flex;
-  color: var(--text-muted);
+  display: flex;
+  gap: var(--sp-2);
 }
 
-.app-shell[data-view='player'][data-height-tier='normal'] .lyrics-toggle:hover:not(:disabled) { color: var(--text); }
-.app-shell[data-view='player'][data-height-tier='normal'] .lyrics-toggle[aria-pressed='true'] { color: var(--accent); }
+.player-actions :is(.lyrics-toggle, .player-close) { color: var(--text-muted); }
+.player-actions :is(.lyrics-toggle, .player-close):hover:not(:disabled) { color: var(--text); }
+.player-actions .lyrics-toggle[aria-pressed='true'] { color: var(--accent); }
 
-.player-view[data-lyrics] :is(.progress-section, .playback-controls, .player-volume) { display: none; }
+.player-view[data-lyrics] :is(.progress-section, .playback-controls) { display: none; }
 .player-lyrics {
   width: min(100%, 640px);
   min-height: 0;
@@ -511,7 +512,7 @@ body::before {
   .playback-controls > :not(.play) { font-size: var(--text-base); }
 }
 
-.app-shell[data-height-tier='snug'] .player-content { --content-gap: var(--sp-4); padding: var(--sp-4); }
+.app-shell[data-height-tier='snug'] .player-content { --content-gap: var(--sp-4); padding: var(--sp-6); }
 
 @container player (max-height: 420px) {
   .player-content {
@@ -520,7 +521,7 @@ body::before {
     --play-glyph-size: var(--text-xl);
     --title-size: var(--text-lg);
     --content-gap: var(--sp-2);
-    padding: var(--sp-2);
+    padding: var(--sp-3);
   }
 
   .playback-controls { gap: var(--sp-3); }
@@ -544,7 +545,7 @@ body::before {
   display: grid;
   align-content: center;
   gap: var(--sp-2) var(--sp-4);
-  padding: var(--sp-2) var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
 }
 
 .app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .player-art { grid-area: art; }
@@ -552,7 +553,7 @@ body::before {
 .app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .progress-section { grid-area: progress; }
 .app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .playback-controls { grid-area: controls; }
 .app-shell:is([data-height-tier='compact'], [data-height-tier='mini'])
-  :is(.player-volume, .playback-controls .mode) { display: none; }
+  .playback-controls .mode { display: none; }
 
 .app-shell[data-height-tier='compact'] .player-content {
   --art-size: clamp(56px, 60cqh, 140px);
@@ -663,13 +664,6 @@ body::before {
   outline-offset: -2px;
 }
 
-/*
- * The footer bar drops the volume slider entirely — system volume and the
- * full player both already own that job, and the width it costs is better
- * spent on the progress bar. It stays in the full-window player.
- */
-.app-shell[data-height-tier='normal']:not([data-view='player']) .player-volume { display: none; }
-
 .app-shell[data-height-tier='normal']:not([data-view='player']) .player-content {
   --art-size: var(--titlebar-h);
   --play-size: 32px;
@@ -690,7 +684,7 @@ body::before {
 .app-shell[data-height-tier='normal']:not([data-view='player']) .playback-controls .mode { display: none; }
 
 .app-shell[data-height-tier='normal']:not([data-view='player'])
-  :is(.player-art, .progress-section, .playback-controls, .player-volume) { pointer-events: auto; }
+  :is(.player-art, .progress-section, .playback-controls) { pointer-events: auto; }
 .app-shell[data-height-tier='normal']:not([data-view='player']) .player-art { grid-area: art; }
 .app-shell[data-height-tier='normal']:not([data-view='player']) .album-art-card { box-shadow: none; }
 .app-shell[data-height-tier='normal']:not([data-view='player']) .art-fallback { font-size: var(--text-xl); }

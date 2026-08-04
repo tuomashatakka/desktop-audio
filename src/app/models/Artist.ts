@@ -20,12 +20,8 @@ export class ArtistIndex {
   readonly #artists = new Map<string, Artist>()
 
   addTrack (track: Track): void {
-    let artist = this.#artists.get(track.artist)
-    if (!artist) {
-      const newArtist = new Artist(track.artist)
-      this.#artists.set(track.artist, newArtist)
-      artist = newArtist
-    }
+    const artist = this.#artists.get(track.artist) ?? new Artist(track.artist)
+    this.#artists.set(track.artist, artist)
     if (!artist.tracks.includes(track))
       artist.tracks.push(track)
   }

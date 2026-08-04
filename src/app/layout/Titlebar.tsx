@@ -46,8 +46,11 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
       </button>
 
       <div className='titlebar-logo'>
-        <span className='logo-icon' aria-hidden='true'>♫</span>
-        <span className='logo-text'>Desktop Audio</span>
+        <span className='logo-icon' aria-hidden='true'>
+          <svg viewBox='0 0 1024 1024' width='18' height='18' fill='none' stroke='currentColor' strokeWidth='56' strokeLinecap='round' strokeLinejoin='round'>
+            <polyline points='120,512 320,512 432,232 624,792 736,512 904,512' />
+          </svg>
+        </span>
       </div>
 
       {/* Icon-only: the label is carried by `aria-label` and the `title`

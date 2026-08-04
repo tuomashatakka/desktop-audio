@@ -120,6 +120,7 @@ async function decodeWaveformBars (
 const AudioContext = createContext<AudioContextValue | null>(null)
 
 /** Global reference to ensureReady function, set by AudioProvider on mount */
+// eslint-disable-next-line functional/no-let
 let globalEnsureReady: (() => Promise<void>) | null = null
 
 // Register the renderer-wide `ensureReady` so non-React code (e.g. the
@@ -131,6 +132,76 @@ export function setGlobalEnsureReady (fn: (() => Promise<void>) | null) {
 /** Retrieve the currently-registered `ensureReady` if {@link AudioProvider} is mounted. */
 export function getGlobalEnsureReady (): (() => Promise<void>) | null {
   return globalEnsureReady
+}
+
+/**
+ * Refs the transport actions register themselves into (set near the bottom
+ * of {@link AudioProvider}, read from the media-session handlers below and
+ * from the `ended` listener) plus the metadata/action-handler wiring itself.
+ * Split out purely to keep `AudioProvider`'s own statement count down —
+ * the refs are still shared, mutable objects either way.
+ */
+function useMediaSessionRefs (currentTrack: Track | null) {
+  const pauseRef = useRef<() => void>(noop)
+  const resumeRef = useRef<() => void>(noop)
+  const seekRef = useRef<(time: number) => void>(noop)
+  const playNextRef = useRef<(tracks: readonly Track[]) => void>(noop)
+  const playPreviousRef = useRef<(tracks: readonly Track[]) => void>(noop)
+
+  /** What to do when a track runs out. Reassigned every render, see below. */
+  const advanceRef = useRef<() => void>(noop)
+
+  // Track the current playlist being played
+  const currentQueueRef = useRef<Track[]>([])
+  const setCurrentQueue = useCallback((tracks: Track[]) => {
+    currentQueueRef.current = tracks
+  }, [])
+
+  // MediaSession: set up metadata & handlers when track changes
+  useEffect(() => {
+    if (!navigator.mediaSession || !currentTrack)
+      return
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title:   currentTrack.title || 'Unknown Title',
+      artist:  currentTrack.artist || 'Unknown Artist',
+      album:   currentTrack.album || 'Unknown Album',
+      artwork: currentTrack.albumArt
+        ? [
+          { src: currentTrack.albumArt, sizes: '96x96', type: 'image/jpeg' }
+        ]
+        : []
+    })
+
+    navigator.mediaSession.setActionHandler('play', () => {
+      resumeRef.current()
+    })
+    navigator.mediaSession.setActionHandler('pause', () => {
+      pauseRef.current()
+    })
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      playPreviousRef.current(currentQueueRef.current)
+    })
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+      playNextRef.current(currentQueueRef.current)
+    })
+    navigator.mediaSession.setActionHandler('seekto', details => {
+      if (details.seekTime !== undefined) {
+        seekRef.current(details.seekTime)
+      }
+    })
+  }, [ currentTrack ])
+
+  return {
+    pauseRef,
+    resumeRef,
+    seekRef,
+    playNextRef,
+    playPreviousRef,
+    advanceRef,
+    currentQueueRef,
+    setCurrentQueue,
+  }
 }
 
 /**
@@ -162,56 +233,10 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   const host = useHost()
   const data = useData()
 
-  // Refs for MediaSession handlers to avoid circular deps
-  const pauseRef = useRef<() => void>(noop)
-  const resumeRef = useRef<() => void>(noop)
-  const seekRef = useRef<(time: number) => void>(noop)
-  const playNextRef = useRef<(tracks: readonly Track[]) => void>(noop)
-  const playPreviousRef = useRef<(tracks: readonly Track[]) => void>(noop)
-
-  /** What to do when a track runs out. Reassigned every render, see below. */
-  const advanceRef = useRef<() => void>(noop)
-
-  // Track the current playlist being played
-  const currentQueueRef = useRef<Track[]>([])
-  const setCurrentQueue = useCallback((tracks: Track[]) => {
-    currentQueueRef.current = tracks
-  }, [])
-
-  // MediaSession: set up metadata & handlers when track changes
-  useEffect(() => {
-    if (!navigator.mediaSession || !state.currentTrack)
-      return
-
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title:   state.currentTrack.title || 'Unknown Title',
-      artist:  state.currentTrack.artist || 'Unknown Artist',
-      album:   state.currentTrack.album || 'Unknown Album',
-      artwork: state.currentTrack.albumArt
-        ? [
-          { src: state.currentTrack.albumArt, sizes: '96x96', type: 'image/jpeg' }
-        ]
-        : []
-    })
-
-    navigator.mediaSession.setActionHandler('play', () => {
-      resumeRef.current()
-    })
-    navigator.mediaSession.setActionHandler('pause', () => {
-      pauseRef.current()
-    })
-    navigator.mediaSession.setActionHandler('previoustrack', () => {
-      playPreviousRef.current(currentQueueRef.current)
-    })
-    navigator.mediaSession.setActionHandler('nexttrack', () => {
-      playNextRef.current(currentQueueRef.current)
-    })
-    navigator.mediaSession.setActionHandler('seekto', details => {
-      if (details.seekTime !== undefined) {
-        seekRef.current(details.seekTime)
-      }
-    })
-  }, [ state.currentTrack ])
+  const {
+    pauseRef, resumeRef, seekRef, playNextRef, playPreviousRef,
+    advanceRef, currentQueueRef, setCurrentQueue,
+  } = useMediaSessionRefs(state.currentTrack)
 
   useEffect(() => {
     if (!audioRef.current) {

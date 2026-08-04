@@ -108,12 +108,6 @@ that stays put is `position: sticky` inside it:
   `<details>`. Album groups put artwork outside the heading and path groups put
   an interactive breadcrumb trail inside it, and neither survives a
   `<summary>`. A collapsed group renders no rows at all.
-- Scrolling down collapses `.view-header` (`data-header-hidden` on `.library`,
-  driven by TrackTable's `onScroll`); the column header then rides up and pins
-  at the top of the view. The collapse is a `1fr → 0fr` grid row on
-  `.view-header-slot` — the one way to animate to a zero height without
-  hard-coding it. `min-height: 0` alone leaves a stub the size of the header's
-  padding + border, so those collapse too.
 
 ## Ambient wash
 

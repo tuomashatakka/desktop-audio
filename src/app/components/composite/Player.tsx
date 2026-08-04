@@ -140,41 +140,9 @@ function PlayerLyrics ({ lyrics }: { readonly lyrics?: string }) {
   )
 }
 
-function PlayerVolume ({ hasTrack, volume, onChange }: {
-  readonly hasTrack: boolean
-  readonly volume:   number
-  readonly onChange: (volume: number) => void
-}) {
-  const muted = volume === 0
-
-  return (
-    <div className='player-volume'>
-      <IconButton
-        label={muted ? 'Unmute' : 'Mute'}
-        type='button'
-        disabled={!hasTrack}
-        onClick={() =>
-          onChange(muted ? 0.8 : 0)}
-      >
-        <span aria-hidden='true'>{muted ? '🔇' : '🔊'}</span>
-      </IconButton>
-
-      <input
-        type='range'
-        className='slider volume-slider'
-        aria-label='Volume'
-        disabled={!hasTrack}
-        min={0}
-        max={1}
-        step={0.01}
-        value={volume}
-        onChange={e =>
-          onChange(Number(e.target.value))}
-      />
-    </div>
-  )
+function playerAriaLabel (track: Track | null): string {
+  return track ? `Now playing: ${track.title}` : 'Player'
 }
-
 
 /**
  * The one and only player.
@@ -192,8 +160,8 @@ function PlayerVolume ({ hasTrack, volume, onChange }: {
 export function Player () {
   const { setView, currentView } = useUI()
   const {
-    currentTrack, isPlaying, currentTime, duration, volume, waveformBars,
-    pause, resume, seek, setVolume, playNext, playPrevious,
+    currentTrack, isPlaying, currentTime, duration, waveformBars,
+    pause, resume, seek, playNext, playPrevious,
   } = useAudio()
   const { filteredTracks } = useLibrary()
   const { shuffle, setShuffle, repeatMode, setRepeatMode } = useSettings()
@@ -211,7 +179,7 @@ export function Player () {
       className='player-view'
       data-empty={currentTrack ? undefined : ''}
       data-lyrics={lyricsOpen ? '' : undefined}
-      aria-label={currentTrack ? `Now playing: ${currentTrack.title}` : 'Player'}
+      aria-label={playerAriaLabel(currentTrack)}
     >
       {currentTrack?.albumArt &&
         <div className='album-art-bg' aria-hidden='true'>
@@ -243,18 +211,30 @@ export function Player () {
           <p className='track-album'>{currentTrack?.album}</p>
         </hgroup>
 
-        <IconButton
-          label={showLyrics ? 'Show playback controls' : 'Show lyrics'}
-          type='button'
-          className='lyrics-toggle'
-          aria-pressed={showLyrics}
-          disabled={!currentTrack}
-          onClick={() =>
-            setShowLyrics(current =>
-              !current)}
-        >
-          <span aria-hidden='true'>☰</span>
-        </IconButton>
+        <div className='player-actions'>
+          <IconButton
+            label={showLyrics ? 'Show playback controls' : 'Show lyrics'}
+            type='button'
+            className='lyrics-toggle'
+            aria-pressed={showLyrics}
+            disabled={!currentTrack}
+            onClick={() =>
+              setShowLyrics(current =>
+                !current)}
+          >
+            <span aria-hidden='true'>☰</span>
+          </IconButton>
+
+          <IconButton
+            label='Close player'
+            type='button'
+            className='player-close'
+            onClick={() =>
+              setView('library')}
+          >
+            <span aria-hidden='true'>✕</span>
+          </IconButton>
+        </div>
 
         {lyricsOpen && <PlayerLyrics lyrics={currentTrack?.lyrics} />}
 
@@ -291,12 +271,6 @@ export function Player () {
           repeatMode={repeatMode}
           onRepeat={() =>
             setRepeatMode(REPEAT_CYCLE[repeatMode])}
-        />
-
-        <PlayerVolume
-          hasTrack={Boolean(currentTrack)}
-          volume={volume}
-          onChange={setVolume}
         />
       </div>
     </article>

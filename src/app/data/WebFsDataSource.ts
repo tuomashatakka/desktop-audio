@@ -63,16 +63,14 @@ function pickDirectoryFallback (): Promise<{ label: string; files: File[] } | nu
   return new Promise(resolve => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.multiple = true
+    input.multiple = true;
     // webkitdirectory is non-standard but supported in Firefox, Safari, Chromium
-    ;(input as HTMLInputElement & { webkitdirectory: boolean }).webkitdirectory = true
+    (input as HTMLInputElement & { webkitdirectory: boolean }).webkitdirectory = true
     input.style.display = 'none'
 
-    let settled = false
+    // Promise resolution is idempotent by spec, so a second settle() (e.g. a
+    // stray 'change' after 'cancel') is a harmless no-op — no latch needed.
     const settle = (value: { label: string; files: File[] } | null) => {
-      if (settled)
-        return
-      settled = true
       input.remove()
       resolve(value)
     }
@@ -188,17 +186,82 @@ export class WebFsDataSource implements DataSource {
     )
   }
 
+  /** In-memory Firefox/Safari root: files carry no relative-path structure of their own. */
+  private async scanFilesRoot (
+    rootId: string, value: FilesRootEntry, pushTrack: (track: TrackDTO) => Promise<void>
+  ): Promise<void> {
+    const files = this.rootFiles.get(rootId)
+    if (!files || files.length === 0)
+      return
+
+    const rootPrefix = `${value.label}/`
+    for (const file of files) {
+      const ext = `.${(file.name.split('.').pop() ?? '').toLowerCase()}`
+      if (!AUDIO_EXTENSIONS.has(ext))
+        continue
+
+      // webkitRelativePath: "<rootLabel>/sub/dir/file.mp3" — strip leading root
+      const fullPath = file.webkitRelativePath || file.name
+      const relativePath = fullPath.startsWith(rootPrefix)
+        ? fullPath.slice(rootPrefix.length)
+        : fullPath
+
+      const trackId = await hashString(rootId + relativePath)
+      this.setTrackSource(trackId, { kind: 'file', file })
+
+      await pushTrack({
+        id:         trackId,
+        path:       `${value.label}/${relativePath}`,
+        title:      file.name.replace(/\.[^/.]+$/, ''),
+        artist:     'Unknown Artist',
+        album:      'Unknown Album',
+        duration:   0,
+        format:     ext.slice(1),
+        size:       file.size,
+        coverColor: `#${Math.floor(Math.random() * 16777215).toString(16)
+          .padStart(6, '0')}`
+      })
+    }
+  }
+
+  /** Chromium root: a real `FileSystemDirectoryHandle` walked recursively. */
+  private async scanHandleRoot (
+    rootId: string, value: HandleRootEntry, pushTrack: (track: TrackDTO) => Promise<void>
+  ): Promise<void> {
+    const { handle: rootHandle, label } = value
+    for await (const [ relativePath, fileHandle ] of walkDir(rootHandle)) {
+      const ext = `.${(fileHandle.name.split('.').pop() ?? '').toLowerCase()}`
+      if (!AUDIO_EXTENSIONS.has(ext))
+        continue
+
+      const trackId = await hashString(rootId + relativePath)
+      this.setTrackSource(trackId, { kind: 'handle', handle: fileHandle })
+
+      await pushTrack({
+        id:         trackId,
+        path:       `${label}/${relativePath}`,
+        title:      fileHandle.name.replace(/\.[^/.]+$/, ''),
+        artist:     'Unknown Artist',
+        album:      'Unknown Album',
+        duration:   0,
+        format:     ext.slice(1),
+        size:       0,
+        coverColor: `#${Math.floor(Math.random() * 16777215).toString(16)
+          .padStart(6, '0')}`
+      })
+    }
+  }
+
   private async performScan (rootIds: readonly string[]): Promise<void> {
     const batchSize = 20
-    let batch: TrackDTO[] = []
-    let totalCount = 0
+    const state = { batch: [] as TrackDTO[], totalCount: 0 }
 
     const pushTrack = async (track: TrackDTO): Promise<void> => {
-      batch.push(track)
-      if (batch.length >= batchSize) {
-        this.emit({ type: 'batch', tracks: [ ...batch ]})
-        totalCount += batch.length
-        batch = []
+      state.batch.push(track)
+      if (state.batch.length >= batchSize) {
+        this.emit({ type: 'batch', tracks: [ ...state.batch ]})
+        state.totalCount += state.batch.length
+        state.batch = []
       }
     }
 
@@ -209,73 +272,18 @@ export class WebFsDataSource implements DataSource {
 
       const value = (rootEntry as { value: RootEntry }).value
 
-      if (value.kind === 'files') {
-        const files = this.rootFiles.get(rootId)
-        if (!files || files.length === 0)
-          continue
-
-        const rootPrefix = `${value.label}/`
-        for (const file of files) {
-          const ext = `.${(file.name.split('.').pop() ?? '').toLowerCase()}`
-          if (!AUDIO_EXTENSIONS.has(ext))
-            continue
-
-          // webkitRelativePath: "<rootLabel>/sub/dir/file.mp3" — strip leading root
-          const fullPath = file.webkitRelativePath || file.name
-          const relativePath = fullPath.startsWith(rootPrefix)
-            ? fullPath.slice(rootPrefix.length)
-            : fullPath
-
-          const trackId = await hashString(rootId + relativePath)
-          this.setTrackSource(trackId, { kind: 'file', file })
-
-          await pushTrack({
-            id:         trackId,
-            path:       `${value.label}/${relativePath}`,
-            title:      file.name.replace(/\.[^/.]+$/, ''),
-            artist:     'Unknown Artist',
-            album:      'Unknown Album',
-            duration:   0,
-            format:     ext.slice(1),
-            size:       file.size,
-            coverColor: `#${Math.floor(Math.random() * 16777215).toString(16)
-              .padStart(6, '0')}`
-          })
-        }
-        continue
-      }
-
-      // Handle path (Chromium)
-      const { handle: rootHandle, label } = value
-      for await (const [ relativePath, fileHandle ] of walkDir(rootHandle)) {
-        const ext = `.${(fileHandle.name.split('.').pop() ?? '').toLowerCase()}`
-        if (!AUDIO_EXTENSIONS.has(ext))
-          continue
-
-        const trackId = await hashString(rootId + relativePath)
-        this.setTrackSource(trackId, { kind: 'handle', handle: fileHandle })
-
-        await pushTrack({
-          id:         trackId,
-          path:       `${label}/${relativePath}`,
-          title:      fileHandle.name.replace(/\.[^/.]+$/, ''),
-          artist:     'Unknown Artist',
-          album:      'Unknown Album',
-          duration:   0,
-          format:     ext.slice(1),
-          size:       0,
-          coverColor: `#${Math.floor(Math.random() * 16777215).toString(16)
-            .padStart(6, '0')}`
-        })
-      }
+      if (value.kind === 'files')
+        await this.scanFilesRoot(rootId, value, pushTrack)
+      else
+        await this.scanHandleRoot(rootId, value, pushTrack)
     }
 
-    if (batch.length > 0) {
-      this.emit({ type: 'batch', tracks: [ ...batch ]})
-      totalCount += batch.length
+    if (state.batch.length > 0) {
+      this.emit({ type: 'batch', tracks: [ ...state.batch ]})
+      state.totalCount += state.batch.length
     }
 
-    this.emit({ type: 'done', totalCount })
+    this.emit({ type: 'done', totalCount: state.totalCount })
   }
 
   async load (): Promise<readonly TrackDTO[]> {
@@ -357,7 +365,8 @@ export class WebFsDataSource implements DataSource {
   async init (): Promise<readonly string[]> {
     const rootEntries = await idbGetAll('roots')
     const verifiedRootIds: string[] = []
-    let firefoxRootsPruned = 0
+    const firefoxRootsPruned = rootEntries.filter(entry =>
+      (entry as { value: RootEntry }).value.kind === 'files').length
 
     for (const entry of rootEntries) {
       const value = (entry as { value: RootEntry }).value
@@ -365,7 +374,6 @@ export class WebFsDataSource implements DataSource {
       if (value.kind === 'files') {
         // No durable handle — must be re-picked. Drop silently.
         await this.removeRoot(value.id)
-        firefoxRootsPruned += 1
         continue
       }
 
@@ -379,18 +387,15 @@ export class WebFsDataSource implements DataSource {
       try {
         const fh = handle as FileSystemDirectoryHandle & { queryPermission?: (options: { mode: string }) => Promise<PermissionState> }
 
-        let permission: PermissionState = 'prompt'
-        if (fh.queryPermission) {
-          const currentPerm = await fh.queryPermission({ mode: 'read' })
-          if (currentPerm) {
-            permission = currentPerm
-          }
-        }
+        const queriedPermission = fh.queryPermission
+          ? await fh.queryPermission({ mode: 'read' })
+          : undefined
+        const initialPermission: PermissionState = queriedPermission ?? 'prompt'
 
         const fr = handle as FileSystemDirectoryHandle & { requestPermission?: (options: { mode: string }) => Promise<PermissionState> }
-        if (permission !== 'granted' && fr.requestPermission) {
-          permission = await fr.requestPermission({ mode: 'read' })
-        }
+        const permission = initialPermission !== 'granted' && fr.requestPermission
+          ? await fr.requestPermission({ mode: 'read' })
+          : initialPermission
 
         if (permission === 'granted') {
           verifiedRootIds.push(id)

@@ -2,7 +2,7 @@ import { useMemo, useEffect, useState, useCallback, useRef } from 'react'
 import { useUI, useLibrary, useAudio, useSettings } from '../contexts'
 import type { Track } from '../contexts'
 import { useLibraryScanner } from '../hooks'
-import { PromptDialog } from '../components/atomic'
+import { Button, PromptDialog } from '../components/atomic'
 import { TrackTable } from '../components/composite/TrackTable'
 import { useHost } from '../data'
 import type { SerializableMenuItem } from '../services/types'
@@ -27,13 +27,18 @@ const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(item =>
 
 /** Scrollable track collection; its heading and controls live in the shell titlebar. */
 export function LibraryView () {
-  const { setEditingTrack, selectedFolderPath, selectedPlaylistId, selectFolder } = useUI()
+  const { setView, setEditingTrack, selectedFolderPath, selectedPlaylistId, selectFolder } = useUI()
   const { filteredTracks, playlists, addPlaylist, selectTrack, isLoading } = useLibrary()
   const { play, currentTrack, isPlaying } = useAudio()
   const { libraryPaths, theme } = useSettings()
   const host = useHost()
 
-  useLibraryScanner()
+  const { isInitialLoading } = useLibraryScanner()
+
+  const goToLibrarySettings = useCallback(() => {
+    setView('settings')
+    location.hash = '#settings-library'
+  }, [ setView ])
 
   const [ promptOpen, setPromptOpen ] = useState(false)
   const contextTrackRef = useRef<Track | null>(null)
@@ -94,25 +99,40 @@ export function LibraryView () {
 
   return (
     <section className='library' aria-label='Library tracks'>
-      {displayTracks.length === 0 && !isLoading
-        ? <p className='status-message'>
-          No tracks found
-          <small>
-            {activePlaylist
-              ? 'This playlist is empty'
-              : 'Select a folder or add library paths in Settings'}
-          </small>
-        </p>
-        : <TrackTable
-          tracks={displayTracks}
-          isLoading={isLoading}
-          currentTrack={currentTrack}
-          isPlaying={isPlaying}
-          onPlay={handleTrackPlay}
-          onContextMenu={handleContextMenu}
-          onNavigate={selectFolder}
-          roots={libraryPaths}
-        />
+      {libraryPaths.length === 0
+        ? <div className='library-empty'>
+          <div className='library-empty-card'>
+            <h3>No library folder yet</h3>
+            <p>Add a folder in Settings to start scanning for music.</p>
+
+            <Button type='button' variant='secondary' onClick={goToLibrarySettings}>
+              Open Settings
+            </Button>
+          </div>
+        </div>
+        : isInitialLoading && displayTracks.length === 0
+          ? <div className='library-empty'>
+            <span className='spinner' role='status' aria-label='Loading library' />
+          </div>
+          : displayTracks.length === 0 && !isLoading
+            ? <p className='status-message'>
+              No tracks found
+              <small>
+                {activePlaylist
+                  ? 'This playlist is empty'
+                  : 'Select a folder or add library paths in Settings'}
+              </small>
+            </p>
+            : <TrackTable
+              tracks={displayTracks}
+              isLoading={isLoading}
+              currentTrack={currentTrack}
+              isPlaying={isPlaying}
+              onPlay={handleTrackPlay}
+              onContextMenu={handleContextMenu}
+              onNavigate={selectFolder}
+              roots={libraryPaths}
+            />
       }
 
       <PromptDialog

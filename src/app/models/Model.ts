@@ -67,6 +67,17 @@ export class Model {
       this.flush(), DB_WRITE_DEBOUNCE_MS)
   }
 
+  /** Getter names declared anywhere on `proto`'s chain, up to `Object.prototype`. */
+  #collectPrototypeGetterKeys (proto: object | null): string[] {
+    if (!proto || proto === Object.prototype)
+      return []
+
+    const keys = Object.getOwnPropertyNames(proto).filter(key =>
+      key !== 'constructor' && typeof Object.getOwnPropertyDescriptor(proto, key)?.get === 'function')
+
+    return [ ...keys, ...this.#collectPrototypeGetterKeys(Object.getPrototypeOf(proto)) ]
+  }
+
   toJSON (): Record<string, unknown> {
     const result: Record<string, unknown> = { id: this.id }
 
@@ -74,23 +85,7 @@ export class Model {
     const instanceKeys = Object.getOwnPropertyNames(this)
 
     // Also get property names from the prototype chain to find getters
-    let proto = Object.getPrototypeOf(this)
-    const protoKeys: string[] = []
-    while (proto && proto !== Object.prototype) {
-      const keys = Object.getOwnPropertyNames(proto)
-      for (const key of keys) {
-        // Skip constructor and other non-property methods
-        if (key === 'constructor')
-          continue
-
-        const descriptor = Object.getOwnPropertyDescriptor(proto, key)
-        // Only include properties with getters (not methods)
-        if (descriptor && typeof descriptor.get === 'function') {
-          protoKeys.push(key)
-        }
-      }
-      proto = Object.getPrototypeOf(proto)
-    }
+    const protoKeys = this.#collectPrototypeGetterKeys(Object.getPrototypeOf(this))
 
     const allKeys = [ ...new Set([ ...instanceKeys, ...protoKeys ]) ]
 
