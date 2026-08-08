@@ -130,7 +130,7 @@
 .config-toggle:hover { color: var(--text); background: var(--bg-hover); }
 .config-menu { min-width: 200px; padding: var(--sp-3); border: 0; }
 .config-menu legend { padding-bottom: var(--sp-2); color: var(--text-muted); font-size: var(--text-xs); text-transform: uppercase; }
-.config-menu label { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); font-size: var(--text-sm); cursor: pointer; }
+.config-menu label { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); font-size: var(--text-sm); cursor: pointer; }
 .config-menu label:hover { background: var(--bg-hover); }
 
 /* One scroll container owns both the sticky table header and group headings. */
@@ -140,16 +140,16 @@
   --pad-x: var(--sp-3);
   --head-h: 34px;
 
-  display: flex;
+  display: grid;
   flex: 1;
-  flex-direction: column;
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0;
   padding-inline: var(--sp-4);
 }
 
 .track-table[data-density='compact'] { --art: 20px; --pad-y: var(--sp-1); }
 .track-table[data-density='relaxed'] { --art: 44px; --pad-y: var(--sp-3); }
-.track-scroll { flex: 1; min-height: 0; overflow: auto; }
+.track-scroll { min-height: 0; overflow: auto; }
 .track-header { position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--border); background: var(--bg); }
 .track-header-row,
 .track-row {
@@ -211,8 +211,11 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
 .track-table[data-density='relaxed'] .track-row .col-title { display: grid; line-height: 1.2; }
 .track-table[data-density='relaxed'] .track-row .col-title small { font-size: var(--text-xs); }
 
-.track-body.grouped { padding-top: var(--sp-2); }
-.track-group + .track-group { margin-top: var(--sp-3); }
+.track-body.grouped { margin-top: var(--sp-2); }
+.track-body.grouped > .track-group {
+  border-block-end: var(--sp-3) solid transparent;
+  background-clip: padding-box;
+}
 .track-group > header {
   position: sticky;
   top: var(--head-h);
@@ -230,7 +233,6 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
 
 /* One disclosure button for every grouping mode — see `GroupToggle`. */
 .group-toggle {
-  flex: 0 0 auto;
   align-self: center;
   padding: 0 var(--sp-1);
   color: var(--text-muted);
@@ -268,7 +270,7 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
 .track-group.album[data-collapsed] { grid-template-columns: 40px minmax(0, 1fr); }
 .track-group.album[data-collapsed] > .album-art { grid-row: auto; width: 40px; }
 
-.group-rows { min-width: 0; }
+.group-rows { position: relative; min-width: 0; }
 .track-group.album > .group-rows {
   grid-column: 1 / -1;
   margin: 0 calc(-1 * var(--sp-3)) calc(-1 * var(--sp-3));

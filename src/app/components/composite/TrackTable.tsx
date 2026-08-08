@@ -7,15 +7,15 @@
  *
  * Layout: one scroll container owns everything. The column header row is the
  * scroller's first child and `position: sticky`, so it pins as soon as you
- * scroll past it. The flat list is virtualized with `@tanstack/react-virtual`
- * (absolutely positioned rows inside a spacer sized to the whole list);
- * grouped views render in full because their row offsets aren't uniform.
+ * scroll past it. Flat rows and whole group sections are virtualized with
+ * `@tanstack/react-virtual`, so the DOM stays proportional to the viewport
+ * even when a library contains thousands of tracks.
  *
  * The div grid carries the full ARIA table role chain (table → rowgroup →
  * row → columnheader/cell); a real `<table>` can't be virtualized or
  * column-resized without fighting table layout.
  */
-import { useRef, useState, useMemo, useEffect, useCallback } from 'react'
+import { useRef, useState, useMemo, useEffect, useCallback, useLayoutEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useSortableTable } from '../../hooks/useSortableTable'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
@@ -39,9 +39,33 @@ const ROW_HEIGHT_BY_DENSITY: Record<Density, number> = {
 }
 
 const SKELETON_ROW_COUNT = 20
+const GROUP_GAP = 12
+const GROUP_HEADER_HEIGHT = 36
+const ALBUM_GROUP_LEAD_HEIGHT = 132
+const ALBUM_ROWS_OFFSET = 120
+const COLLAPSED_ALBUM_HEIGHT = 64
+const GROUP_ROW_OVERSCAN = 12
 
 function withTableSemantics<T> (enabled: boolean, value: T): T | undefined {
   return enabled ? value : undefined
+}
+
+function visibleRowRange (
+  groupStart: number,
+  rowCount: number,
+  rowHeight: number,
+  viewportStart: number,
+  viewportHeight: number
+): readonly [number, number] {
+  const start = Math.max(0, Math.min(
+    rowCount,
+    Math.floor((viewportStart - groupStart) / rowHeight) - GROUP_ROW_OVERSCAN
+  ))
+  const end = Math.max(start, Math.min(
+    rowCount,
+    Math.ceil((viewportStart + viewportHeight - groupStart) / rowHeight) + GROUP_ROW_OVERSCAN
+  ))
+  return [ start, end ]
 }
 
 interface TrackTableProps {
@@ -381,6 +405,13 @@ export function TrackTable ({
 
   const groups = useMemo(() =>
     buildGroups(sorted, grouping), [ sorted, grouping ])
+  const trackIndexById = useMemo(() =>
+    new Map(sorted.map((track, index) =>
+      [ track.id, index ])), [ sorted ])
+  const groupPositionByTrackId = useMemo(() =>
+    new Map(groups.flatMap((group, groupIndex) =>
+      group.tracks.map((track, rowIndex) =>
+        [ track.id, { groupIndex, rowIndex } ] as const))), [ groups ])
 
   const toggleGroup = useCallback((key: string, toggleAll: boolean) => {
     setCollapsedGroups(current => {
@@ -415,6 +446,30 @@ export function TrackTable ({
       rowHeight,
     overscan: 12,
   })
+  const groupVirtualizer = useVirtualizer({
+    count: flat ? 0 : groups.length,
+    getScrollElement: () =>
+      scrollRef.current,
+    getItemKey: index =>
+      groups[index]?.key ?? index,
+    estimateSize: index => {
+      const group = groups[index]
+      if (!group)
+        return GROUP_HEADER_HEIGHT + GROUP_GAP
+
+      const collapsed = collapsedGroups.has(group.key)
+      const lead = grouping === 'album'
+        ? collapsed ? COLLAPSED_ALBUM_HEIGHT : ALBUM_GROUP_LEAD_HEIGHT
+        : GROUP_HEADER_HEIGHT
+      return lead + (collapsed ? 0 : group.tracks.length * rowHeight) + GROUP_GAP
+    },
+    initialRect: { width: 1000, height: 800 },
+    overscan: 3,
+  })
+
+  useLayoutEffect(() => {
+    groupVirtualizer.measure()
+  }, [ collapsedGroups, density, grouping, groups, groupVirtualizer ])
 
   const style = useMemo(() =>
     ({ '--track-grid': gridTemplate }) as React.CSSProperties,
@@ -435,13 +490,30 @@ export function TrackTable ({
     setFocusedIndex(nextIndex)
     if (flat)
       virtualizer.scrollToIndex(nextIndex, { align: 'auto' })
+    else {
+      const track = sorted[nextIndex]
+      const position = track && groupPositionByTrackId.get(track.id)
+      if (position) {
+        const groupOffset = groupVirtualizer
+          .getOffsetForIndex(position.groupIndex, 'start')?.[0]
+        if (groupOffset !== undefined) {
+          const rowOffset = grouping === 'album'
+            ? ALBUM_ROWS_OFFSET
+            : GROUP_HEADER_HEIGHT
+          groupVirtualizer.scrollToOffset(
+            groupOffset + rowOffset + position.rowIndex * rowHeight,
+            { align: 'auto' }
+          )
+        }
+      }
+    }
 
     window.requestAnimationFrame(() => {
       scrollRef.current
         ?.querySelector<HTMLElement>(`[data-track-index='${nextIndex}']`)
         ?.focus()
     })
-  }, [ flat, sorted.length, virtualizer ])
+  }, [ flat, groupPositionByTrackId, groupVirtualizer, grouping, rowHeight, sorted, virtualizer ])
 
   const renderRow = useCallback((track: Track, index: number, rowStyle?: React.CSSProperties) => {
     const active = currentTrack?.id === track.id
@@ -544,11 +616,9 @@ export function TrackTable ({
   }, [ currentTrack?.id, flat, showSkeleton, sorted, virtualizer ])
 
   /** Row index within the full sorted list, so numbering survives grouping. */
-  const indexOf = useCallback((track: Track, fallback: number) => {
-    const i = sorted.findIndex(x =>
-      x.id === track.id)
-    return i >= 0 ? i : fallback
-  }, [ sorted ])
+  const indexOf = useCallback((track: Track, fallback: number) =>
+    trackIndexById.get(track.id) ?? fallback,
+  [ trackIndexById ])
 
   const bodyRowCount = showSkeleton ? SKELETON_ROW_COUNT : sorted.length
 
@@ -620,19 +690,51 @@ export function TrackTable ({
             })}
           </div>
 
-          : <div className='track-body grouped'>
-            {groups.map((g, groupIndex) => {
+          : <div className='track-body grouped' style={{ height: groupVirtualizer.getTotalSize() }}>
+            {groupVirtualizer.getVirtualItems().map(vgroup => {
+              const g = groups[vgroup.index]
+              if (!g)
+                return null
+
+              const groupIndex = vgroup.index
+              const groupStyle: React.CSSProperties = {
+                position:    'absolute',
+                insetInline: 0,
+                top:         0,
+                height:      vgroup.size,
+                transform:   `translateY(${vgroup.start}px)`,
+              }
               const headingId = `track-group-${grouping}-${groupIndex}`
               const rowsId = `${headingId}-rows`
               const collapsed = collapsedGroups.has(g.key)
 
-              // A collapsed group renders no rows at all rather than hiding
-              // them: with a large library that is the difference between a
-              // few hundred DOM nodes and a few thousand.
+              // Collapsed groups render no rows; open groups mount only the
+              // viewport slice while a fixed-height native block preserves
+              // the complete scroll range.
+              const rowsOffset = grouping === 'album'
+                ? ALBUM_ROWS_OFFSET
+                : GROUP_HEADER_HEIGHT
+              const [ firstRow, lastRow ] = visibleRowRange(
+                vgroup.start + rowsOffset,
+                g.tracks.length,
+                rowHeight,
+                groupVirtualizer.scrollOffset ?? 0,
+                groupVirtualizer.scrollRect?.height ?? 800
+              )
               const rows = collapsed
                 ? null
-                : g.tracks.map((t, i) =>
-                  renderRow(t, indexOf(t, i)))
+                : g.tracks.slice(firstRow, lastRow).map((track, rowOffset) => {
+                  const groupRowIndex = firstRow + rowOffset
+                  return renderRow(track, indexOf(track, groupRowIndex), {
+                    position:    'absolute',
+                    insetInline: 0,
+                    top:         groupRowIndex * rowHeight,
+                    height:      rowHeight,
+                  })
+                })
+              const rowsStyle = collapsed
+                ? undefined
+                : { height: g.tracks.length * rowHeight }
 
               const toggle =
                 <GroupToggle
@@ -647,6 +749,8 @@ export function TrackTable ({
                 return (
                   <section
                     key={g.key}
+                    data-index={vgroup.index}
+                    style={groupStyle}
                     className='track-group album'
                     data-collapsed={collapsed || undefined}
                     aria-labelledby={headingId}
@@ -659,7 +763,7 @@ export function TrackTable ({
                       <small>{g.subtitle}</small>
                     </header>
 
-                    <div className='group-rows' id={rowsId} hidden={collapsed}>{rows}</div>
+                    <div className='group-rows' id={rowsId} style={rowsStyle} hidden={collapsed}>{rows}</div>
                   </section>
                 )
 
@@ -669,6 +773,8 @@ export function TrackTable ({
                 return (
                   <section
                     key={g.key}
+                    data-index={vgroup.index}
+                    style={groupStyle}
                     className='track-group'
                     data-collapsed={collapsed || undefined}
                     aria-label={g.key}
@@ -687,13 +793,15 @@ export function TrackTable ({
                       <small>{g.subtitle}</small>
                     </header>
 
-                    <div className='group-rows' id={rowsId} hidden={collapsed}>{rows}</div>
+                    <div className='group-rows' id={rowsId} style={rowsStyle} hidden={collapsed}>{rows}</div>
                   </section>
                 )
 
               return (
                 <section
                   key={g.key}
+                  data-index={vgroup.index}
+                  style={groupStyle}
                   className='track-group'
                   data-collapsed={collapsed || undefined}
                   aria-labelledby={headingId}
@@ -704,7 +812,7 @@ export function TrackTable ({
                     <small>{g.subtitle}</small>
                   </header>
 
-                  <div className='group-rows' id={rowsId} hidden={collapsed}>{rows}</div>
+                  <div className='group-rows' id={rowsId} style={rowsStyle} hidden={collapsed}>{rows}</div>
                 </section>
               )
             })}

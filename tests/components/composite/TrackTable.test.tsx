@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TrackTable } from '../../../src/app/components/composite/TrackTable'
 import { UIProvider } from '../../../src/app/contexts'
 import { Track } from '../../../src/app/models'
@@ -26,6 +26,23 @@ const uiValue: UIValue = {
   setDensity:         noop,
   setGrouping:        noop,
 }
+
+beforeEach(() => {
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
+    if (this.classList.contains('track-scroll'))
+      return 800
+    if (this.classList.contains('track-group'))
+      return 48 + this.querySelectorAll('.track-row').length * 40
+    return 0
+  })
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function () {
+    return this.classList.contains('track-scroll') ? 1000 : 0
+  })
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 const tracks = [
   Track.fromDTO({
@@ -115,6 +132,37 @@ describe('TrackTable', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /^Expand / })[0], { altKey: true })
     expect(screen.getByRole('button', { name: /first track/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /third track/i })).toBeInTheDocument()
+  })
+
+  it('windows grouped sections to keep large libraries proportional to the viewport', () => {
+    const manyTracks = Array.from({ length: 200 }, (_, index) =>
+      Track.fromDTO({
+        id:         `many-${index}`,
+        title:      `Track ${index}`,
+        artist:     `Artist ${index}`,
+        album:      'Album',
+        duration:   120,
+        format:     'mp3',
+        size:       1024,
+        coverColor: '#123456',
+        path:       `/music/track-${index}.mp3`,
+      }))
+    const { container } = render(
+      <UIProvider value={uiValue}>
+        <TrackTable
+          tracks={manyTracks}
+          isLoading={false}
+          currentTrack={null}
+          isPlaying={false}
+          onPlay={vi.fn()}
+        />
+      </UIProvider>
+    )
+
+    const renderedGroups = container.querySelectorAll('.track-group')
+    expect(renderedGroups.length).toBeGreaterThan(0)
+    expect(renderedGroups.length).toBeLessThan(30)
+    expect(container.querySelectorAll('.track-row').length).toBeLessThan(30)
   })
 
   it('opens every column option at the exact pointer position and updates in place', () => {
