@@ -14,7 +14,7 @@ export { IpcDataSource } from './IpcDataSource'
 
 export { WebFsDataSource } from './WebFsDataSource'
 
-export { DataProvider, useData } from './DataContext'
+export { DataProvider, useData, useOptionalData } from './DataContext'
 
 // IndexedDB helpers
 export { openDB, idbGet, idbSet, idbDelete, idbGetAll } from './idb'

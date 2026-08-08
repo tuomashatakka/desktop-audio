@@ -60,7 +60,20 @@ export interface DataSource {
   readonly readMetadata: (trackId: string) => Promise<AudioMetadata>
   readonly upsertTrack:  (track: TrackDTO) => Promise<void>
   readonly deleteTrack:  (trackId: string) => Promise<void>
+
+  /**
+   * One track's album art as a data URL, or `null` if it has none.
+   *
+   * Art is *not* part of {@link TrackDTO} on the streaming paths — the blobs
+   * run to megabytes each and relaying them inline is what made a scan
+   * unsurvivable. `'thumb'` is a downscale suitable for a list row; `'full'`
+   * is the stored image, for the player and the tag editor.
+   */
+  readonly readArtwork: (trackId: string, size?: ArtworkSize) => Promise<string | null>
 }
+
+/** See {@link DataSource.readArtwork}. */
+export type ArtworkSize = 'thumb' | 'full'
 
 export type { TrackDTO }
 

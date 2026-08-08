@@ -6,15 +6,16 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Resvg } from '@resvg/resvg-js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const root = resolve(__dirname, '..')
+const __dirname  = dirname(fileURLToPath(import.meta.url))
+const root       = resolve(__dirname, '..')
+const assetsPath = resolve(root, 'assets')
 
-const svgPath = resolve(root, 'assets/icon.svg')
-const svg = readFileSync(svgPath)
+const svgPath    = resolve(assetsPath, 'icon.svg')
+const svg        = readFileSync(svgPath)
 
-const sizes = [ 16, 32, 48, 64, 128, 256, 512, 1024 ]
+const sizes      = [ 16, 32, 48, 64, 128, 256, 512, 1024 ]
 
-mkdirSync(resolve(root, 'assets'), { recursive: true })
+mkdirSync(assetsPath, { recursive: true })
 
 // Render each size and collect for ICO/ICNS
 const pngBuffers = {}
@@ -26,11 +27,11 @@ for (const size of sizes) {
   const rendered = resvg.render()
   const png = rendered.asPng()
   pngBuffers[size] = png
-  writeFileSync(resolve(root, `assets/icon-${size}.png`), png)
+  writeFileSync(resolve(assetsPath, `icon-${size}.png`), png)
 }
 
 // Write the primary 1024×1024 as icon.png (used by Linux and Electron packager)
-writeFileSync(resolve(root, 'assets/icon.png'), pngBuffers[1024])
+writeFileSync(resolve(assetsPath, 'icon.png'), pngBuffers[1024])
 
 console.log('Generated assets/icon.png and assets/icon-{size}.png for all sizes.')
 console.log('For macOS (.icns) and Windows (.ico), run:')

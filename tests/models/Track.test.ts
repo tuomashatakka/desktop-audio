@@ -91,4 +91,49 @@ describe('Track model', () => {
     track.title = 'Changed'
     expect(track.dirty).toBe(true)
   })
+
+  /*
+   * The renderer's half of the "never write a column you did not carry" rule.
+   * Track lists arrive without `albumArt` — it is fetched per track — so a
+   * `toDTO()` that emitted every field would send `albumArt: undefined` on
+   * every save and the writer would dutifully NULL the column.
+   */
+  describe('round-tripping a DTO that omits fields', () => {
+    const listDto = {
+      id:         'track-1',
+      title:      'Test Track',
+      artist:     'Test Artist',
+      album:      'Test Album',
+      duration:   180,
+      format:     'mp3',
+      size:       5000000,
+      coverColor: '#ff0000',
+    } as TrackDTO
+
+    it('does not invent fields the DTO never carried', () => {
+      const dto = Track.fromDTO(listDto).toDTO()
+
+      expect(Object.hasOwn(dto, 'albumArt')).toBe(false)
+      expect(Object.hasOwn(dto, 'genre')).toBe(false)
+      expect(dto.title).toBe('Test Track')
+    })
+
+    it('carries a field once it is assigned', () => {
+      const track = Track.fromDTO(listDto)
+      track.albumArt = 'data:image/png;base64,x'
+
+      expect(Object.hasOwn(track.toDTO(), 'albumArt')).toBe(true)
+    })
+
+    it('reports a cleared field, but not a clear of something never held', () => {
+      const carried = Track.fromDTO({ ...listDto, genre: 'Jazz' } as TrackDTO)
+      carried.genre = undefined
+      // Present-and-undefined: the writer turns this into `genre = NULL`.
+      expect(Object.hasOwn(carried.toDTO(), 'genre')).toBe(true)
+
+      const absent = Track.fromDTO(listDto)
+      absent.genre = undefined
+      expect(Object.hasOwn(absent.toDTO(), 'genre')).toBe(false)
+    })
+  })
 })

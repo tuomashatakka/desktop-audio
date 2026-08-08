@@ -64,20 +64,39 @@ export class Track extends Model {
     this.dispatchEvent('waveform')
   }
 
-  /** Hydrates without marking dirty — a fresh read is not a pending write. */
+  /**
+   * Hydrates without marking dirty — a fresh read is not a pending write.
+   *
+   * Only fields the DTO actually carries get a backing property, which is what
+   * lets {@link Track#toDTO} tell "this track has no artwork" apart from "this
+   * DTO never mentioned artwork". List rows omit `albumArt` entirely (it is
+   * fetched lazily), so without that distinction every save would write
+   * `album_art = NULL` and destroy the cover of every track anyone edited.
+   */
   static fromDTO (dto: TrackDTO): Track {
-    const track = new Track(dto.id)
-    const store = track as unknown as Record<string, unknown>
+    const track  = new Track(dto.id)
+    const store  = track as unknown as Record<string, unknown>
+    const source = dto as unknown as Record<string, unknown>
     for (const field of FIELDS)
-      store[`_${field}`] = dto[field]
+      if (Object.hasOwn(source, field))
+        store[`_${field}`] = source[field]
     return track
   }
 
+  /**
+   * The fields this track actually knows about — see {@link Track.fromDTO}.
+   *
+   * An explicit `undefined` still round-trips as "cleared": the setter creates
+   * the backing property whenever the value differs, so clearing a tag the
+   * track *did* carry is a write, while clearing one it never had is a no-op.
+   */
   toDTO (): TrackDTO {
     const source                       = this as unknown as Record<Field, unknown>
+    const own                          = this as unknown as Record<string, unknown>
     const dto: Record<string, unknown> = { id: this.id }
     for (const field of FIELDS)
-      dto[field] = source[field]
+      if (Object.hasOwn(own, `_${field}`))
+        dto[field] = source[field]
     return dto as unknown as TrackDTO
   }
 

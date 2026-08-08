@@ -12,6 +12,7 @@ import type { Track } from './LibraryContext'
 import { useOptionalSettings } from './SettingsContext'
 import type { RepeatMode } from './SettingsContext'
 import { useHost, useData } from '../data'
+import { useArtwork } from '../hooks/useArtwork'
 import { noop } from '../utils/noop'
 import { listenAll } from '../utils/events'
 
@@ -148,6 +149,10 @@ function useMediaSessionRefs (currentTrack: Track | null) {
   /** What to do when a track runs out. Reassigned every render, see below. */
   const advanceRef = useRef<() => void>(noop)
 
+  // Tracks no longer carry their art; the OS media session needs a real image,
+  // so it is fetched for the current track like every other full-size use.
+  const currentArt = useArtwork(currentTrack?.id, 'full')
+
   // Track the current playlist being played
   const currentQueueRef = useRef<Track[]>([])
   const setCurrentQueue = useCallback((tracks: Track[]) => {
@@ -163,9 +168,9 @@ function useMediaSessionRefs (currentTrack: Track | null) {
       title:   currentTrack.title || 'Unknown Title',
       artist:  currentTrack.artist || 'Unknown Artist',
       album:   currentTrack.album || 'Unknown Album',
-      artwork: currentTrack.albumArt
+      artwork: currentArt
         ? [
-          { src: currentTrack.albumArt, sizes: '96x96', type: 'image/jpeg' }
+          { src: currentArt, sizes: '96x96', type: 'image/jpeg' }
         ]
         : []
     })
@@ -186,7 +191,7 @@ function useMediaSessionRefs (currentTrack: Track | null) {
       if (details.seekTime !== undefined)
         seekRef.current(details.seekTime)
     })
-  }, [ currentTrack ])
+  }, [ currentTrack, currentArt ])
 
   return {
     pauseRef,
@@ -310,6 +315,7 @@ export function AudioProvider ({ children }: AudioProviderProps) {
 
   // Push current playback state to OS native media controls (MPRIS on Linux)
   const mediaStateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const nowPlayingArt         = useArtwork(state.currentTrack?.id, 'full')
   useEffect(() => {
     if (!state.currentTrack)
       return
@@ -324,7 +330,7 @@ export function AudioProvider ({ children }: AudioProviderProps) {
         title:     state.currentTrack.title,
         artist:    state.currentTrack.artist,
         album:     state.currentTrack.album,
-        albumArt:  state.currentTrack.albumArt,
+        albumArt:  nowPlayingArt,
         isPlaying: state.isPlaying,
         position:  state.currentTime,
         duration:  state.duration,
@@ -335,7 +341,7 @@ export function AudioProvider ({ children }: AudioProviderProps) {
       if (mediaStateDebounceRef.current)
         clearTimeout(mediaStateDebounceRef.current)
     }
-  }, [ state.currentTrack, state.isPlaying, state.currentTime, state.duration, host ])
+  }, [ state.currentTrack, state.isPlaying, state.currentTime, state.duration, host, nowPlayingArt ])
 
   // Handle seek events forwarded from MPRIS (delta in microseconds)
   useEffect(() =>

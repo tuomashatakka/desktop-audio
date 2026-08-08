@@ -6,19 +6,37 @@
  * `library:*` for scanning/track CRUD, `file:*` for filesystem reads,
  * `window:*` for chrome controls, `media:*` for transport state.
  */
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { Worker } from 'node:worker_threads'
 import started from 'electron-squirrel-startup'
 import * as mm from 'music-metadata'
 import * as mediaControls from './media-controls'
-import { rowToDto } from './track-schema'
+import { rowToListDto } from './track-schema'
 import type { MediaState, SerializableMenuItem } from './app/services/types'
 
 
 if (started)
   app.quit()
+
+/**
+ * One instance per user-data-dir. Nothing here used to quit the app — the
+ * popover window kept `window-all-closed` from ever firing and Forge's SIGINT
+ * handler exits without killing its Electron child — so every dev session left
+ * a live process holding the profile's leveldb locks. A second instance then
+ * started alongside it and died silently inside a `localStorage` read. Failing
+ * the lock is loud; colliding on it was not.
+ */
+const gotInstanceLock = app.requestSingleInstanceLock()
+
+if (!gotInstanceLock) {
+  console.error(
+    '◬ [main] another desktop-audio instance already owns this profile — exiting. ' +
+    'Leftover process? `pkill -f "desktop-audio.*Electron"`'
+  )
+  app.quit()
+}
 
 /** Frameless windows paint their own background; the shell supplies the rest. */
 const TRANSPARENT_BACKGROUND = '#00000000'
@@ -34,11 +52,51 @@ const MAIN_WINDOW_MIN_HEIGHT = 60
 const POPOVER_WINDOW_WIDTH  = 240
 const POPOVER_WINDOW_HEIGHT = 160
 
+/**
+ * How hard to chase a dev server that is not listening yet. Forge freezes
+ * `http://localhost:<port>` into this bundle at build time, so the URL is fixed
+ * before the server is up and a first load can legitimately lose the race.
+ */
+const DEV_LOAD_RETRIES     = 20
+const DEV_LOAD_RETRY_DELAY = 250
+
+/** Chromium's "load was cancelled by us", not a failure worth retrying. */
+const ERR_ABORTED = -3
+
 let mainWindow: BrowserWindow | null    = null
 let popoverWindow: BrowserWindow | null = null
 
+// ─── Logging ──────────────────────────────────────────────────────────────────
+
+const log = {
+  info: (msg: string) =>
+    console.log(`ⓘ [main] ${msg}`),
+  debug: (msg: string) =>
+    console.log(`⌗ [main] ${msg}`),
+  warn: (msg: string) =>
+    console.warn(`◬ [main] ${msg}`),
+  error: (msg: string) =>
+    console.error(`⨂ [main] ${msg}`),
+}
+
+/**
+ * Last-resort visible failure.
+ *
+ * The window is frameless, transparent and painted `#00000000`, so a renderer
+ * that never loads is not "a broken window" — it is *no window at all* to look
+ * at, while the process stays alive. Every failure below therefore ends up
+ * here rather than in a log nobody reads.
+ */
+const errorPage = (title: string, detail: string) =>
+  'data:text/html;charset=utf-8,' + encodeURIComponent(
+    `<html><body style="margin:0;font:14px/1.6 -apple-system,sans-serif;` +
+    `background:#1a1a1a;color:#eee;padding:2rem;-webkit-app-region:drag">` +
+    `<h1 style="font-size:16px;margin:0 0 .5rem">${title}</h1>` +
+    `<pre style="white-space:pre-wrap;color:#f88;margin:0">${detail}</pre></body></html>`
+  )
+
 const createWindow = () => {
-  mainWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     icon:            path.join(__dirname, '..', 'assets', 'icon.png'),
     width:           MAIN_WINDOW_WIDTH,
     height:          MAIN_WINDOW_HEIGHT,
@@ -47,6 +105,9 @@ const createWindow = () => {
     frame:           false,
     transparent:     true,
     backgroundColor: TRANSPARENT_BACKGROUND,
+    // Nothing is shown until the renderer has something to paint — otherwise a
+    // failed load leaves an invisible window that reads as "the app didn't start".
+    show:            false,
     webPreferences:  {
       preload:          path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -54,15 +115,61 @@ const createWindow = () => {
     },
   })
 
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL)
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL)
-  else
-    mainWindow.loadFile(
+  mainWindow = win
+
+  const load = () => {
+    if (MAIN_WINDOW_VITE_DEV_SERVER_URL)
+      return win.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL)
+    return win.loadFile(
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     )
+  }
 
-  mainWindow.on('closed', () => {
+  win.once('ready-to-show', () =>
+    win.show())
+
+  let attempts = 0
+
+  win.webContents.on('did-fail-load', (_e, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame || errorCode === ERR_ABORTED)
+      return
+
+    log.error(`renderer load failed (${errorCode} ${errorDescription}) — ${validatedURL}`)
+
+    if (attempts++ < DEV_LOAD_RETRIES) {
+      setTimeout(() => {
+        if (!win.isDestroyed())
+          void load()
+      }, DEV_LOAD_RETRY_DELAY)
+      return
+    }
+
+    // Out of retries. Show *something* rather than an invisible ghost process.
+    void win.loadURL(errorPage(
+      'Renderer failed to load',
+      `${errorCode} ${errorDescription}\n${validatedURL}\n\n` +
+      `Is the Vite dev server listening on that exact host and port?`
+    ))
+    win.show()
+  })
+
+  // A dead renderer looks identical to a window that never opened, so say so.
+  win.webContents.on('render-process-gone', (_e, details) =>
+    log.error(`renderer process gone — reason: ${details.reason}, exitCode: ${details.exitCode}`))
+
+  win.on('unresponsive', () =>
+    log.warn('renderer is unresponsive'))
+
+  void load()
+
+  win.on('closed', () => {
     mainWindow = null
+    // The popover is a `show: false` helper that is only ever hidden, never
+    // closed — leaving it alive kept the window count above zero forever, so
+    // `window-all-closed` could not fire and the process outlived its UI.
+    if (popoverWindow && !popoverWindow.isDestroyed())
+      popoverWindow.destroy()
+    popoverWindow = null
   })
 }
 
@@ -108,27 +215,43 @@ app.on('ready', () => {
 app.on('will-quit', () =>
   mediaControls.teardown())
 
-app.on('window-all-closed', () => {
-  const userWindows = BrowserWindow.getAllWindows().filter(w =>
-    w !== popoverWindow)
-  if (process.platform !== 'darwin' && userWindows.length === 0)
-    app.quit()
+/** A second launch surfaces the instance that already owns the profile. */
+app.on('second-instance', () => {
+  if (!mainWindow)
+    return
+  if (mainWindow.isMinimized())
+    mainWindow.restore()
+  mainWindow.focus()
 })
 
+/**
+ * Quit with the last window, macOS included. `createWindow` destroys the
+ * popover on close so this can actually fire, and a single-window player has
+ * nothing left to be once its window is gone — staying resident is how the
+ * orphans accumulated. Dock relaunch still works through `activate`.
+ */
+app.on('window-all-closed', () =>
+  app.quit())
+
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().filter(w =>
-    w !== popoverWindow).length === 0)
+  if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
+    createPopoverWindow()
+  }
 })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * DB row → renderer DTO. The column list, and therefore the snake→camel
- * mapping, comes from `track-schema.ts` so adding a tag doesn't need an edit
- * here as well.
+ * DB row → renderer DTO for the *track list*. The column list, and therefore
+ * the snake→camel mapping, comes from `track-schema.ts` so adding a tag
+ * doesn't need an edit here as well.
+ *
+ * `album_art` is deliberately absent: it is 372 MB across this library, and
+ * relaying it inline put ~744 MB of base64 into the renderer's string heap per
+ * scan. Artwork is fetched per track through `library:artwork` instead.
  */
-const mapTrack = rowToDto
+const mapTrack = rowToListDto
 
 /** Every process that opens the library database resolves the path this way. */
 const libraryDbPath = () =>
@@ -181,23 +304,23 @@ ipcMain.handle('file:read', async (_event, filePath: string) => {
   return buffer
 })
 
-// ─── Logging ──────────────────────────────────────────────────────────────────
-
-const log = {
-  info: (msg: string) =>
-    console.log(`ⓘ [main] ${msg}`),
-  debug: (msg: string) =>
-    console.log(`⌗ [main] ${msg}`),
-  warn: (msg: string) =>
-    console.warn(`◬ [main] ${msg}`),
-}
-
 // ─── Worker supervision ───────────────────────────────────────────────────────
 
+/**
+ * Every worker reply carries the `id` of the request that caused it.
+ *
+ * Without it, a listener attached for one request sees every other request's
+ * replies too — which is fine while only one request is ever in flight, and
+ * wrong the moment the track list asks for forty thumbnails at once while a
+ * hydrate is still streaming.
+ */
 type WorkerMessage =
-  { type: 'batch'; tracks: unknown[] } |
-  { type: 'done'; totalCount: number } |
-  { type: 'error'; message: string }
+  { type: 'batch'; id: number; tracks: unknown[] } |
+  { type: 'done'; id: number; totalCount: number } |
+  { type: 'artwork'; id: number; art: string | null } |
+  { type: 'error'; id: number; message: string }
+
+let nextRequestId = 0
 
 /** Worker entry points, spawned as `<name>.js` beside this file. */
 const WORKER_SCANNER = 'scanner-worker'
@@ -226,8 +349,21 @@ function getWorker (name: WorkerName): Worker {
   if (existing)
     return existing
 
+  const entry = path.join(__dirname, `${name}.js`)
+
+  // `new Worker()` over a missing file fails asynchronously, so an unbuilt
+  // worker used to present as nothing happening at all — which is exactly how
+  // `db-reader` and `db-writer` went missing for two releases. Fail here, by
+  // name, where the cause is still legible.
+  if (!fs.existsSync(entry))
+    throw new Error(
+      `worker '${name}' was never built (${entry} does not exist). ` +
+      `Check its entry in config/forge.config.ts and that config/vite/worker.config.ts ` +
+      `does not declare build.lib.`
+    )
+
   const worker = new Worker(
-    path.join(__dirname, `${name}.js`),
+    entry,
     { workerData: { dbPath: libraryDbPath() }}
   )
 
@@ -251,6 +387,95 @@ app.on('before-quit', () => {
 
 // ─── Library handlers ─────────────────────────────────────────────────────────
 
+/** Renderer channels one streaming request writes to. */
+interface StreamChannels {
+  batch: string
+  done:  string
+}
+
+/**
+ * Runs one streaming request against a worker, guaranteeing a terminal event.
+ *
+ * Every exit — batches exhausted, the worker reporting an error, the worker
+ * failing to spawn at all — sends exactly one `done`. That event is what
+ * retires the renderer's initial spinner, so a path that can end without it
+ * strands the UI permanently; an unbuilt `db-reader` did exactly that, and
+ * nothing downstream could tell the difference between "still loading" and
+ * "will never load".
+ */
+function streamFromWorker (
+  sender: Electron.WebContents,
+  name: WorkerName,
+  request: Record<string, unknown>,
+  channels: StreamChannels,
+  mapBatch: (tracks: unknown[]) => unknown[] = tracks =>
+    tracks
+): void {
+  const t0 = Date.now()
+  const id = nextRequestId++
+
+  const send = (channel: string, payload?: unknown) => {
+    if (!sender.isDestroyed())
+      sender.send(channel, payload)
+  }
+
+  let worker: Worker
+  try {
+    worker = getWorker(name)
+  }
+  catch (err) {
+    log.error(String(err))
+    send('library:error', String(err))
+    send(channels.done)
+    return
+  }
+
+  let batchCount = 0
+  let totalSent  = 0
+  let settled    = false
+
+  const finish = (message?: string) => {
+    if (settled)
+      return
+    settled = true
+    worker.off('message', onMessage)
+    worker.off('error', onError)
+
+    if (message) {
+      log.warn(`⨂ ${name} error: ${message}`)
+      send('library:error', message)
+    }
+    else
+      log.info(`✓ ${name} done — ${totalSent} tracks in ${batchCount} batches · ◴ ${Date.now() - t0}ms`)
+
+    send(channels.done)
+  }
+
+  function onMessage (msg: WorkerMessage) {
+    if (msg.id !== id)
+      return
+
+    if (msg.type === 'batch') {
+      const tracks = mapBatch(msg.tracks)
+      batchCount++
+      totalSent += tracks.length
+      log.debug(`⇗ ${name} batch #${batchCount} → renderer (${tracks.length} tracks, ${totalSent} total)`)
+      send(channels.batch, tracks)
+      return
+    }
+
+    finish(msg.type === 'error' ? msg.message : undefined)
+  }
+
+  function onError (err: Error) {
+    finish(String(err))
+  }
+
+  worker.on('message', onMessage)
+  worker.on('error', onError)
+  worker.postMessage({ ...request, id })
+}
+
 /**
  * Streaming hydrate — the persisted library, read on the reader thread and
  * relayed batch by batch.
@@ -258,64 +483,106 @@ app.on('before-quit', () => {
  * This used to be an `ipcMain.handle` that opened SQLite synchronously here
  * and returned the whole table in one array: the main process stalled for the
  * length of the query and the renderer painted nothing until it finished.
+ * Rows are already DTO-mapped worker-side, so no `mapBatch` here.
  */
-ipcMain.on('library:load', event => {
-  const t0     = Date.now()
-  const worker = getWorker(WORKER_READER)
-
-  let batchCount = 0
-
-  const handle = (msg: WorkerMessage) => {
-    if (msg.type === 'batch') {
-      batchCount++
-      log.debug(`⇗ hydrate batch #${batchCount} → renderer (${msg.tracks.length} tracks)`)
-      event.sender.send('library:hydrate-batch', msg.tracks)
-      return
-    }
-
-    worker.off('message', handle)
-    if (msg.type === 'error')
-      log.warn(`⨂ hydrate error from worker: ${msg.message}`)
-    else
-      log.info(`▤ library:load done — ${msg.totalCount} tracks in ${batchCount} batches · ◴ ${Date.now() - t0}ms`)
-
-    event.sender.send('library:hydrate-done')
-  }
-
-  worker.on('message', handle)
-  worker.postMessage({ type: 'load' })
-})
+ipcMain.on('library:load', event =>
+  streamFromWorker(event.sender, WORKER_READER, { type: 'load' }, {
+    batch: 'library:hydrate-batch',
+    done:  'library:hydrate-done',
+  }))
 
 // Streaming scan — delegates all work to the scanner worker
 ipcMain.on('library:scan', (event, dirPaths: string[]) => {
-  const t0     = Date.now()
-  const worker = getWorker(WORKER_SCANNER)
-
   log.info(`⟲ library:scan — ${dirPaths.length} path(s): ${dirPaths.join(', ')}`)
 
-  let batchCount = 0
-  let totalSent  = 0
+  streamFromWorker(event.sender, WORKER_SCANNER, { type: 'scan', dirPaths }, {
+    batch: 'library:batch',
+    done:  'library:done',
+  }, tracks =>
+    (tracks as Record<string, unknown>[]).map(mapTrack))
+})
 
-  const handle = (msg: WorkerMessage) => {
-    if (msg.type === 'batch') {
-      const tracks = (msg.tracks as Record<string, unknown>[]).map(mapTrack)
-      batchCount++
-      totalSent += tracks.length
-      log.debug(`⇗ batch #${batchCount} → renderer (${tracks.length} tracks, ${totalSent} total)`)
-      event.sender.send('library:batch', tracks)
-    }
-    else if (msg.type === 'done' || msg.type === 'error') {
-      worker.off('message', handle)
-      if (msg.type === 'error')
-        log.warn(`⨂ scan error from worker: ${msg.message}`)
-      else
-        log.info(`✓ library:scan done — ${totalSent} tracks in ${batchCount} batches · ◴ ${Date.now() - t0}ms`)
-      event.sender.send('library:done')
-    }
+// ─── Artwork ──────────────────────────────────────────────────────────────────
+
+/**
+ * Album art is fetched per track rather than carried on every list row.
+ *
+ * The blob read happens on the reader thread (some rows are 2.4 MB), but the
+ * downscale has to happen here: `nativeImage` is an Electron API and is not
+ * reachable from a worker thread.
+ */
+const ARTWORK_THUMB_WIDTH = 64
+
+/** Rough ceiling on retained art; thumbs are small, full art is not. */
+const ARTWORK_CACHE_LIMIT = 256
+
+type ArtworkSize = 'thumb' | 'full'
+
+const artworkCache = new Map<string, string | null>()
+
+/** Insertion-ordered LRU-ish eviction — good enough for a scroll window. */
+function cacheArtwork (key: string, value: string | null): string | null {
+  artworkCache.set(key, value)
+  if (artworkCache.size > ARTWORK_CACHE_LIMIT) {
+    const oldest = artworkCache.keys().next().value
+    if (oldest !== undefined)
+      artworkCache.delete(oldest)
   }
+  return value
+}
 
-  worker.on('message', handle)
-  worker.postMessage({ type: 'scan', dirPaths })
+/** One `artwork` round-trip to the reader thread, resolved by request id. */
+function requestArtwork (trackId: string): Promise<string | null> {
+  const worker = getWorker(WORKER_READER)
+  const id     = nextRequestId++
+
+  return new Promise<string | null>((resolve, reject) => {
+    const onMessage = (msg: WorkerMessage) => {
+      if (msg.id !== id)
+        return
+      worker.off('message', onMessage)
+      worker.off('error', onError)
+      if (msg.type === 'error')
+        reject(new Error(msg.message))
+      else
+        resolve(msg.type === 'artwork' ? msg.art : null)
+    }
+
+    const onError = (err: Error) => {
+      worker.off('message', onMessage)
+      worker.off('error', onError)
+      reject(err)
+    }
+
+    worker.on('message', onMessage)
+    worker.on('error', onError)
+    worker.postMessage({ type: 'artwork', trackId, id })
+  })
+}
+
+ipcMain.handle('library:artwork', async (_event, trackId: string, size: ArtworkSize = 'thumb') => {
+  const key    = `${size}:${trackId}`
+  const cached = artworkCache.get(key)
+  if (cached !== undefined)
+    return cached
+
+  try {
+    const art = await requestArtwork(trackId)
+    if (!art)
+      return cacheArtwork(key, null)
+    if (size === 'full')
+      return cacheArtwork(key, art)
+
+    const image = nativeImage.createFromDataURL(art)
+    if (image.isEmpty())
+      return cacheArtwork(key, art)
+
+    return cacheArtwork(key, image.resize({ width: ARTWORK_THUMB_WIDTH }).toDataURL())
+  }
+  catch (err) {
+    log.warn(`⨂ artwork failed for ${trackId}: ${String(err)}`)
+    return null
+  }
 })
 
 // ─── Window handlers ──────────────────────────────────────────────────────────
@@ -410,23 +677,36 @@ ipcMain.on('media:state-update', (_event, state: MediaState) =>
 /** Round-trips one write through the writer worker as a promise. */
 function requestWrite (message: Record<string, unknown>): Promise<void> {
   const worker = getWorker(WORKER_WRITER)
+  const id     = nextRequestId++
 
   return new Promise<void>((resolve, reject) => {
-    const handler = (msg: WorkerMessage) => {
-      worker.off('message', handler)
+    const onMessage = (msg: WorkerMessage) => {
+      if (msg.id !== id)
+        return
+      worker.off('message', onMessage)
+      worker.off('error', onError)
       if (msg.type === 'error')
         reject(new Error(msg.message))
       else
         resolve()
     }
 
-    worker.on('message', handler)
-    worker.postMessage(message)
+    const onError = (err: Error) => {
+      worker.off('message', onMessage)
+      worker.off('error', onError)
+      reject(err)
+    }
+
+    worker.on('message', onMessage)
+    worker.on('error', onError)
+    worker.postMessage({ ...message, id })
   })
 }
 
 ipcMain.handle('models:upsert', (_event, kind: string, payload: Record<string, unknown>) =>
   requestWrite({ type: 'upsert', kind, payload }))
 
-ipcMain.handle('models:delete', (_event, kind: string, id: string) =>
-  requestWrite({ type: 'delete', kind, id }))
+// `trackId`, not `id` — `requestWrite` stamps its own numeric `id` onto every
+// message for reply correlation, and would otherwise overwrite this one.
+ipcMain.handle('models:delete', (_event, kind: string, trackId: string) =>
+  requestWrite({ type: 'delete', kind, trackId }))

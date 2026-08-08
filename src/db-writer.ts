@@ -8,14 +8,17 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import path from 'node:path'
 import fs from 'node:fs'
-import { migrate, upsertDtoSql, dtoToParams } from './track-schema'
+import { migrate, upsertDtoSql, dtoToParams, dtoColumns } from './track-schema'
 
 
 interface WriteMessage {
   type:     'upsert' | 'delete'
   kind:     string
   payload?: Record<string, unknown>
-  id?:      string
+  trackId?: string
+
+  /** Correlates the reply with the caller's request. See `main.ts`. */
+  id: number
 }
 
 interface SqliteDatabase {
@@ -62,10 +65,18 @@ function upsert (kind: string, payload: Record<string, unknown>): void {
   if (!database || kind !== 'track')
     return
 
+  // Only the columns the DTO actually carries. List rows no longer include
+  // `albumArt`, so writing every column unconditionally would blank the
+  // artwork of every track the user ever edits. An explicit `null` still
+  // clears a field; an absent key leaves it alone.
+  const columns = dtoColumns(payload)
+  if (columns.length === 0)
+    return
+
   // `dtoToParams` also drops anything that isn't a column — a model payload
   // carries a few extra getters, and better-sqlite3 rejects stray named
   // parameters outright.
-  database.prepare(upsertDtoSql()).run(dtoToParams(payload))
+  database.prepare(upsertDtoSql(columns)).run(dtoToParams(payload, columns))
 }
 
 function deleteModel (kind: string, id: string): void {
@@ -78,17 +89,15 @@ function deleteModel (kind: string, id: string): void {
 
 parentPort?.on('message', (msg: WriteMessage) => {
   try {
-    if (msg.type === 'upsert' && msg.payload) {
+    if (msg.type === 'upsert' && msg.payload)
       upsert(msg.kind, msg.payload)
-      parentPort?.postMessage({ type: 'done' })
-    }
-    else if (msg.type === 'delete' && msg.id) {
-      deleteModel(msg.kind, msg.id)
-      parentPort?.postMessage({ type: 'done' })
-    }
+    else if (msg.type === 'delete' && msg.trackId)
+      deleteModel(msg.kind, msg.trackId)
+
+    parentPort?.postMessage({ type: 'done', id: msg.id })
   }
   catch (err) {
     console.error('[db-writer] Error:', err)
-    parentPort?.postMessage({ type: 'error', message: String(err) })
+    parentPort?.postMessage({ type: 'error', id: msg.id, message: String(err) })
   }
 })

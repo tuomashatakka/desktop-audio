@@ -22,6 +22,7 @@ import type { Track } from '../models'
 import type { TagField, TrackDTO } from '../services/types'
 import { PRIMARY_TAG_FIELDS, EXTENDED_TAG_FIELDS } from '../services/types'
 import { useData } from '../data'
+import { useArtwork } from '../hooks/useArtwork'
 import { Button, Icon, Input } from '../components/atomic'
 import { formatTime, isoDuration } from '../utils/time'
 
@@ -213,8 +214,20 @@ function TagEditorForm ({ track, onClose, onSaved }: TagEditorFormProps) {
   const data              = useData()
   const [ form, setForm ] = useState<FormState>(() =>
     readForm(track))
-  const [ art, setArt ]       = useState<string | undefined>(track.albumArt)
-  const [ status, setStatus ] = useState<string | null>(null)
+  // Artwork is not on the track — it is fetched per id. `artEdit` stays
+  // `undefined` until the user actually touches it, which is what keeps a save
+  // from rewriting (or worse, clearing) a cover nobody meant to change.
+  const storedArt                     = useArtwork(track.id, 'full')
+  const [ artEdit, setArtEdit ]       = useState<string | undefined>(undefined)
+  const [ artCleared, setArtCleared ] = useState(false)
+  const [ status, setStatus ]         = useState<string | null>(null)
+
+  const art = artCleared ? undefined : artEdit ?? storedArt
+
+  const setArt = (value: string | undefined) => {
+    setArtCleared(value === undefined)
+    setArtEdit(value)
+  }
 
   const setField = (field: TagField, value: string) =>
     setForm(current =>
@@ -229,7 +242,19 @@ function TagEditorForm ({ track, onClose, onSaved }: TagEditorFormProps) {
     const target = track as unknown as Record<string, unknown>
     for (const field of ALL_FIELDS)
       target[field] = parseField(field, form[field])
-    target.albumArt = art
+
+    // Untouched artwork is left off the write entirely rather than assigned
+    // back — the model only sends columns it carries, so silence here means
+    // "leave album_art alone" instead of "set it to whatever I happened to
+    // have loaded".
+    if (artCleared || artEdit !== undefined) {
+      // Seed what the database currently holds before clearing, so removal
+      // registers as a change: the setter ignores an assignment equal to the
+      // value it already has, and a list-hydrated track has none.
+      if (artCleared && storedArt !== undefined)
+        target.albumArt = storedArt
+      target.albumArt = artCleared ? undefined : artEdit
+    }
 
     try {
       await data.upsertTrack(track.toDTO() as TrackDTO)

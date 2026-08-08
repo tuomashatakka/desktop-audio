@@ -18,6 +18,7 @@ function makeUIValue (overrides: Partial<UIValue> = {}): UIValue {
     editingTrackId: null,
     density: 'normal',
     grouping: 'none',
+    sidebarWidth: 220,
     setView: noop,
     toggleSidebar: noop,
     selectFolder: noop,
@@ -25,6 +26,7 @@ function makeUIValue (overrides: Partial<UIValue> = {}): UIValue {
     setEditingTrack: noop,
     setDensity: noop,
     setGrouping: noop,
+    setSidebarWidth: noop,
     ...overrides,
   }
 }
@@ -83,6 +85,16 @@ describe('AppLayout', () => {
 
     expect(container.firstChild).toHaveClass('app-shell')
     expect(container.firstChild).toHaveAttribute('data-view', 'settings')
+  })
+
+  it('exposes the persisted sidebar width as a shell custom property', () => {
+    const { container } = render(
+      <UIProvider value={makeUIValue({ sidebarWidth: 264 })}>
+        <AppLayout main={<div>Content</div>} />
+      </UIProvider>
+    )
+
+    expect(container.firstChild).toHaveStyle('--sidebar-w: 264px')
   })
 
   it('renders main content in app-main', () => {

@@ -13,6 +13,7 @@
  */
 import { useEffect } from 'react'
 import { useAudio } from '../contexts'
+import { useArtwork } from './useArtwork'
 
 
 /** Edge length of the sampling canvas. 24² pixels is plenty for a wash. */
@@ -151,7 +152,9 @@ async function extractPalette (src: string): Promise<readonly [string, string, s
 export function useAmbientPalette (): void {
   const { currentTrack } = useAudio()
 
-  const art      = currentTrack?.albumArt
+  // The thumbnail is plenty: the sampler downsizes to 24×24 anyway, so asking
+  // for the full image would only make the first paint of the wash slower.
+  const art      = useArtwork(currentTrack?.id, 'thumb')
   const fallback = currentTrack?.coverColor
 
   useEffect(() => {

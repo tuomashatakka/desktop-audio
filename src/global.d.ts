@@ -9,6 +9,10 @@ interface ElectronAPI {
   onLibraryDone:         (cb: () => void) => () => void
   onLibraryHydrateBatch: (cb: (tracks: unknown[]) => void) => () => void
   onLibraryHydrateDone:  (cb: () => void) => () => void
+  onLibraryError:        (cb: (message: string) => void) => () => void
+
+  /** Album art, fetched per track — list rows never carry it. */
+  getArtwork: (trackId: string, size?: 'thumb' | 'full') => Promise<string | null>
 
   // Files
   selectDirectory:  () => Promise<string | null>

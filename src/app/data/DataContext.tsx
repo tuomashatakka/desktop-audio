@@ -25,3 +25,15 @@ export function useData (): DataSource {
     throw new Error('useData must be used within a DataProvider')
   return data
 }
+
+/**
+ * The data source if there is one, `null` otherwise.
+ *
+ * For consumers whose job is decoration rather than content — album art being
+ * the case in hand. A track row renders perfectly well without a cover, so
+ * demanding a provider for it would make presentational components untestable
+ * in isolation for the sake of a thumbnail. Mirrors `useOptionalSettings`.
+ */
+export function useOptionalData (): DataSource | null {
+  return useContext(DataContext)
+}

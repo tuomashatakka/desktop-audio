@@ -6,9 +6,9 @@
  * Nothing here is shown or hidden from JS.
  *
  * Motion: every state change animates in *and* out. The three mechanisms are
- * a registered `--player-h` for the player's growth, a `0fr`/`1fr` grid track
- * for the sidebar, and `transition-behavior: allow-discrete` plus
- * `@starting-style` for anything that toggles `display`.
+ * a registered `--player-h` for the player's growth, an animating sidebar
+ * `flex-basis`, and `transition-behavior: allow-discrete` plus `@starting-style`
+ * for anything that toggles `display`.
  */
 
 .app-shell {
@@ -87,27 +87,22 @@
 }
 
 /*
- * A `0fr` track collapses to nothing and interpolates on the way; `width:
- * auto` → `width: 0` does not. The inner sidebar keeps its own inline width
- * (the resize handle's output) and the track closes around it.
+ * The width is a real length (UIContext → `--sidebar-w` on the shell), so the
+ * outer box can animate straight to zero. This used to be a `1fr` → `0fr`
+ * grid track because the width was `auto`; the track never actually collapsed,
+ * as the child's inline width floored it and only opacity ever applied.
  */
 .app-sidebar {
-  display: grid;
-  flex-shrink: 0;
-  grid-template-columns: 1fr;
-  align-self: stretch;
-  height: 100%;
+  flex: 0 0 var(--sidebar-w);
   overflow: hidden;
   opacity: 1;
   transition:
-    grid-template-columns var(--duration) var(--ease-emphasis),
+    flex-basis var(--duration) var(--ease-emphasis),
     opacity var(--duration-fast) var(--ease);
-
-  > * { min-width: 0; overflow: hidden; }
 
   .app-shell:not([data-sidebar-open]) &,
   .app-shell[data-view='player'] & {
-    grid-template-columns: 0fr;
+    flex-basis: 0;
     opacity: 0;
   }
 }
@@ -268,6 +263,7 @@
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
+  width: var(--sidebar-w);
   height: 100%;
   overflow: auto hidden;
   border-right: 1px solid var(--border);
@@ -652,7 +648,9 @@ body::before {
   cursor: pointer;
   transition: height var(--duration) var(--ease-emphasis);
 
-  &:focus-within { border-radius: var(--radius); box-shadow: var(--focus-ring); }
+  /* A pointer click focuses the invisible range input too. Only keyboard focus
+     should paint the focus ring around its visible waveform proxy. */
+  &:has(:focus-visible) { box-shadow: var(--focus-ring); }
   &.compact { height: 28px; }
 
   &:not([data-loaded]) .waveform-shape { visibility: hidden; }
@@ -672,9 +670,21 @@ body::before {
   height: calc(100% - 2 * (var(--sp-1) + var(--sp-0-5)));
 }
 
-.waveform-unplayed { fill: var(--wf-unplayed); stroke: var(--wf-unplayed); }
-.waveform-played { fill: var(--wf-played); stroke: var(--wf-played); }
-.waveform-shape { transform-box: fill-box; transform-origin: center; }
+/* Closed amplitude paths use fill only. A stroke is measured in user units,
+   and this viewBox is one unit tall, so it scales into a full-height band. */
+.waveform-shape.waveform-unplayed { fill: var(--wf-unplayed); }
+.waveform-shape.waveform-played { fill: var(--wf-played); }
+
+.waveform-shape {
+  fill-rule: nonzero;
+  stroke: none;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Hairline fallbacks have no fill; their stroke stays pinned to device pixels. */
+.waveform-line.waveform-unplayed { stroke: var(--wf-unplayed); }
+.waveform-line.waveform-played { stroke: var(--wf-played); }
 .waveform-line { display: block; vector-effect: non-scaling-stroke; stroke-width: 1px; }
 
 .waveform-input {

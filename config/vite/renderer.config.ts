@@ -33,6 +33,13 @@ export default defineConfig(async ({ command }) => {
       }
       : {}),
     plugins,
+    // Bind dual-stack. Vite's default resolves `localhost` to a single family
+    // (here `::1`), while Forge freezes the literal string
+    // `http://localhost:<port>` into the main bundle — so whether the window
+    // loaded came down to which family Chromium happened to try, and a refused
+    // connection on a transparent frameless window looks like no window at all.
+    // `::` accepts IPv4-mapped connections too, so both spellings answer.
+    server: { host: '::' },
     build: {
       ...(isWebBuild
         ? {

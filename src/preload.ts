@@ -52,6 +52,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     subscribe('library:hydrate-batch', cb),
   onLibraryHydrateDone: (cb: () => void) =>
     subscribe('library:hydrate-done', cb),
+  // A worker that failed to spawn still sends a terminal `done`, but silently —
+  // this is how the renderer learns *why* the library came back empty.
+  onLibraryError: (cb: (message: string) => void) =>
+    subscribe('library:error', cb),
+
+  /** One track's album art. `size` is 'thumb' (64px) or 'full'. */
+  getArtwork: (trackId: string, size?: 'thumb' | 'full') =>
+    ipcRenderer.invoke('library:artwork', trackId, size),
 
   // Files
   selectDirectory: () =>

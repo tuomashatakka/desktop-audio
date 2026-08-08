@@ -25,6 +25,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { VirtualItem } from '@tanstack/react-virtual'
 import { useSortableTable } from '../../hooks/useSortableTable'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useArtwork } from '../../hooks/useArtwork'
 import type { ColumnKey, ColumnConfig } from '../../hooks/useColumnConfig'
 import { useUI } from '../../contexts'
 import type { Density, Grouping, Track } from '../../contexts'
@@ -105,9 +106,19 @@ function isSortableKey (key: ColumnKey): key is SortKey {
 }
 
 /** Always square, always cropped — see `.album-art` in views.css. */
-type AlbumArtProps = { readonly src?: string; readonly color?: string }
+type AlbumArtProps = { readonly trackId?: string; readonly color?: string }
 
-function AlbumArt ({ src, color }: AlbumArtProps) {
+/**
+ * Art arrives after the row does.
+ *
+ * Track DTOs carry no `albumArt` — it is fetched per track, downscaled to a
+ * thumbnail host-side, and cached across mounts by {@link useArtwork}. The
+ * `coverColor` block is not a placeholder so much as the resting state: most
+ * tracks have no cover at all, and this is what they keep showing.
+ */
+function AlbumArt ({ trackId, color }: AlbumArtProps) {
+  const src = useArtwork(trackId)
+
   return src
     ? <img className='album-art' src={ src } alt='' loading='lazy' />
     : <span className='album-art' style={{ background: color }} />
@@ -118,7 +129,7 @@ type CellRenderer = (track: Track, index: number, density: Density) => React.Rea
 /** Column renderers keep adding a column from inflating one giant switch. */
 const CELL_RENDERERS: Record<ColumnKey, CellRenderer> = {
   art: track =>
-    <AlbumArt src={ track.albumArt } color={ track.coverColor } />,
+    <AlbumArt trackId={ track.id } color={ track.coverColor } />,
   index: (_track, index) =>
     index + 1,
   title: (track, _index, density) =>
@@ -427,7 +438,7 @@ function TrackGroup ({
       data-collapsed={ collapsed || undefined }
       data-group-key={ group.key }
       aria-labelledby={ headingId }>
-      <AlbumArt src={ group.tracks[0].albumArt } color={ group.tracks[0].coverColor } />
+      <AlbumArt trackId={ group.tracks[0].id } color={ group.tracks[0].coverColor } />
 
       <header>
         {toggle}

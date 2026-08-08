@@ -1,5 +1,3 @@
-/* eslint-disable react-strict/no-style-prop -- The width is the live output of
-   the drag-to-resize handle. */
 /**
  * LibrarySidebar — folder tree + playlists.
  *
@@ -7,29 +5,34 @@
  * Both sections are native `<details>`, so their collapse is platform
  * behaviour rather than duplicated React state.
  */
-import { useLibrary, useUI } from '../contexts'
+import {
+  clampSidebarWidth,
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH,
+  useLibrary,
+  useUI,
+} from '../contexts'
 import { FolderTree } from '../components/composite/FolderTree'
 import { Icon } from '../components/atomic'
-import { useState, useCallback } from 'react'
+import { useCallback } from 'react'
 import { listenAll } from '../utils/events'
 
-
-const MIN_WIDTH     = 180
-const MAX_WIDTH     = 400
-const DEFAULT_WIDTH = 220
 
 /** Pixels per arrow-key press on the resize handle. */
 const RESIZE_STEP = 10
 
-const clampWidth = (width: number) =>
-  Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width))
-
 /** See module docstring. */
 export function LibrarySidebar () {
-  const { registry, playlists, toggleFolder, addPlaylist }                                = useLibrary()
-  const { selectedFolderPath, selectedPlaylistId, selectFolder, selectPlaylist, setView } = useUI()
-
-  const [ width, setWidth ] = useState(DEFAULT_WIDTH)
+  const { registry, playlists, toggleFolder, addPlaylist } = useLibrary()
+  const {
+    selectedFolderPath,
+    selectedPlaylistId,
+    sidebarWidth,
+    selectFolder,
+    selectPlaylist,
+    setSidebarWidth,
+    setView,
+  } = useUI()
 
   const folders = Array.from(registry.folders.values())
 
@@ -42,14 +45,14 @@ export function LibrarySidebar () {
     // collection is disposed by the mouseup handler rather than by React.
     const drag = listenAll(document, {
       mousemove: event =>
-        setWidth(clampWidth((event as MouseEvent).clientX)),
+        setSidebarWidth(clampSidebarWidth((event as MouseEvent).clientX)),
       mouseup: () => {
         document.body.style.cursor     = ''
         document.body.style.userSelect = ''
         drag.dispose()
       },
     })
-  }, [])
+  }, [ setSidebarWidth ])
 
   const handleResizeKeyDown = useCallback((event: React.KeyboardEvent) => {
     const delta = event.key === 'ArrowLeft'
@@ -61,18 +64,18 @@ export function LibrarySidebar () {
       return
 
     event.preventDefault()
-    setWidth(current =>
-      clampWidth(current + delta))
-  }, [])
+    setSidebarWidth(current =>
+      clampSidebarWidth(current + delta))
+  }, [ setSidebarWidth ])
 
-  return <nav className='library-sidebar' style={{ width }} aria-label='Library'>
+  return <nav className='library-sidebar' aria-label='Library'>
     <span
       className='resize-handle'
       aria-label='Resize library sidebar'
       aria-orientation='vertical'
-      aria-valuemin={ MIN_WIDTH }
-      aria-valuemax={ MAX_WIDTH }
-      aria-valuenow={ width }
+      aria-valuemin={ MIN_SIDEBAR_WIDTH }
+      aria-valuemax={ MAX_SIDEBAR_WIDTH }
+      aria-valuenow={ sidebarWidth }
       role='separator'
       tabIndex={ 0 }
       onMouseDown={ handleResizeStart }

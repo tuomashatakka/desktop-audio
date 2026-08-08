@@ -55,10 +55,25 @@ describe('batchRows', () => {
 
   it('maps rows to camelCase DTOs and drops null columns', () => {
     const batches = batchesOf([
-      { id: 'a', title: 'T', album_art: 'data:image/png;base64,x', genre: null },
+      { id: 'a', title: 'T', genre: null, cover_color: '#abc' },
     ])
 
-    expect(batches[0][0]).toEqual({ id: 'a', title: 'T', albumArt: 'data:image/png;base64,x' })
+    expect(batches[0][0]).toEqual({ id: 'a', title: 'T', coverColor: '#abc' })
+  })
+
+  /*
+   * Artwork is the one column a list row never carries: the blobs are base64
+   * data URLs running to megabytes each, and relaying them inline is what made
+   * a hydrate cost hundreds of megabytes. The reader's SELECT does not even ask
+   * for the column, but the mapping refuses it too — a stray `SELECT *`
+   * somewhere upstream must not be able to reintroduce it.
+   */
+  it('never carries album art on a hydrate row', () => {
+    const batches = batchesOf([
+      { id: 'a', title: 'T', album_art: 'data:image/png;base64,x' },
+    ])
+
+    expect(batches[0][0]).not.toHaveProperty('albumArt')
   })
 
   /*

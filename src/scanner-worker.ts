@@ -10,7 +10,10 @@ import { workerData, parentPort } from 'node:worker_threads'
 import path from 'node:path'
 import { readdir, stat } from 'node:fs/promises'
 import Database from 'better-sqlite3'
-import { migrate, upsertSql, TRACK_COLUMN_NAMES, MTIME_COLUMN } from './track-schema'
+import {
+  migrate, upsertSql, TRACK_COLUMN_NAMES, MTIME_COLUMN,
+  LIST_COLUMN_NAMES, ARTWORK_COLUMN,
+} from './track-schema'
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -34,9 +37,10 @@ function row (values: Record<string, string | number | null | undefined>): Scann
   return out
 }
 
+/** `id` is echoed on every reply so the caller can match it. See `main.ts`. */
 type MainMessage =
-  | { type: 'scan'; dirPaths: string[] } |
-  { type: 'abort' }
+  | { type: 'scan'; dirPaths: string[]; id: number } |
+  { type: 'abort'; id: number }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -224,8 +228,14 @@ const stmtGetMtime = db.prepare<[string], { mtime_ms: number }>(
   'SELECT mtime_ms FROM tracks WHERE path = ?'
 )
 
+/**
+ * Columns listed explicitly, not `SELECT *`: this is the cache-hit path, so it
+ * runs for nearly every file on a warm library, and `album_art` is 372 MB
+ * across this one. Reading it here only to relay it to a track list that never
+ * shows it at full size is the whole cost. See `ARTWORK_COLUMN`.
+ */
 const stmtGetFull = db.prepare<[string], ScannedTrack>(
-  'SELECT * FROM tracks WHERE path = ?'
+  `SELECT ${LIST_COLUMN_NAMES.join(', ')} FROM tracks WHERE path = ?`
 )
 
 const stmtUpsert = db.prepare(upsertSql())
@@ -243,7 +253,18 @@ const log = {
 
 // ─── Scan logic ───────────────────────────────────────────────────────────────
 
-async function scanDirs (dirPaths: string[]): Promise<void> {
+/**
+ * The row minus the artwork blob. It still goes to SQLite in full — only the
+ * copy relayed to the renderer drops it, because the track list fetches art
+ * per row through `library:artwork` instead.
+ */
+function withoutArtwork (track: ScannedTrack): ScannedTrack {
+  const copy = { ...track }
+  delete copy[ARTWORK_COLUMN]
+  return copy
+}
+
+async function scanDirs (dirPaths: string[], id: number): Promise<void> {
   const t0                      = Date.now()
   const seenPaths               = new Set<string>()
   const pending: ScannedTrack[] = []
@@ -259,7 +280,7 @@ async function scanDirs (dirPaths: string[]): Promise<void> {
       return
     batchCount++
     log.debug(`⊞ batch #${batchCount} → ${pending.length} tracks (total sent: ${totalCount})`)
-    parentPort!.postMessage({ type: 'batch', tracks: pending.splice(0) })
+    parentPort!.postMessage({ type: 'batch', id, tracks: pending.splice(0) })
   }
 
   const walk = async (dir: string): Promise<void> => {
@@ -300,6 +321,7 @@ async function scanDirs (dirPaths: string[]): Promise<void> {
               log.debug(`Δ parse ${path.basename(fullPath)} (${existing ? 'modified' : 'new'})`)
               track = await processAudioFile(fullPath, stats.size, mtimeMs)
               stmtUpsert.run(track)
+              track = withoutArtwork(track)
               cacheMisses++
             }
 
@@ -343,14 +365,14 @@ async function scanDirs (dirPaths: string[]): Promise<void> {
     `◴ ${elapsed}ms`
   )
 
-  parentPort!.postMessage({ type: 'done', totalCount })
+  parentPort!.postMessage({ type: 'done', id, totalCount })
 }
 
 // ─── Message loop ─────────────────────────────────────────────────────────────
 
 parentPort!.on('message', (msg: MainMessage) => {
   if (msg.type === 'scan')
-    scanDirs(msg.dirPaths).catch(err => {
-      parentPort!.postMessage({ type: 'error', message: String(err) })
+    scanDirs(msg.dirPaths, msg.id).catch(err => {
+      parentPort!.postMessage({ type: 'error', id: msg.id, message: String(err) })
     })
 })

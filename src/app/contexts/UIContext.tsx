@@ -1,14 +1,14 @@
 /**
- * UIContext — ephemeral, view-layer state only.
+ * UIContext — view-layer state only.
  *
  * Tracks which view is active, sidebar visibility, the currently-selected
- * folder/playlist, and presentation preferences (density, grouping). Density
- * and grouping are persisted to localStorage; the rest is session-only.
+ * folder/playlist, and presentation preferences (density, grouping, sidebar
+ * width). Presentation preferences are persisted; the rest is session-only.
  *
  * Does NOT own library data, audio playback, or user settings — see
  * {@link LibraryContext}, {@link AudioContext}, {@link SettingsContext}.
  */
-import type { ReactNode } from 'react'
+import type { ReactNode, SetStateAction } from 'react'
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 
 
@@ -35,6 +35,7 @@ interface UIState {
   readonly editingTrackId:     string | null
   readonly density:            Density
   readonly grouping:           Grouping
+  readonly sidebarWidth:       number
 }
 
 /** UI state plus the actions that mutate it. */
@@ -46,21 +47,60 @@ interface UIContextValue extends UIState {
   readonly setEditingTrack: (id: string | null) => void
   readonly setDensity:      (d: Density) => void
   readonly setGrouping:     (g: Grouping) => void
+  readonly setSidebarWidth: (width: SetStateAction<number>) => void
 }
 
 const UIContext = createContext<UIContextValue | null>(null)
 
-const DENSITY_KEY  = 'desktop-audio-density'
-const GROUPING_KEY = 'desktop-audio-grouping'
+const DENSITY_KEY       = 'desktop-audio-density'
+const GROUPING_KEY      = 'desktop-audio-grouping'
+const SIDEBAR_WIDTH_KEY = 'desktop-audio-sidebar-width'
+
+export const MIN_SIDEBAR_WIDTH     = 180
+export const MAX_SIDEBAR_WIDTH     = 400
+export const DEFAULT_SIDEBAR_WIDTH = 220
+
+export function clampSidebarWidth (width: number): number {
+  if (!Number.isFinite(width))
+    return DEFAULT_SIDEBAR_WIDTH
+
+  return Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, width))
+}
+
+/**
+ * `localStorage` throws, it does not merely return null.
+ *
+ * A second Electron instance sharing this profile finds the leveldb backing
+ * store already locked, and the preference readers run inside
+  * `useState` initialisers, so an unhandled throw there takes down the whole
+ * React tree before it mounts — and the window is frameless and transparent,
+ * so the result is a live process showing nothing at all. Defaults are a fine
+ * answer to "I can't read your preferences"; a blank app is not.
+ */
+function readSetting (key: string): string | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage.getItem(key)
+  }
+  catch {
+    return null
+  }
+}
 
 function loadDensity (): Density {
-  const v = typeof localStorage === 'undefined' ? null : localStorage.getItem(DENSITY_KEY)
+  const v = readSetting(DENSITY_KEY)
   return v === 'compact' || v === 'relaxed' ? v : 'normal'
 }
 
 function loadGrouping (): Grouping {
-  const v = typeof localStorage === 'undefined' ? null : localStorage.getItem(GROUPING_KEY)
+  const v = readSetting(GROUPING_KEY)
   return v === 'album' || v === 'artist' || v === 'path' ? v : 'none'
+}
+
+function loadSidebarWidth (): number {
+  const stored = readSetting(SIDEBAR_WIDTH_KEY)
+  return stored === null
+    ? DEFAULT_SIDEBAR_WIDTH
+    : clampSidebarWidth(Number(stored))
 }
 
 /**
@@ -80,6 +120,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       editingTrackId:     null,
       density:            loadDensity(),
       grouping:           loadGrouping(),
+      sidebarWidth:       loadSidebarWidth(),
     }))
 
   /** Switches the stable view tree immediately; CSS owns the resulting layout. */
@@ -122,6 +163,16 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       ({ ...s, grouping: g }))
   }, [])
 
+  const setSidebarWidth = useCallback((width: SetStateAction<number>) => {
+    setState(state => {
+      const nextWidth = typeof width === 'function'
+        ? width(state.sidebarWidth)
+        : width
+
+      return { ...state, sidebarWidth: clampSidebarWidth(nextWidth) }
+    })
+  }, [])
+
   useEffect(() => {
     localStorage.setItem(DENSITY_KEY, state.density)
   }, [ state.density ])
@@ -129,6 +180,11 @@ export function UIProvider ({ children, value }: UIProviderProps) {
   useEffect(() => {
     localStorage.setItem(GROUPING_KEY, state.grouping)
   }, [ state.grouping ])
+
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Persist UI preference changes to browser storage.
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(state.sidebarWidth))
+  }, [ state.sidebarWidth ])
 
   // `value` is the test-injection escape hatch; otherwise memoise, so
   // consumers don't re-render on every provider render.
@@ -142,6 +198,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       setEditingTrack,
       setDensity,
       setGrouping,
+      setSidebarWidth,
     }, [
     value,
     state,
@@ -152,6 +209,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
     setEditingTrack,
     setDensity,
     setGrouping,
+    setSidebarWidth,
   ])
 
   return <UIContext.Provider value={ contextValue }>

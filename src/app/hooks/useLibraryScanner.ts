@@ -111,9 +111,42 @@ export function useLibraryScanner () {
     libraryPathsRef.current = libraryPaths
   }, [ libraryPaths ])
 
+  const publishScheduled = useRef(false)
+
   const publish = useCallback(() => {
     setTracks([ ...trackMap.current.values() ].sort(byTitle))
   }, [ setTracks ])
+
+  /**
+   * Publishing is O(n log n) *and* rebuilds the whole `ModelRegistry`, so
+   * doing it per batch cost 300 full-library sorts and reconciliations on a
+   * 6000-track scan.
+   *
+   * Coalescing has to be per *frame*, not per microtask: every batch arrives
+   * as its own IPC event, so a microtask queue drains between them and would
+   * collapse nothing. A frame is also the finest granularity anyone can see.
+   */
+  const schedulePublish = useCallback(() => {
+    if (publishScheduled.current)
+      return
+    publishScheduled.current = true
+
+    const run = () => {
+      publishScheduled.current = false
+      publish()
+    }
+
+    if (typeof requestAnimationFrame === 'function')
+      requestAnimationFrame(run)
+    else
+      setTimeout(run, 16)
+  }, [ publish ])
+
+  /** Publish now, cancelling any pending frame — for terminal events. */
+  const publishNow = useCallback(() => {
+    publishScheduled.current = false
+    publish()
+  }, [ publish ])
 
   /**
    * Rebuild the sidebar tree from whatever is in the cache. Called after
@@ -153,12 +186,13 @@ export function useLibraryScanner () {
         hydrateCount++
         mergeTracks(event.tracks as TrackDTO[])
         log.debug(`▤ hydrate batch #${hydrateCount} — ${event.tracks.length} tracks (map size: ${trackMap.current.size})`)
-        publish()
+        schedulePublish()
         // Rows are on screen; there is nothing left for a spinner to wait on.
         markInitialResolved()
       }
       else if (event.type === 'hydrate-done') {
         log.info(`▤ DB hydrated — ${trackMap.current.size} tracks · ◴ ${Date.now() - t0}ms`)
+        publishNow()
         publishFolders()
         markInitialResolved()
       }
@@ -170,7 +204,7 @@ export function useLibraryScanner () {
           seenThisScan.current.add(t.id)
 
         log.debug(`⇘ batch #${batchCount} — ${event.tracks.length} tracks (map size: ${trackMap.current.size})`)
-        publish()
+        schedulePublish()
         setLoading(true)
       }
       else if (event.type === 'done') {
@@ -183,7 +217,7 @@ export function useLibraryScanner () {
         seenThisScan.current.clear()
 
         log.info(`✓ scan done — ${trackMap.current.size} tracks · ◴ ${Date.now() - t0}ms`)
-        publish()
+        publishNow()
         publishFolders()
         setLoading(false)
         markInitialResolved()
@@ -200,7 +234,7 @@ export function useLibraryScanner () {
       log.info('⊖ unsubscribing from library events')
       subscription.dispose()
     }
-  }, [ data, mergeTracks, publish, publishFolders, setLoading, markInitialResolved ])
+  }, [ data, mergeTracks, schedulePublish, publishNow, publishFolders, setLoading, markInitialResolved ])
 
   // Cache hydration — replay what we already have, then ask for the DB once.
   //

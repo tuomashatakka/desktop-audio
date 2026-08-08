@@ -2,7 +2,7 @@
 // Preserves current Electron behaviour exactly
 
 import type { DisposableCollection } from 'disposable-events'
-import type { DataSource, DataEvent, DataListener, AudioMetadata, TrackDTO } from './DataSource'
+import type { DataSource, DataEvent, DataListener, AudioMetadata, TrackDTO, ArtworkSize } from './DataSource'
 import { collectUnsubscribes } from '../utils/events'
 import { noop } from '../utils/noop'
 
@@ -63,9 +63,18 @@ export class IpcDataSource implements DataSource {
       this._ipc?.onLibraryHydrateBatch(relayTracks('hydrate-batch')) ?? noop,
       this._ipc?.onLibraryHydrateDone(() =>
         l({ type: 'hydrate-done', totalCount: this.trackIdToPath.size })) ?? noop,
+      // Without this the `error` branch of every listener was unreachable under
+      // Electron: a worker that failed to spawn produced silence, not a fault.
+      this._ipc?.onLibraryError?.((message: string) =>
+        l({ type: 'error', message })) ?? noop,
     ]
 
     return collectUnsubscribes(...unsubscribes)
+  }
+
+  /** See {@link DataSource.readArtwork}. Cached main-side, per track and size. */
+  async readArtwork (trackId: string, size: ArtworkSize = 'thumb'): Promise<string | null> {
+    return await this._ipc?.getArtwork?.(trackId, size) ?? null
   }
 
   async readBytes (trackId: string): Promise<ArrayBuffer> {

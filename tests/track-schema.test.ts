@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  ARTWORK_COLUMN,
+  LIST_COLUMN_NAMES,
   MTIME_COLUMN,
   TRACK_COLUMN_NAMES,
   createTableSql,
+  dtoColumns,
   dtoToParams,
   migrate,
   rowToDto,
+  rowToListDto,
   upsertDtoSql,
   upsertSql,
 } from '../src/track-schema'
@@ -62,5 +66,48 @@ describe('track schema', () => {
     expect(statements.slice(1)).toEqual([
       'ALTER TABLE tracks ADD COLUMN rating INTEGER',
     ])
+  })
+})
+
+/*
+ * These four guard one invariant between them: **a renderer write must never
+ * touch a column it did not carry.** Track lists deliberately arrive without
+ * `album_art`, so a writer that assumed every column was present would blank
+ * the cover of every track the user ever edited — silently, and only visible
+ * after a restart.
+ */
+describe('partial DTO writes', () => {
+  it('leaves album art out of the list projection', () => {
+    expect(LIST_COLUMN_NAMES).not.toContain(ARTWORK_COLUMN)
+    expect(LIST_COLUMN_NAMES).toHaveLength(TRACK_COLUMN_NAMES.length - 1)
+
+    const row = { id: 'a', title: 'T', album_art: 'data:image/png;base64,x' }
+
+    expect(rowToListDto(row)).not.toHaveProperty('albumArt')
+    expect(rowToDto(row)).toHaveProperty('albumArt')
+  })
+
+  it('counts only the columns a DTO actually carries', () => {
+    expect(dtoColumns({ id: 'a', title: 'T' })).toEqual([ 'id', 'title' ])
+  })
+
+  it('treats an explicit undefined as a clear, and absence as silence', () => {
+    // Present-but-undefined is how the tag editor empties a field.
+    expect(dtoColumns({ id: 'a', genre: undefined })).toEqual([ 'id', 'genre' ])
+    expect(dtoToParams({ id: 'a', genre: undefined }, [ 'id', 'genre' ]))
+      .toEqual({ id: 'a', genre: null })
+
+    // Absent entirely — the column must not appear in the statement at all.
+    expect(dtoColumns({ id: 'a' })).toEqual([ 'id' ])
+  })
+
+  it('builds an upsert naming only the given columns', () => {
+    const sql = upsertDtoSql([ 'id', 'title' ])
+
+    expect(sql).toContain('INSERT INTO tracks (id, title)')
+    expect(sql).toContain('title = excluded.title')
+    expect(sql).not.toContain(ARTWORK_COLUMN)
+    // `id` is the conflict target, never an assignment.
+    expect(sql).not.toContain('id = excluded.id')
   })
 })

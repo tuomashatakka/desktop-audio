@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+/* eslint-disable react-strict/no-style-prop -- A CSS custom property carries persisted UI state into layout CSS. */
+import type { CSSProperties, ReactNode } from 'react'
 import { useUI } from '../contexts'
 import { useHeightTier } from '../hooks'
 
@@ -19,11 +20,12 @@ interface AppLayoutProps {
  * affordable at all — no element is shown or hidden from here.
  */
 export function AppLayout ({ titlebar, sidebar, main, player }: AppLayoutProps) {
-  const { sidebarOpen, currentView } = useUI()
-  const heightTier                   = useHeightTier()
+  const { sidebarOpen, sidebarWidth, currentView } = useUI()
+  const heightTier                                 = useHeightTier()
 
   return <div
     className='app-shell'
+    style={{ '--sidebar-w': `${sidebarWidth}px` } as CSSProperties}
     data-height-tier={ heightTier }
     data-view={ currentView }
     data-sidebar-open={ sidebarOpen || undefined }>

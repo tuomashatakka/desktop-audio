@@ -11,6 +11,11 @@ export default defineConfig(async () => {
   return {
     root: path.resolve(projectRoot, 'src/app/context-menu'),
 
+    // Dual-stack, for the same reason as `renderer.config.ts` — see the note
+    // there. This window is `show: false` until a menu opens, so a failed load
+    // here is even quieter.
+    server: { host: '::' },
+
     build: {
       // Forge injects a *relative* outDir ('.vite/renderer/context_menu_window'),
       // which Vite resolves against `root` — i.e. into src/app/context-menu/.

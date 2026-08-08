@@ -360,6 +360,16 @@ export class WebFsDataSource implements DataSource {
     }
   }
 
+  /**
+   * The browser build keeps whole DTOs in IndexedDB rather than a column store,
+   * so art was never split out of the row here — this just reads it back. The
+   * `size` distinction is an Electron-side downscale and has no equivalent.
+   */
+  async readArtwork (trackId: string): Promise<string | null> {
+    const track = await idbGet('tracks', trackId) as TrackDTO | undefined
+    return track?.albumArt ?? null
+  }
+
   async upsertTrack (track: TrackDTO): Promise<void> {
     await idbSet('tracks', track.id, track)
   }

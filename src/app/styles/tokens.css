@@ -141,8 +141,6 @@
     --titlebar-h: 40px;
     --player-bar-h: 72px;
     --track-head-h: 34px;
-    --sidebar-w-min: 180px;
-    --sidebar-w-max: 400px;
     --settings-nav-w: 200px;
     --titlebar-btn-w: 46px;
     --album-art-lg: 96px;
@@ -203,7 +201,7 @@
   /*
    * Flatten motion at the token level as well as with the blanket rule in
    * components.css. Rules that read a duration token directly — the player's
-   * `--player-h` growth, the sidebar's grid track — need the token itself to
+    * `--player-h` growth, the sidebar's flex basis — need the token itself to
    * collapse, not just their own `transition-duration`.
    */
   @media (prefers-reduced-motion: reduce) {

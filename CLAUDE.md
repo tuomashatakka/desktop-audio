@@ -21,7 +21,7 @@ longer sits where its relative paths assume. Only `package.json` and
 `package.json`'s `config.forge` field is what points electron-forge at its
 relocated config.
 
-Linting is `@tuomashatakka/eslint-config` applied whole. The 35 remaining
+Linting is `@tuomashatakka/eslint-config` applied whole. The 36 remaining
 `react-strict/prefer-no-use-effect` warnings are known and deliberate —
 rewriting those effects is a separate refactor, not part of adopting the
 config.
@@ -75,10 +75,28 @@ and everything reaches it as a **stream of events** — nothing returns a librar
 
 Three of them, all spawned by `main.ts` through one `getWorker(name)`
 supervisor and all built from `config/vite/worker.config.ts`:
-`scanner-worker`, `db-reader`, `db-writer`. **A worker that is not listed in
-`config/forge.config.ts` is never built**, and `new Worker()` then points at a
-file that does not exist — that is exactly how every renderer-side tag save was
-failing silently before `db-writer` was added to the build.
+`scanner-worker`, `db-reader`, `db-writer`.
+
+Getting a worker built takes **two** things, and the second one is not obvious:
+
+1. It must be listed in `config/forge.config.ts`, and
+2. `config/vite/worker.config.ts` must **not** declare `build.lib`. Forge's Vite
+   plugin only injects the per-entry `entry` when the user config leaves
+   `build.lib` undefined — declaring it opts out of the injection entirely.
+   Because all three workers share that one config file, pinning
+   `entry: 'src/scanner-worker.ts'` there meant every worker build compiled the
+   scanner and `db-reader.js` / `db-writer.js` were never emitted at all. That
+   is why hydration returned nothing and every tag save failed silently, even
+   after the forge entries were added.
+
+`getWorker` now `existsSync`-checks the entry and throws by name, and every
+streaming handler sends a terminal `done` even when the worker fails to spawn —
+a request that can end without one strands the renderer's spinner forever.
+
+`main.ts` stamps a numeric `id` on every worker request and each worker echoes
+it. Without that, a listener attached for one request sees every other
+request's replies — fine while only one is ever in flight, wrong the moment the
+track list asks for forty thumbnails during a hydrate.
 
 ## Subscriptions
 
@@ -114,6 +132,33 @@ The editor shows `PRIMARY_TAG_FIELDS` up front and `EXTENDED_TAG_FIELDS` behind
 a `<details>`; both lists are ordered as they appear on screen. Artwork is a
 data URL either way, whether it came from a picture frame or the file picker.
 
+### Album art is never on a track row
+
+`album_art` is the one column excluded from every list DTO (`LIST_COLUMN_NAMES`
+/ `rowToListDto`). It is base64, and on a real library it dwarfs everything
+else — 372 MB against ~1 MB for all other columns combined, single rows up to
+2.4 MB. Streaming it inline put roughly twice that into the renderer's string
+heap on every scan. The reader's and scanner's `SELECT`s name their columns for
+this reason; a stray `SELECT *` reintroduces the whole problem.
+
+Art is fetched per track over `library:artwork` instead: the blob read happens
+on the reader thread, the downscale in `main.ts` (`nativeImage` is an Electron
+API and is unreachable from a worker), and both sizes are cached there and
+again in `useArtwork`. Lists ask for `'thumb'`; the player, tag editor and
+media session ask for `'full'`.
+
+**Writes are partial, and this is load-bearing.** Since a track in memory has
+no `albumArt`, a write that named every column would set `album_art = NULL` for
+every track anyone edits. So:
+
+- `Track.fromDTO` only creates a backing property for fields the DTO carried,
+  and `toDTO()` only emits fields that have one.
+- `dtoColumns()` / `upsertDtoSql(columns)` build a statement over exactly those.
+- Absent key ⇒ leave the column alone. Present-but-`undefined` ⇒ write `NULL`.
+  That is what still lets the tag editor clear a field, and why clearing
+  artwork seeds the stored value first (the setter ignores an assignment equal
+  to what it already holds, and a list-hydrated track holds nothing).
+
 ## Appearance settings
 
 `useAppearance` writes three things onto the document root, because they have
@@ -130,6 +175,34 @@ to reach `@layer tokens` which nothing renders:
 
 It is mounted in `AppContent`, above `useThemeApply` in `SettingsView`, so it
 runs *after* it on any commit that changes both. Don't move it deeper.
+
+## Window lifecycle & dev startup
+
+The main window is `frame: false` + `transparent: true` + `#00000000`, which
+means **a window that fails to load is not a broken window, it is no window at
+all** while the process stays alive. Everything here exists because that failure
+mode is invisible:
+
+- `show: false` + `ready-to-show`, so nothing is shown until there is something
+  to paint.
+- `did-fail-load` logs and retries the dev-server URL (20 × 250 ms), then loads
+  an inline error page **and shows it**. `render-process-gone` and
+  `unresponsive` log loudly. Before these, every one of those states looked
+  identical to "the app didn't start".
+- Both renderer configs bind `server: { host: '::' }`. Vite's default bound
+  IPv6-only while Forge freezes the literal `http://localhost:<port>` into the
+  main bundle at build time, so whether the window appeared came down to which
+  family Chromium tried — the origin of the "every other run" bug. `::` accepts
+  IPv4-mapped connections, so both spellings answer.
+
+Nothing used to quit the app: `window-all-closed` could never fire because the
+popover window is only ever hidden, never closed, and Forge's SIGINT handler
+exits without killing its Electron child. Every session leaked a live process
+holding the profile's leveldb locks. Now the main window's `closed` destroys the
+popover, `window-all-closed` quits on every platform, and
+`requestSingleInstanceLock()` makes a surviving orphan fail the next run loudly
+instead of colliding silently. `UIContext`'s `localStorage` reads are wrapped
+because that collision surfaced as a throw inside a `useState` initialiser.
 
 ## Track table layout
 
@@ -256,8 +329,7 @@ Every UI mutation animates in **and** out. Durations live in `tokens.css`
 use `--ease-emphasis` and exits `--ease-exit`, so arriving and leaving don't
 read the same. `--shift-sm` / `--shift-md` are the travel distances.
 
-Three mechanisms carry the structural transitions, because the obvious
-property is not animatable in any of these cases:
+Three mechanisms carry the structural transitions:
 
 - **Now playing slides up and down** off `--player-h`, a registered
   `@property` on `.app-player`. `display` and `flex: 1` cannot interpolate;
@@ -265,9 +337,10 @@ property is not animatable in any of these cases:
   the top of the window and back. `.app-main` is *not* `display: none` in
   player view any more — it fades and is squeezed by the growing player, which
   is what makes the growth watchable.
-- **The sidebar** collapses a `1fr` → `0fr` grid track. `width: auto` → `0`
-  does not interpolate; a grid track does. `.library-sidebar` keeps its own
-  inline width (the resize handle's output) and the track closes around it.
+- **The sidebar** animates the outer `.app-sidebar`'s `flex-basis` from its
+  persisted pixel width to `0`. `UIContext` exposes that width as
+  `--sidebar-w` on the shell; `.library-sidebar` keeps the fixed width while
+  the outer box clips it, so the contents slide out without reflowing.
 - **Anything that toggles `display`** — the four `.app-view`s, dialogs,
   popovers — pairs `transition-behavior: allow-discrete` with
   `@starting-style`. Without `allow-discrete` the outgoing element vanishes on
@@ -283,9 +356,9 @@ Two deliberate exceptions:
 
 `prefers-reduced-motion` is handled twice: the blanket rule in
 `components.css` flattens animations and transitions, and `tokens.css`
-additionally collapses the duration tokens themselves — rules that read a
-token directly, like `--player-h`'s transition, need the token to go to zero,
-not just their own `transition-duration`.
+additionally collapses the duration tokens themselves — rules that read one
+directly, like `--player-h` and the sidebar's `flex-basis`, need the token to
+go to zero, not just their own `transition-duration`.
 
 ## CSS conventions
 

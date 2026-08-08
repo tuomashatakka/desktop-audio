@@ -4,6 +4,7 @@ import type { Track, RepeatMode } from '../../contexts'
 import { Icon, IconButton, Button } from '../atomic'
 import { WaveformProgress } from '../atomic/WaveformProgress'
 import { useWindowScale } from '../../hooks'
+import { useArtwork } from '../../hooks/useArtwork'
 import { formatTime, isoDuration } from '../../utils/time'
 
 
@@ -27,6 +28,10 @@ type PlayerArtworkProps = {
 }
 
 function PlayerArtwork ({ track, onToggle }: PlayerArtworkProps) {
+  // Full resolution, not the list thumbnail — this is the largest the artwork
+  // is ever shown, and there is only ever one current track to pay for it.
+  const art = useArtwork(track?.id, 'full')
+
   return <figure className='player-art'>
     {/* Album art doubles as the compact/expanded window toggle, so the
           figure contains a real button rather than becoming clickable. */}
@@ -36,8 +41,8 @@ function PlayerArtwork ({ track, onToggle }: PlayerArtworkProps) {
       type='button'
       disabled={ !track }
       onClick={ onToggle }>
-      {track?.albumArt
-        ? <img src={ track.albumArt } alt='' />
+      {art
+        ? <img src={ art } alt='' />
         : <Icon className='art-fallback' name='music' />
       }
     </button>
@@ -167,14 +172,17 @@ export function Player () {
   // all rather than being hidden after the fact.
   const lyricsOpen = showLyrics && currentView === 'player'
 
+  // Shares the cache entry `PlayerArt` above already warmed for this track.
+  const currentArt = useArtwork(currentTrack?.id, 'full')
+
   return <article
     className='player-view'
     data-empty={ currentTrack ? undefined : '' }
     data-lyrics={ lyricsOpen ? '' : undefined }
     aria-label={ playerAriaLabel(currentTrack) }>
-    {currentTrack?.albumArt &&
+    {currentArt &&
         <div className='album-art-bg' aria-hidden='true'>
-          <img src={ currentTrack.albumArt } alt='' />
+          <img src={ currentArt } alt='' />
         </div>
     }
 

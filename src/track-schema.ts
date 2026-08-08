@@ -54,6 +54,21 @@ export const MTIME_COLUMN = 'mtime_ms'
 
 export const TRACK_COLUMN_NAMES = Object.keys(TRACK_COLUMNS)
 
+/**
+ * The one column never carried on a track-list row.
+ *
+ * Album art is stored as a base64 data URL, which on a real library runs to
+ * hundreds of megabytes (372 MB across 5991 rows here, single rows up to
+ * 2.4 MB). Streaming it inline put roughly twice that into the renderer's
+ * string heap on every scan, so the list ships without it and
+ * `library:artwork` fetches it per track instead.
+ */
+export const ARTWORK_COLUMN = 'album_art'
+
+/** Columns streamed to the renderer's track list. See {@link ARTWORK_COLUMN}. */
+export const LIST_COLUMN_NAMES = TRACK_COLUMN_NAMES.filter(name =>
+  name !== ARTWORK_COLUMN)
+
 /** `album_art` → `albumArt`. */
 export function toCamel (column: string): string {
   return column.replace(/_([a-z])/g, (_, c: string) =>
@@ -67,6 +82,9 @@ export function toSnake (field: string): string {
 }
 
 const CAMEL_BY_COLUMN = new Map(TRACK_COLUMN_NAMES.map(c =>
+  [ c, toCamel(c) ]))
+
+const CAMEL_BY_LIST_COLUMN = new Map(LIST_COLUMN_NAMES.map(c =>
   [ c, toCamel(c) ]))
 
 /** `CREATE TABLE` for a fresh database, including `mtime_ms`. */
@@ -130,29 +148,48 @@ export function upsertSql (): string {
 }
 
 /**
- * `INSERT … ON CONFLICT DO UPDATE` for renderer-originated writes (the tag
- * editor). Deliberately leaves `mtime_ms` alone: it still reflects the file
- * on disk, so the next scan sees "unchanged", serves the row from the DB, and
- * the user's edit survives instead of being re-parsed away.
+ * Which columns a renderer DTO actually speaks to.
+ *
+ * **A key that is absent means "leave this column alone"; an explicit `null`
+ * means "clear it".** That distinction is what keeps album art alive: list
+ * rows no longer carry `albumArt` at all (see {@link ARTWORK_COLUMN}), so a
+ * write that assumed every column was present would blank the artwork of every
+ * track anyone ever edited. Clearing a field is still expressible — the tag
+ * editor sends `null` for it.
  */
-export function upsertDtoSql (): string {
-  const assignments = TRACK_COLUMN_NAMES
+export function dtoColumns (dto: Record<string, unknown>): string[] {
+  return TRACK_COLUMN_NAMES.filter(column =>
+    Object.hasOwn(dto, CAMEL_BY_COLUMN.get(column)!))
+}
+
+/**
+ * `INSERT … ON CONFLICT DO UPDATE` for renderer-originated writes (the tag
+ * editor), over only the columns the DTO carries. Deliberately leaves
+ * `mtime_ms` alone: it still reflects the file on disk, so the next scan sees
+ * "unchanged", serves the row from the DB, and the user's edit survives
+ * instead of being re-parsed away.
+ */
+export function upsertDtoSql (columns: readonly string[] = TRACK_COLUMN_NAMES): string {
+  const assignments = columns
     .filter(name =>
       name !== 'id')
     .map(name =>
       `    ${name} = excluded.${name}`)
     .join(',\n')
 
-  return `INSERT INTO tracks (${TRACK_COLUMN_NAMES.join(', ')})
-  VALUES (${TRACK_COLUMN_NAMES.map(n =>
+  return `INSERT INTO tracks (${columns.join(', ')})
+  VALUES (${columns.map(n =>
     `@${n}`).join(', ')})
   ON CONFLICT(id) DO UPDATE SET\n${assignments}`
 }
 
-/** DB row → renderer DTO: camelCase keys, `null` collapsed to `undefined`. */
-export function rowToDto (row: Record<string, unknown>): Record<string, unknown> {
+/** Shared snake→camel projection; see {@link rowToDto} / {@link rowToListDto}. */
+function mapRow (
+  row: Record<string, unknown>,
+  columns: Map<string, string>
+): Record<string, unknown> {
   const dto: Record<string, unknown> = {}
-  for (const [ column, field ] of CAMEL_BY_COLUMN) {
+  for (const [ column, field ] of columns) {
     const value = row[column]
     if (value !== null && value !== undefined)
       dto[field] = value
@@ -160,10 +197,23 @@ export function rowToDto (row: Record<string, unknown>): Record<string, unknown>
   return dto
 }
 
+/** DB row → renderer DTO: camelCase keys, `null` collapsed to `undefined`. */
+export function rowToDto (row: Record<string, unknown>): Record<string, unknown> {
+  return mapRow(row, CAMEL_BY_COLUMN)
+}
+
+/** As {@link rowToDto}, minus {@link ARTWORK_COLUMN}. Used for every list row. */
+export function rowToListDto (row: Record<string, unknown>): Record<string, unknown> {
+  return mapRow(row, CAMEL_BY_LIST_COLUMN)
+}
+
 /** Renderer DTO → bound statement parameters; missing fields bind as `null`. */
-export function dtoToParams (dto: Record<string, unknown>): Record<string, unknown> {
+export function dtoToParams (
+  dto: Record<string, unknown>,
+  columns: readonly string[] = TRACK_COLUMN_NAMES
+): Record<string, unknown> {
   const params: Record<string, unknown> = {}
-  for (const [ column, field ] of CAMEL_BY_COLUMN)
-    params[column] = dto[field] ?? null
+  for (const column of columns)
+    params[column] = dto[CAMEL_BY_COLUMN.get(column)!] ?? null
   return params
 }
