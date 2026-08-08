@@ -425,6 +425,7 @@ function TrackGroup ({
     return <section
       className='track-group album'
       data-collapsed={ collapsed || undefined }
+      data-group-key={ group.key }
       aria-labelledby={ headingId }>
       <AlbumArt src={ group.tracks[0].albumArt } color={ group.tracks[0].coverColor } />
 
@@ -443,6 +444,7 @@ function TrackGroup ({
     return <section
       className='track-group'
       data-collapsed={ collapsed || undefined }
+      data-group-key={ group.key }
       aria-label={ group.key }>
       <header>
         {toggle}
@@ -463,6 +465,7 @@ function TrackGroup ({
   return <section
     className='track-group'
     data-collapsed={ collapsed || undefined }
+    data-group-key={ group.key }
     aria-labelledby={ headingId }>
     <header>
       {toggle}
@@ -472,6 +475,13 @@ function TrackGroup ({
 
     {body}
   </section>
+}
+
+/** A track's position in the globally sorted list; `fallback` when missing. */
+function indexOfTrack (sorted: readonly Track[], track: Track, fallback = 0): number {
+  const index = sorted.findIndex(candidate =>
+    candidate.id === track.id)
+  return index >= 0 ? index : fallback
 }
 
 /** Buckets an already-sorted list into labelled groups; empty when ungrouped. */
@@ -563,6 +573,31 @@ export function TrackTable ({
   const flat           = grouping === 'none' || showSkeleton
   const tableSemantics = flat
 
+  /**
+   * Row ids in the order they are actually rendered, and the group each one
+   * sits in.
+   *
+   * Grouped views render group by group, but a row's *index* is its position
+   * in the globally sorted list, so it can display a stable row number. Arrow
+   * keys used to step through those global indices, which in a grouped view
+   * jumps to whatever row happens to hold the adjacent number rather than the
+   * row below. Navigation walks this list instead.
+   */
+  const visibleRows = useMemo(() => {
+    if (flat)
+      return sorted.map((track, index) =>
+        ({ index, groupKey: null as string | null }))
+
+    const rows: { index: number; groupKey: string | null }[] = []
+    for (const group of groups) {
+      if (collapsedGroups.has(group.key))
+        continue
+      for (const track of group.tracks)
+        rows.push({ index: indexOfTrack(sorted, track), groupKey: group.key })
+    }
+    return rows
+  }, [ flat, sorted, groups, collapsedGroups ])
+
   const virtualizer = useVirtualizer({
     count:            showSkeleton ? SKELETON_ROW_COUNT : flat ? sorted.length : 0,
     getScrollElement: () =>
@@ -586,18 +621,56 @@ export function TrackTable ({
       currentIndex >= 0 ? currentIndex : Math.min(index, Math.max(0, sorted.length - 1)))
   }, [ currentTrack?.id, sorted ])
 
-  const moveRowFocus = useCallback((index: number) => {
-    const nextIndex = Math.max(0, Math.min(index, sorted.length - 1))
-    setFocusedIndex(nextIndex)
+  /** Focus the row at `position` in the rendered order. */
+  const focusRowAt = useCallback((position: number) => {
+    const clamped = Math.max(0, Math.min(position, visibleRows.length - 1))
+    const target  = visibleRows[clamped]
+    if (!target)
+      return
+
+    setFocusedIndex(target.index)
     if (flat)
-      virtualizer.scrollToIndex(nextIndex, { align: 'auto' })
+      virtualizer.scrollToIndex(target.index, { align: 'auto' })
 
     window.requestAnimationFrame(() => {
       scrollRef.current
-        ?.querySelector<HTMLElement>(`[data-track-index='${nextIndex}']`)
+        ?.querySelector<HTMLElement>(`[data-track-index='${target.index}']`)
         ?.focus()
     })
-  }, [ flat, sorted.length, virtualizer ])
+  }, [ flat, visibleRows, virtualizer ])
+
+  /** Step `delta` rows through the rendered order from the row at `index`. */
+  const moveRowFocus = useCallback((index: number, delta: number) => {
+    const position = visibleRows.findIndex(row =>
+      row.index === index)
+    focusRowAt((position < 0 ? 0 : position) + delta)
+  }, [ visibleRows, focusRowAt ])
+
+  /** The group a rendered row belongs to; `null` in a flat list. */
+  const groupKeyOf = useCallback((index: number) =>
+    visibleRows.find(row =>
+      row.index === index)?.groupKey ?? null, [ visibleRows ])
+
+  /** Collapse the row's group and move focus to its heading toggle. */
+  const collapseGroupOf = useCallback((index: number) => {
+    const key = groupKeyOf(index)
+    if (key === null || collapsedGroups.has(key))
+      return
+
+    toggleGroup(key, false)
+    window.requestAnimationFrame(() => {
+      scrollRef.current
+        ?.querySelector<HTMLElement>(`[data-group-key='${CSS.escape(key)}'] .group-toggle`)
+        ?.focus()
+    })
+  }, [ groupKeyOf, collapsedGroups, toggleGroup ])
+
+  /** Expand the row's group; a row is only reachable when it is open already. */
+  const expandGroupOf = useCallback((index: number) => {
+    const key = groupKeyOf(index)
+    if (key !== null && collapsedGroups.has(key))
+      toggleGroup(key, false)
+  }, [ groupKeyOf, collapsedGroups, toggleGroup ])
 
   const renderRow = useCallback((track: Track, index: number, rowStyle?: React.CSSProperties) => {
     const active   = currentTrack?.id === track.id
@@ -617,21 +690,21 @@ export function TrackTable ({
         return
       }
 
-      const nextIndex = event.key === 'ArrowDown'
-        ? index + 1
-        : event.key === 'ArrowUp'
-          ? index - 1
-          : event.key === 'Home'
-            ? 0
-            : event.key === 'End'
-              ? sorted.length - 1
-              : null
-      if (nextIndex === null)
-        return
+      switch (event.key) {
+        case 'ArrowDown': moveRowFocus(index, 1); break
+        case 'ArrowUp': moveRowFocus(index, -1); break
+        case 'Home': focusRowAt(0); break
+        case 'End': focusRowAt(Number.MAX_SAFE_INTEGER); break
+        // Left/Right mirror the sidebar tree: Right opens the group this row
+        // belongs to, Left closes it and moves focus up to its heading. Both
+        // are no-ops in a flat list, which has no parent to close.
+        case 'ArrowLeft': collapseGroupOf(index); break
+        case 'ArrowRight': expandGroupOf(index); break
+        default: return
+      }
 
       event.preventDefault()
       event.stopPropagation()
-      moveRowFocus(nextIndex)
     }
     const cells = visible.map(col =>
       <span
@@ -677,7 +750,7 @@ export function TrackTable ({
       onKeyDown={ handleKeyDown }>
       {cells}
     </div>
-  }, [ tableSemantics, visible, density, currentTrack, isPlaying, onPlay, onContextMenu, focusedIndex, moveRowFocus, sorted.length ])
+  }, [ tableSemantics, visible, density, currentTrack, isPlaying, onPlay, onContextMenu, focusedIndex, moveRowFocus, focusRowAt, collapseGroupOf, expandGroupOf ])
 
   // Keep the playing track in view (flat list only — grouped views aren't
   // virtualized, so the virtualizer has no offsets to scroll to).
@@ -692,11 +765,8 @@ export function TrackTable ({
   }, [ currentTrack?.id, flat, showSkeleton, sorted, virtualizer ])
 
   /** Row index within the full sorted list, so numbering survives grouping. */
-  const indexOf = useCallback((track: Track, fallback: number) => {
-    const i = sorted.findIndex(x =>
-      x.id === track.id)
-    return i >= 0 ? i : fallback
-  }, [ sorted ])
+  const indexOf = useCallback((track: Track, fallback: number) =>
+    indexOfTrack(sorted, track, fallback), [ sorted ])
 
   const bodyRowCount = showSkeleton ? SKELETON_ROW_COUNT : sorted.length
 

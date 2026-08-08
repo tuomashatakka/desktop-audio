@@ -136,17 +136,48 @@
     --radius-lg: 2px;
     --radius-full: 9999px;
     --control-radius: 999px;
+
+    /* structural sizes — read by both the stylesheet and the height tiers */
     --titlebar-h: 40px;
+    --player-bar-h: 72px;
+    --track-head-h: 34px;
+    --sidebar-w-min: 180px;
+    --sidebar-w-max: 400px;
+    --settings-nav-w: 200px;
+    --titlebar-btn-w: 46px;
+    --album-art-lg: 96px;
+    --album-art-sm: 40px;
+    --art-blur: 60px;
+
+    /* z-index scale, so a new layer is a token and not a guess */
+    --z-raised: 1;
+    --z-sticky: 2;
+    --z-handle: 10;
+    --z-player: 5;
+    --z-popover: 150;
+    --z-ambient: 1000000;
 
     --shadow-lg: 0 1px 0 rgb(255 255 255 / 5%) inset, 0 12px 32px rgb(0 0 0 / 50%);
     --shadow-card: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 32px 80px rgb(0 0 0 / 70%);
     --accent-glow: 0 0 0 1px var(--accent-muted), 0 0 32px color-mix(in srgb, var(--accent) 25%, transparent);
     --focus-ring: 0 0 0 2px var(--border-focus);
 
+    /*
+     * Motion. `--ease` stays symmetric for hover and colour changes; enters
+     * decelerate hard (`--ease-emphasis`) and exits accelerate away
+     * (`--ease-exit`), so a thing arriving and a thing leaving don't read the
+     * same.
+     */
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
-    --duration-fast: 0ms;
-    --duration: 0ms;
-    --duration-slow: 300ms;
+    --ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --duration-fast: 180ms;
+    --duration: 260ms;
+    --duration-slow: 420ms;
+
+    /* travel distances for enter/exit transforms */
+    --shift-sm: 6px;
+    --shift-md: 12px;
 
     --wf-unplayed: rgb(255 255 255 / 15%);
     --wf-played: var(--accent);
@@ -168,4 +199,31 @@
     --wf-unplayed: rgb(0 0 0 / 13%);
     --shell-wash: rgb(0 0 0 / 4%);
   }
+
+  /*
+   * Flatten motion at the token level as well as with the blanket rule in
+   * components.css. Rules that read a duration token directly — the player's
+   * `--player-h` growth, the sidebar's grid track — need the token itself to
+   * collapse, not just their own `transition-duration`.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --duration-fast: 1ms;
+      --duration: 1ms;
+      --duration-slow: 1ms;
+      --shift-sm: 0px;
+      --shift-md: 0px;
+    }
+  }
+}
+
+/*
+ * The player's height is animated, so it has to be a registered property:
+ * an unregistered custom property has no type and cannot be interpolated.
+ * Same reason the ambient colours above are registered.
+ */
+@property --player-h {
+  syntax: '<length-percentage>';
+  inherits: false;
+  initial-value: 72px;
 }

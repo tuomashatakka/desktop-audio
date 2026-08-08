@@ -137,7 +137,7 @@ runs *after* it on any commit that changes both. Don't move it deeper.
 that stays put is `position: sticky` inside it:
 
 - `.track-header` pins at `top: 0`; its row height is fixed to `--head-h`
-  (34px) so group headers can pin at `top: var(--head-h)`.
+  (`--track-head-h`) so group headers can pin at `top: var(--head-h)`.
 - The flat list is virtualized (absolutely positioned rows inside a spacer);
   grouped views render in full.
 - Ancestors (`.app-main`, `.view-content`) are `overflow: hidden` for views
@@ -147,7 +147,39 @@ that stays put is `position: sticky` inside it:
   button next to the heading, keyed by group in a `collapsedGroups` set — not
   `<details>`. Album groups put artwork outside the heading and path groups put
   an interactive breadcrumb trail inside it, and neither survives a
-  `<summary>`. A collapsed group renders no rows at all.
+  `<summary>`. A collapsed group renders no rows at all, which is also why its
+  collapse cannot animate (see Motion) and why it drops out of the keyboard
+  navigation order.
+- `data-group-key` on each group section is what ArrowLeft uses to find the
+  heading to move focus to.
+
+## Keyboard browsing
+
+Arrow keys act on whatever pane holds focus — there is no global arrow router,
+and there shouldn't be one. Each pane handles its own keys, so "sidebar or
+list?" answers itself.
+
+**Sidebar** (`FolderTree` + `useTreeNavigation`) is the WAI-ARIA tree pattern:
+`role="tree"` / `role="treeitem"`, one tab stop, exactly one row at
+`tabIndex={0}`. Up/Down walk the *visible* nodes (a collapsed branch
+contributes none), Right opens a closed node and descends into an open one,
+Left closes an open node and climbs to the parent from a closed one or a leaf,
+Home/End jump. It renders **flat**, not recursively: the hook already flattens
+the visible nodes to do index arithmetic, and reusing that list is what
+guarantees DOM order matches traversal order. Depth is `--level`, not nesting.
+The chevron is a decorative `<span>` — `aria-expanded` lives on the treeitem,
+so a nested button would be a second interactive node for the same job.
+
+**Track list** navigates `visibleRows`, the ids in *render* order, not the
+global sorted index. A row's index is its position in the sorted list so its
+row number stays stable, but grouped views render group by group — stepping
+through global indices jumped to whatever row held the adjacent number rather
+than the row below. Left/Right mirror the tree: Right opens the row's group,
+Left closes it and moves focus to its heading toggle. Both are no-ops in a
+flat list, which has no parent to close.
+
+Bare arrows are safe to claim: `src/keybindings/defaults.ts` only ever binds
+`mod+arrow*`.
 
 ## Ambient wash
 
@@ -217,12 +249,56 @@ The footer bar has **no volume slider** — the system volume and the full playe
 both already own that, and the width is better spent on the progress bar. The
 `.player-volume` element still renders; the bar-mode rules hide it.
 
-## Instant interaction and waveform rendering
+## Motion
 
-Interactive state changes do not wait for transitions: `--duration-fast` and
-`--duration` are zero, view changes are ordinary React state updates, and the
-sidebar changes width immediately. The slow token remains reserved for
-non-blocking feedback such as the loading spinner and ambient album-art wash.
+Every UI mutation animates in **and** out. Durations live in `tokens.css`
+(`--duration-fast` 180ms, `--duration` 260ms, `--duration-slow` 420ms); enters
+use `--ease-emphasis` and exits `--ease-exit`, so arriving and leaving don't
+read the same. `--shift-sm` / `--shift-md` are the travel distances.
+
+Three mechanisms carry the structural transitions, because the obvious
+property is not animatable in any of these cases:
+
+- **Now playing slides up and down** off `--player-h`, a registered
+  `@property` on `.app-player`. `display` and `flex: 1` cannot interpolate;
+  a registered length-percentage can, so the footer bar's top edge travels to
+  the top of the window and back. `.app-main` is *not* `display: none` in
+  player view any more — it fades and is squeezed by the growing player, which
+  is what makes the growth watchable.
+- **The sidebar** collapses a `1fr` → `0fr` grid track. `width: auto` → `0`
+  does not interpolate; a grid track does. `.library-sidebar` keeps its own
+  inline width (the resize handle's output) and the track closes around it.
+- **Anything that toggles `display`** — the four `.app-view`s, dialogs,
+  popovers — pairs `transition-behavior: allow-discrete` with
+  `@starting-style`. Without `allow-discrete` the outgoing element vanishes on
+  frame one and only the enter would animate.
+
+Two deliberate exceptions:
+
+- **Track rows animate colour only.** They are virtualized and re-keyed on
+  every scroll tick, so an enter animation would fire on each wheel movement.
+- **Group collapse is asymmetric.** A collapsed group unmounts its rows
+  outright (a few hundred DOM nodes instead of a few thousand), so only
+  expansion can animate; the chevron carries the collapse.
+
+`prefers-reduced-motion` is handled twice: the blanket rule in
+`components.css` flattens animations and transitions, and `tokens.css`
+additionally collapses the duration tokens themselves — rules that read a
+token directly, like `--player-h`'s transition, need the token to go to zero,
+not just their own `transition-duration`.
+
+## CSS conventions
+
+Stylesheets use **native CSS nesting** (no PostCSS in this project; Electron's
+Chromium supports it), one top-level block per component with `&`-nested
+variants, states and descendants. No BEM. Every length, duration, colour and
+z-index resolves to a token — including the structural ones
+(`--player-bar-h`, `--track-head-h`, `--settings-nav-w`, `--album-art-lg`,
+the `--z-*` scale). Media-query breakpoints are the exception: they cannot
+read custom properties, so each file collects them at the end with a comment
+naming what the breakpoint is for.
+
+## Waveform rendering
 
 `WaveformProgress` renders amplitudes as one memoized SVG path. The path is
 painted once as unplayed and once through an SVG clip as played; a transparent

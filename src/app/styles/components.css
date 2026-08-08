@@ -1,9 +1,9 @@
 @layer components {
   svg.icon {
     display: block;
+    flex: 0 0 auto;
     width: 1em;
     height: 1em;
-    flex: 0 0 auto;
   }
 
   .button {
@@ -22,21 +22,43 @@
       color var(--duration-fast) var(--ease),
       background-color var(--duration-fast) var(--ease),
       border-color var(--duration-fast) var(--ease),
-      box-shadow var(--duration-fast) var(--ease);
+      box-shadow var(--duration-fast) var(--ease),
+      transform var(--duration-fast) var(--ease-emphasis);
+
+    &:disabled { cursor: not-allowed; opacity: 0.5; }
+
+    /* Presses read as a press; the release springs back on the emphasis curve. */
+    &:active:not(:disabled) { transform: scale(0.97); }
+
+    &.primary {
+      color: var(--accent-contrast);
+      background: var(--accent);
+
+      &:hover:not(:disabled) { background: var(--accent-hover); box-shadow: var(--accent-glow); }
+    }
+
+    &.secondary {
+      border-color: var(--border);
+      color: var(--text);
+      background: var(--bg-raised);
+
+      &:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--border-hover); }
+    }
+
+    &.ghost { color: var(--text-dim); background: transparent; }
+
+    &.ghost:hover:not(:disabled),
+    &.icon:not(.primary):hover:not(:disabled) { color: var(--text); background: var(--bg-hover); }
+
+    &.sm { padding: var(--sp-1) var(--sp-2); font-size: var(--text-sm); }
+    &.icon { padding: var(--sp-2); aspect-ratio: 1; }
+    &.icon.sm { padding: var(--sp-1); }
   }
 
-  .button:disabled { cursor: not-allowed; opacity: 0.5; }
-  .button.primary { color: var(--accent-contrast); background: var(--accent); }
-  .button.primary:hover:not(:disabled) { background: var(--accent-hover); box-shadow: var(--accent-glow); }
-  .button.secondary { color: var(--text); background: var(--bg-raised); border-color: var(--border); }
-  .button.secondary:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--border-hover); }
-  .button.ghost { color: var(--text-dim); background: transparent; }
-  .button.ghost:hover:not(:disabled),
-  .button.icon:not(.primary):hover:not(:disabled) { color: var(--text); background: var(--bg-hover); }
-  .button.sm { padding: var(--sp-1) var(--sp-2); font-size: var(--text-sm); }
-  .button.icon { padding: var(--sp-2); aspect-ratio: 1; }
-  .button.icon.sm { padding: var(--sp-1); }
-
+  /*
+   * `[type]`-less inputs only: checkboxes, radios, ranges, colour swatches and
+   * file pickers keep their native box.
+   */
   input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='hidden']),
   select {
     width: 100%;
@@ -46,25 +68,38 @@
     color: var(--text);
     background: var(--bg-input);
     font-size: var(--text-base);
-    transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
-  }
+    transition:
+      border-color var(--duration-fast) var(--ease),
+      background-color var(--duration-fast) var(--ease),
+      box-shadow var(--duration-fast) var(--ease);
 
-  :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='hidden']), select):disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
+    &:disabled { cursor: not-allowed; opacity: 0.5; }
+
+    &:focus {
+      outline: 0;
+      border-color: var(--border-focus);
+      box-shadow: var(--focus-ring);
+    }
   }
 
   input::placeholder { color: var(--text-muted); }
-  :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='hidden']), select):focus {
-    outline: 0;
-    border-color: var(--border-focus);
-    box-shadow: var(--focus-ring);
-  }
 
-  .field { display: block; }
-  .field > span:first-child { display: block; margin-bottom: var(--sp-1); color: var(--text-dim); font-size: var(--text-sm); font-weight: var(--font-medium); }
-  .field.error :is(input, select) { border-color: var(--danger); }
-  .field.error small { color: var(--danger); }
+  .field {
+    display: block;
+
+    > span:first-child {
+      display: block;
+      margin-bottom: var(--sp-1);
+      color: var(--text-dim);
+      font-size: var(--text-sm);
+      font-weight: var(--font-medium);
+    }
+
+    &.error {
+      :is(input, select) { border-color: var(--danger); }
+      small { color: var(--danger); }
+    }
+  }
 
   .slider {
     width: 100%;
@@ -73,20 +108,22 @@
     outline: 0;
     appearance: none;
     background: var(--bg-hover);
-  }
 
-  .slider::-webkit-slider-thumb {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    appearance: none;
-    background: var(--accent);
-    cursor: pointer;
-    transition: transform var(--duration-fast) var(--ease);
-  }
+    &::-webkit-slider-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      appearance: none;
+      background: var(--accent);
+      cursor: pointer;
+      transition:
+        transform var(--duration-fast) var(--ease-emphasis),
+        box-shadow var(--duration-fast) var(--ease);
+    }
 
-  .slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
-  .slider:focus::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--accent-muted); }
+    &::-webkit-slider-thumb:hover { transform: scale(1.2); }
+    &:focus::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--accent-muted); }
+  }
 
   .skeleton {
     border-radius: var(--radius);
@@ -103,17 +140,66 @@
     box-shadow: var(--shadow-lg);
   }
 
+  /*
+   * Dialogs and popovers animate closed as well as open. `@starting-style`
+   * supplies the pre-open frame; `transition-behavior: allow-discrete` on
+   * `display` and `overlay` keeps the element painted in the top layer for
+   * the length of the exit instead of snapping away on the first frame.
+   */
   .dialog-panel {
     width: min(calc(100vw - var(--sp-8)), 480px);
     margin: auto;
     padding: 0;
     overflow: hidden;
-    animation: surface-in var(--duration-fast) var(--ease);
+    opacity: 0;
+    translate: 0 calc(-1 * var(--shift-md));
+    scale: 0.97;
+    transition:
+      opacity var(--duration) var(--ease-exit),
+      translate var(--duration) var(--ease-exit),
+      scale var(--duration) var(--ease-exit),
+      overlay var(--duration) allow-discrete,
+      display var(--duration) allow-discrete;
+
+    &[open] {
+      opacity: 1;
+      translate: 0 0;
+      scale: 1;
+      transition-timing-function: var(--ease-emphasis);
+
+      @starting-style {
+        opacity: 0;
+        translate: 0 calc(-1 * var(--shift-md));
+        scale: 0.97;
+      }
+    }
+
+    &::backdrop {
+      background: var(--overlay);
+      opacity: 0;
+      transition:
+        opacity var(--duration) var(--ease),
+        overlay var(--duration) allow-discrete,
+        display var(--duration) allow-discrete;
+    }
+
+    &[open]::backdrop {
+      opacity: 1;
+
+      @starting-style { opacity: 0; }
+    }
   }
 
-  .dialog-panel::backdrop { background: var(--overlay); animation: fade-in var(--duration-fast) var(--ease); }
-  .dialog-header { display: grid; grid-template-columns: 1fr auto; align-items: center; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); }
-  .dialog-header h2 { font-size: var(--text-base); font-weight: var(--font-semibold); }
+  .dialog-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    padding: var(--sp-3) var(--sp-4);
+    border-bottom: 1px solid var(--border);
+
+    h2 { font-size: var(--text-base); font-weight: var(--font-semibold); }
+  }
+
   .dialog-body { padding: var(--sp-4); }
   .prompt-form { display: grid; gap: var(--sp-4); }
 
@@ -122,44 +208,72 @@
     inset: auto;
     top: anchor(bottom);
     right: anchor(right);
-    z-index: 150;
+    z-index: var(--z-popover);
     min-width: 160px;
     max-width: calc(100vw - var(--sp-6));
     max-height: calc(100vh - var(--sp-6));
     margin-block-start: var(--sp-1);
     overflow: auto;
+    opacity: 0;
+    translate: 0 calc(-1 * var(--shift-sm));
+    scale: 0.97;
     position-try-fallbacks: flip-block, flip-inline;
-    animation: surface-in var(--duration-fast) var(--ease);
-  }
+    transition:
+      opacity var(--duration-fast) var(--ease-exit),
+      translate var(--duration-fast) var(--ease-exit),
+      scale var(--duration-fast) var(--ease-exit),
+      overlay var(--duration-fast) allow-discrete,
+      display var(--duration-fast) allow-discrete;
 
-  .popover-panel::before {
-    content: '';
-    position: absolute;
-    top: -6px;
-    right: 14px;
-    width: 10px;
-    height: 10px;
-    border-top: 1px solid var(--border);
-    border-left: 1px solid var(--border);
-    background: var(--bg-raised);
-    transform: rotate(45deg);
-  }
+    &:popover-open {
+      opacity: 1;
+      translate: 0 0;
+      scale: 1;
+      transition-timing-function: var(--ease-emphasis);
 
-  .popover-panel.at-point {
-    right: auto;
-    bottom: auto;
-    margin: 0;
-    position-try-fallbacks: none;
-  }
+      @starting-style {
+        opacity: 0;
+        translate: 0 calc(-1 * var(--shift-sm));
+        scale: 0.97;
+      }
+    }
 
-  .popover-panel.at-point::before { display: none; }
-  .popover-panel.placement-top { top: auto; bottom: anchor(top); margin-block: 0 var(--sp-1); }
-  .popover-panel.placement-top::before {
-    top: auto;
-    bottom: -6px;
-    border: 0;
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+    &::before {
+      content: '';
+      position: absolute;
+      top: -6px;
+      right: 14px;
+      width: 10px;
+      height: 10px;
+      border-top: 1px solid var(--border);
+      border-left: 1px solid var(--border);
+      background: var(--bg-raised);
+      transform: rotate(45deg);
+    }
+
+    &.at-point {
+      right: auto;
+      bottom: auto;
+      margin: 0;
+      position-try-fallbacks: none;
+
+      &::before { display: none; }
+    }
+
+    &.placement-top {
+      top: auto;
+      bottom: anchor(top);
+      margin-block: 0 var(--sp-1);
+      translate: 0 var(--shift-sm);
+
+      &::before {
+        top: auto;
+        bottom: -6px;
+        border: 0;
+        border-right: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+    }
   }
 
   /*
@@ -172,6 +286,7 @@
    * document's root by `ContextMenuApp`.
    */
   #context-menu-root { height: 100%; }
+
   .context-menu-window {
     position: relative;
     isolation: isolate;
@@ -181,11 +296,14 @@
     border-radius: var(--radius-lg);
     background: var(--bg-raised);
     box-shadow: var(--shadow-lg);
+    animation: surface-in var(--duration-fast) var(--ease-emphasis);
+
+    .context-menu-list { position: relative; z-index: var(--z-raised); }
   }
 
-  .context-menu-window .context-menu-list { position: relative; z-index: 1; }
   .context-menu-dismiss { position: fixed; inset: 0; z-index: 0; }
   .context-menu-list { padding-block: var(--sp-1); }
+
   .context-menu-item {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
@@ -196,12 +314,19 @@
     color: var(--text-dim);
     font-size: var(--text-sm);
     text-align: start;
-    transition: color var(--duration-fast) var(--ease), background-color var(--duration-fast) var(--ease);
+    transition:
+      color var(--duration-fast) var(--ease),
+      background-color var(--duration-fast) var(--ease);
+
+    &:hover { color: var(--text); background: var(--bg-hover); }
+
+    &.danger {
+      color: var(--danger);
+
+      &:hover { background: var(--danger-muted); }
+    }
   }
 
-  .context-menu-item:hover { color: var(--text); background: var(--bg-hover); }
-  .context-menu-item.danger { color: var(--danger); }
-  .context-menu-item.danger:hover { background: var(--danger-muted); }
   .context-menu-icon { font-size: var(--text-base); opacity: 0.7; }
   .context-menu-separator { height: 1px; margin-block: var(--sp-1); background: var(--border); }
 
