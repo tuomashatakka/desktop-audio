@@ -217,12 +217,56 @@ The footer bar has **no volume slider** — the system volume and the full playe
 both already own that, and the width is better spent on the progress bar. The
 `.player-volume` element still renders; the bar-mode rules hide it.
 
-## Instant interaction and waveform rendering
+## Motion
 
-Interactive state changes do not wait for transitions: `--duration-fast` and
-`--duration` are zero, view changes are ordinary React state updates, and the
-sidebar changes width immediately. The slow token remains reserved for
-non-blocking feedback such as the loading spinner and ambient album-art wash.
+Every UI mutation animates in **and** out. Durations live in `tokens.css`
+(`--duration-fast` 180ms, `--duration` 260ms, `--duration-slow` 420ms); enters
+use `--ease-emphasis` and exits `--ease-exit`, so arriving and leaving don't
+read the same. `--shift-sm` / `--shift-md` are the travel distances.
+
+Three mechanisms carry the structural transitions, because the obvious
+property is not animatable in any of these cases:
+
+- **Now playing slides up and down** off `--player-h`, a registered
+  `@property` on `.app-player`. `display` and `flex: 1` cannot interpolate;
+  a registered length-percentage can, so the footer bar's top edge travels to
+  the top of the window and back. `.app-main` is *not* `display: none` in
+  player view any more — it fades and is squeezed by the growing player, which
+  is what makes the growth watchable.
+- **The sidebar** collapses a `1fr` → `0fr` grid track. `width: auto` → `0`
+  does not interpolate; a grid track does. `.library-sidebar` keeps its own
+  inline width (the resize handle's output) and the track closes around it.
+- **Anything that toggles `display`** — the four `.app-view`s, dialogs,
+  popovers — pairs `transition-behavior: allow-discrete` with
+  `@starting-style`. Without `allow-discrete` the outgoing element vanishes on
+  frame one and only the enter would animate.
+
+Two deliberate exceptions:
+
+- **Track rows animate colour only.** They are virtualized and re-keyed on
+  every scroll tick, so an enter animation would fire on each wheel movement.
+- **Group collapse is asymmetric.** A collapsed group unmounts its rows
+  outright (a few hundred DOM nodes instead of a few thousand), so only
+  expansion can animate; the chevron carries the collapse.
+
+`prefers-reduced-motion` is handled twice: the blanket rule in
+`components.css` flattens animations and transitions, and `tokens.css`
+additionally collapses the duration tokens themselves — rules that read a
+token directly, like `--player-h`'s transition, need the token to go to zero,
+not just their own `transition-duration`.
+
+## CSS conventions
+
+Stylesheets use **native CSS nesting** (no PostCSS in this project; Electron's
+Chromium supports it), one top-level block per component with `&`-nested
+variants, states and descendants. No BEM. Every length, duration, colour and
+z-index resolves to a token — including the structural ones
+(`--player-bar-h`, `--track-head-h`, `--settings-nav-w`, `--album-art-lg`,
+the `--z-*` scale). Media-query breakpoints are the exception: they cannot
+read custom properties, so each file collects them at the end with a comment
+naming what the breakpoint is for.
+
+## Waveform rendering
 
 `WaveformProgress` renders amplitudes as one memoized SVG path. The path is
 painted once as unplayed and once through an SVG clip as played; a transparent

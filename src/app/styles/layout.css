@@ -1,4 +1,15 @@
-/* shell, persistent view slots, window chrome, sidebar, and player */
+/*
+ * Shell, persistent view slots, window chrome, sidebar, and player.
+ *
+ * Two attributes on `.app-shell` decide the whole layout: `data-view` (which
+ * route is active) and `data-height-tier` (how much vertical room there is).
+ * Nothing here is shown or hidden from JS.
+ *
+ * Motion: every state change animates in *and* out. The three mechanisms are
+ * a registered `--player-h` for the player's growth, a `0fr`/`1fr` grid track
+ * for the sidebar, and `transition-behavior: allow-discrete` plus
+ * `@starting-style` for anything that toggles `display`.
+ */
 
 .app-shell {
   display: flex;
@@ -9,67 +20,145 @@
   background: linear-gradient(135deg, transparent 80%, var(--shell-wash));
 }
 
-.app-workspace { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
-.app-content { display: flex; flex: 1; flex-direction: column; min-width: 0; overflow: hidden; }
-.app-main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
-.app-player { min-width: 0; overflow: hidden; }
-
-.app-sidebar {
+.app-workspace {
   display: flex;
-  flex-shrink: 0;
-  align-self: stretch;
-  width: auto;
-  height: 100%;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
-.app-shell:not([data-sidebar-open]) .app-sidebar { width: 0; opacity: 0; }
+.app-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
 
-/* Every primary view stays mounted; the shell attribute only changes layout. */
-.app-view { display: none; flex: 1; min-width: 0; min-height: 0; }
+.app-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  transition:
+    opacity var(--duration) var(--ease-exit),
+    translate var(--duration) var(--ease-exit);
+
+  /*
+   * Not `display: none` — the player growing over it has to be watchable.
+   * `.app-content` already clips, so the squeezed remainder never spills.
+   */
+  .app-shell[data-view='player'] & {
+    opacity: 0;
+    translate: 0 calc(-1 * var(--shift-md));
+    pointer-events: none;
+  }
+}
+
+/*
+ * The player's height *is* the now-playing transition. `--player-h` is a
+ * registered property (see tokens.css), so it interpolates: the footer bar's
+ * top edge slides up to the top of the window and back down again, with no
+ * JS and no remount.
+ */
+.app-player {
+  flex: 0 0 var(--player-h);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  transition: --player-h var(--duration) var(--ease-emphasis);
+
+  .app-shell[data-height-tier='normal']:not([data-view='player']) & {
+    --player-h: var(--player-bar-h);
+  }
+
+  /* Nothing playing: the bar retracts instead of blinking out. */
+  .app-shell[data-height-tier='normal']:not([data-view='player']) &:has(.player-view[data-empty]) {
+    --player-h: 0px;
+  }
+
+  .app-shell[data-view='player'] &,
+  .app-shell:is([data-height-tier='snug'], [data-height-tier='compact'], [data-height-tier='mini']) & {
+    --player-h: 100%;
+  }
+}
+
+/*
+ * A `0fr` track collapses to nothing and interpolates on the way; `width:
+ * auto` → `width: 0` does not. The inner sidebar keeps its own inline width
+ * (the resize handle's output) and the track closes around it.
+ */
+.app-sidebar {
+  display: grid;
+  flex-shrink: 0;
+  grid-template-columns: 1fr;
+  align-self: stretch;
+  height: 100%;
+  overflow: hidden;
+  opacity: 1;
+  transition:
+    grid-template-columns var(--duration) var(--ease-emphasis),
+    opacity var(--duration-fast) var(--ease);
+
+  > * { min-width: 0; overflow: hidden; }
+
+  .app-shell:not([data-sidebar-open]) &,
+  .app-shell[data-view='player'] & {
+    grid-template-columns: 0fr;
+    opacity: 0;
+  }
+}
+
+/*
+ * Every primary view stays mounted; `data-view` only changes layout.
+ * `allow-discrete` on `display` is what buys the *exit* animation — without
+ * it the outgoing view would vanish on the first frame.
+ */
+.app-view {
+  display: none;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  opacity: 0;
+  translate: 0 var(--shift-sm);
+  transition:
+    opacity var(--duration) var(--ease-exit),
+    translate var(--duration) var(--ease-exit),
+    display var(--duration) allow-discrete;
+}
+
 .app-view-settings,
 .app-view-tag-editor { overflow: auto; container-type: inline-size; }
 
 .app-shell:is([data-view='library'], [data-view='player']) .app-view-library,
 .app-shell[data-view='settings'] .app-view-settings,
-.app-shell[data-view='tag-editor'] .app-view-tag-editor { display: flex; }
+.app-shell[data-view='tag-editor'] .app-view-tag-editor {
+  display: flex;
+  opacity: 1;
+  translate: 0 0;
+  transition-timing-function: var(--ease-emphasis);
 
-/* Promotion expands the one footer player; nothing is remounted. */
-.app-shell[data-view='player'] :is(.app-main, .app-sidebar) { display: none; }
-.app-shell[data-view='player'] .app-player { flex: 1; min-height: 0; }
-
-.app-shell[data-height-tier='normal']:not([data-view='player'])
-  .app-player:has(.player-view[data-empty]) { display: none; }
-
-/* Below 480px tall, chrome yields the window to the persistent player. */
-.app-shell:is(
-  [data-height-tier='snug'],
-  [data-height-tier='compact'],
-  [data-height-tier='mini']
-) :is(.titlebar, .app-main, .app-sidebar) { display: none; }
-
-.app-shell:is(
-  [data-height-tier='snug'],
-  [data-height-tier='compact'],
-  [data-height-tier='mini']
-) .app-player { flex: 1; min-height: 0; }
-
-.app-shell:is(
-  [data-height-tier='snug'],
-  [data-height-tier='compact'],
-  [data-height-tier='mini']
-) .player-view { -webkit-app-region: drag; }
-
-/* Drag regions swallow clicks, so every interactive player area opts out. */
-.app-shell:is(
-  [data-height-tier='snug'],
-  [data-height-tier='compact'],
-  [data-height-tier='mini']
-) :is(.album-art-card, .playback-controls, .progress-section) {
-  -webkit-app-region: no-drag;
+  @starting-style {
+    opacity: 0;
+    translate: 0 var(--shift-sm);
+  }
 }
 
-/* titlebar */
+/* Below 480px tall, chrome yields the window to the persistent player. */
+.app-shell:is([data-height-tier='snug'], [data-height-tier='compact'], [data-height-tier='mini']) {
+  :is(.titlebar, .app-main, .app-sidebar) { display: none; }
+
+  .player-view { -webkit-app-region: drag; }
+
+  /* Drag regions swallow clicks, so every interactive player area opts out. */
+  :is(.album-art-card, .playback-controls, .progress-section) { -webkit-app-region: no-drag; }
+}
+
+/* ─── titlebar ─────────────────────────────────────────────────────────── */
+
 .titlebar {
   display: flex;
   flex-shrink: 0;
@@ -82,14 +171,34 @@
   background: var(--bg-raised);
   user-select: none;
   -webkit-app-region: drag;
+
+  > .menu-toggle { margin-left: var(--sp-2); -webkit-app-region: no-drag; }
 }
 
-.titlebar > .menu-toggle { margin-left: var(--sp-2); -webkit-app-region: no-drag; }
-.titlebar-context { display: flex; flex: 1; align-items: center; gap: var(--sp-3); min-width: 0; height: 100%; -webkit-app-region: no-drag; }
-.app-shell:not([data-view='library']) .titlebar-context { display: none; }
-.logo-icon { width: 18px; height: 18px; margin-inline: var(--sp-2); color: var(--accent); -webkit-app-region: no-drag; }
+.titlebar-context {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  height: 100%;
+  opacity: 1;
+  transition: opacity var(--duration-fast) var(--ease);
+  -webkit-app-region: no-drag;
+
+  .app-shell:not([data-view='library']) & { display: none; }
+}
+
+.logo-icon {
+  width: 18px;
+  height: 18px;
+  margin-inline: var(--sp-2);
+  color: var(--accent);
+  -webkit-app-region: no-drag;
+}
 
 .titlebar-nav { display: flex; gap: var(--sp-1); -webkit-app-region: no-drag; }
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -99,30 +208,50 @@
   color: var(--text-dim);
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
-  transition: color var(--duration-fast) var(--ease), background-color var(--duration-fast) var(--ease);
+  transition:
+    color var(--duration-fast) var(--ease),
+    background-color var(--duration-fast) var(--ease);
+
+  &:hover { color: var(--text); background: var(--bg-hover); }
+  &[aria-current='page'] { color: var(--accent); background: var(--accent-muted); }
 }
 
-.nav-item:hover { color: var(--text); background: var(--bg-hover); }
-.nav-item[aria-current='page'] { color: var(--accent); background: var(--accent-muted); }
 .nav-icon { font-size: var(--text-base); }
 
-.titlebar-controls { display: flex; height: 100%; margin-left: auto; -webkit-app-region: no-drag; }
-.titlebar-controls li { height: 100%; }
-:root[data-runtime='browser'] .titlebar { -webkit-app-region: no-drag; }
-:root[data-runtime='browser'] .titlebar-controls { display: none; }
+.titlebar-controls {
+  display: flex;
+  height: 100%;
+  margin-left: auto;
+  -webkit-app-region: no-drag;
+
+  li { height: 100%; }
+}
+
 .titlebar-btn {
-  width: 46px;
+  width: var(--titlebar-btn-w);
   height: 100%;
   color: var(--text-dim);
   font-size: var(--text-sm);
-  transition: color var(--duration-fast) var(--ease), background-color var(--duration-fast) var(--ease);
+  transition:
+    color var(--duration-fast) var(--ease),
+    background-color var(--duration-fast) var(--ease);
+
+  &:hover { color: var(--text); background: var(--bg-hover); }
+  &.titlebar-btn-close:hover { color: var(--text); background: var(--danger); }
 }
 
-.titlebar-btn:hover { color: var(--text); background: var(--bg-hover); }
-.titlebar-btn-close:hover { color: var(--text); background: var(--danger); }
+:root[data-runtime='browser'] {
+  .titlebar { -webkit-app-region: no-drag; }
+  .titlebar-controls { display: none; }
+}
 
+/*
+ * Titlebar breakpoints. Media queries cannot read custom properties, so the
+ * two widths are spelled out: 900px is where the nav labels stop fitting
+ * beside the toolbar, 500px is where the window controls have to shrink to
+ * the titlebar's own height.
+ */
 @media (max-width: 900px) {
-  .nav-label { display: none; }
   .nav-item { padding-inline: var(--sp-2); }
   .titlebar-context { gap: var(--sp-1); }
 }
@@ -132,7 +261,8 @@
   .titlebar-btn { width: var(--titlebar-h); }
 }
 
-/* sidebar */
+/* ─── sidebar ──────────────────────────────────────────────────────────── */
+
 .library-sidebar {
   position: relative;
   display: flex;
@@ -142,90 +272,116 @@
   overflow: auto hidden;
   border-right: 1px solid var(--border);
   background: var(--bg-raised);
+
+  > .resize-handle {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: var(--z-handle);
+    width: var(--sp-1);
+    cursor: col-resize;
+    transition: background-color var(--duration-fast) var(--ease);
+
+    &:hover { background: var(--accent); }
+  }
+
+  details + details { margin-top: var(--sp-1); border-top: 1px solid var(--border); }
+
+  summary {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    transition: color var(--duration-fast) var(--ease);
+
+    &::-webkit-details-marker { display: none; }
+    &:hover { color: var(--text-dim); }
+
+    > .icon { transition: transform var(--duration-fast) var(--ease-emphasis); }
+  }
+
+  details[open] > summary > .icon { transform: rotate(90deg); }
 }
 
-.library-sidebar > .resize-handle {
-  position: absolute;
-  inset: 0 0 0 auto;
-  z-index: 10;
-  width: var(--sp-1);
-  cursor: col-resize;
+.playlist-list {
+  padding-bottom: var(--sp-2);
+
+  button {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-2);
+    width: 100%;
+    padding: var(--sp-2) var(--sp-3);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    text-align: start;
+    transition:
+      color var(--duration-fast) var(--ease),
+      background-color var(--duration-fast) var(--ease);
+
+    &:hover { color: var(--text); background: var(--bg-hover); }
+    &.active { color: var(--accent); background: var(--accent-muted); }
+  }
+
+  .name { flex: 1; }
+  small { font-size: var(--text-xs); }
+  .add-playlist { color: var(--text-muted); }
 }
 
-.library-sidebar > .resize-handle:hover { background: var(--accent); }
-.library-sidebar details + details { margin-top: var(--sp-1); border-top: 1px solid var(--border); }
-.library-sidebar summary {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  text-transform: uppercase;
-  cursor: pointer;
-  user-select: none;
-  list-style: none;
-}
-
-.library-sidebar summary::-webkit-details-marker { display: none; }
-.library-sidebar summary > .icon { transition: transform var(--duration-fast) var(--ease); }
-.library-sidebar summary:hover { color: var(--text-dim); }
-.library-sidebar details[open] > summary > .icon { transform: rotate(90deg); }
-
-.playlist-list { padding-bottom: var(--sp-2); }
-.playlist-list button {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--sp-2);
-  width: 100%;
-  padding: var(--sp-2) var(--sp-3);
-  color: var(--text-dim);
-  font-size: var(--text-sm);
-  text-align: start;
-}
-
-.playlist-list button:hover { color: var(--text); background: var(--bg-hover); }
-.playlist-list button.active { color: var(--accent); background: var(--accent-muted); }
-.playlist-list .name { flex: 1; }
-.playlist-list small { font-size: var(--text-xs); }
-.playlist-list .add-playlist { color: var(--text-muted); }
-
+/*
+ * Tree rows. `--level` is the node's depth, written inline by `FolderTree`,
+ * because no fixed set of classes can express an arbitrarily deep tree.
+ */
 .folder-row {
   display: grid;
   grid-template-columns: var(--sp-4) minmax(0, 1fr);
   align-items: center;
   gap: var(--sp-1);
   padding-left: calc(var(--sp-2) + var(--level, 0) * var(--sp-3));
+  transition: background-color var(--duration-fast) var(--ease);
+
+  &:hover { background: var(--bg-hover); }
+
+  &.active {
+    background: var(--accent-muted);
+
+    .folder-name { color: var(--accent); }
+  }
+
+  .disclosure {
+    flex: 0 0 auto;
+    width: var(--sp-4);
+    padding: 0;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: 1;
+    transition: transform var(--duration-fast) var(--ease-emphasis);
+
+    &.open { transform: rotate(90deg); }
+  }
+
+  .folder-name {
+    grid-column: 2;
+    padding: var(--sp-2) var(--sp-1);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    text-align: start;
+    transition: color var(--duration-fast) var(--ease);
+
+    &:hover { color: var(--text); }
+  }
 }
 
-.folder-row:hover { background: var(--bg-hover); }
-.folder-row.active { background: var(--accent-muted); }
-.folder-row.active .folder-name { color: var(--accent); }
-.folder-row .disclosure {
-  flex: 0 0 auto;
-  width: var(--sp-4);
-  padding: 0;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  line-height: 1;
-  transition: transform var(--duration-fast) var(--ease);
-}
+/* ─── ambient album-art wash ───────────────────────────────────────────── */
 
-.folder-row .disclosure.open { transform: rotate(90deg); }
-.folder-row .folder-name {
-  grid-column: 2;
-  padding: var(--sp-2) var(--sp-1);
-  color: var(--text-dim);
-  font-size: var(--text-sm);
-  text-align: start;
-}
-
-.folder-row .folder-name:hover { color: var(--text); }
-
-/* Ambient album-art wash. */
 :root {
   --ambient-blend: screen;
   --ambient-strength: 0.75;
@@ -238,6 +394,7 @@
     --ambient-3 var(--duration-slow) var(--ease);
 }
 
+/* `screen` would blow a light surface out to white, hence the flip. */
 [data-theme='light'] {
   --ambient-blend: multiply;
   --ambient-strength: 0.4;
@@ -250,7 +407,7 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  z-index: 1000000;
+  z-index: var(--z-ambient);
   pointer-events: none;
   background: linear-gradient(
     362deg,
@@ -262,7 +419,8 @@ body::before {
   filter: brightness(1.02) contrast(0.95) opacity(var(--ambient-strength));
 }
 
-/* persistent player */
+/* ─── persistent player ────────────────────────────────────────────────── */
+
 .player-view {
   position: relative;
   display: flex;
@@ -273,18 +431,28 @@ body::before {
   overflow: hidden;
   background: var(--bg);
   container: player / size;
+
+  &[data-lyrics] :is(.progress-section, .playback-controls) { display: none; }
 }
 
-.album-art-bg { position: absolute; inset: 0; z-index: 0; overflow: hidden; contain: paint; }
-.album-art-bg img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: blur(60px) brightness(0.2);
-  transform: scale(1.2);
-}
+.album-art-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  contain: paint;
 
-[data-theme='light'] .album-art-bg img { filter: blur(60px) brightness(1.1) saturate(1.05); }
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: blur(var(--art-blur)) brightness(0.2);
+    transform: scale(1.2);
+    transition: filter var(--duration-slow) var(--ease);
+
+    [data-theme='light'] & { filter: blur(var(--art-blur)) brightness(1.1) saturate(1.05); }
+  }
+}
 
 .player-content {
   --art-size: clamp(80px, 40cqh, 320px);
@@ -294,7 +462,7 @@ body::before {
   --content-gap: var(--sp-6);
 
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -303,10 +471,14 @@ body::before {
   width: 100%;
   height: 100%;
   padding: var(--sp-6) var(--sp-8) var(--sp-8);
+  transition:
+    gap var(--duration) var(--ease-emphasis),
+    padding var(--duration) var(--ease-emphasis);
 }
 
 .player-promote { display: none; }
 .player-art { display: flex; flex: 0 0 auto; }
+
 .album-art-card {
   display: grid;
   flex: 0 0 auto;
@@ -319,58 +491,86 @@ body::before {
   box-shadow: var(--shadow-card);
   place-items: center;
   appearance: none;
+  transition:
+    width var(--duration) var(--ease-emphasis),
+    box-shadow var(--duration-fast) var(--ease);
+
+  &:disabled { cursor: default; }
+  &:focus-visible { outline: 0; box-shadow: var(--shadow-card), var(--focus-ring); }
+
+  img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
 }
 
-.album-art-card:disabled { cursor: default; }
-.album-art-card:focus-visible { outline: 0; box-shadow: var(--shadow-card), var(--focus-ring); }
-.album-art-card img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
 .art-fallback {
   width: clamp(var(--text-xl), 20cqi, 64px);
   height: clamp(var(--text-xl), 20cqi, 64px);
   opacity: 0.35;
 }
 
-.player-info { width: 100%; min-width: 0; text-align: center; }
-.player-info .track-title {
-  overflow: hidden;
-  margin-bottom: var(--sp-2);
-  color: var(--text);
-  font-size: var(--title-size);
-  font-weight: var(--font-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.player-info {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
 
-.player-info .track-artist { margin-bottom: var(--sp-1); color: var(--text-dim); font-size: var(--text-sm); }
-.player-info .track-album { color: var(--text-muted); font-size: var(--text-sm); }
+  .track-title {
+    overflow: hidden;
+    margin-bottom: var(--sp-2);
+    color: var(--text);
+    font-size: var(--title-size);
+    font-weight: var(--font-semibold);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: font-size var(--duration) var(--ease-emphasis);
+  }
+
+  .track-artist { margin-bottom: var(--sp-1); color: var(--text-dim); font-size: var(--text-sm); }
+  .track-album { color: var(--text-muted); font-size: var(--text-sm); }
+}
 
 .progress-section { width: 100%; }
 .time-row { display: flex; justify-content: space-between; margin-top: var(--sp-2); }
 .time-label { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
 
-.playback-controls { display: flex; align-items: center; gap: var(--sp-6); }
-.playback-controls .play-pause-btn {
-  width: var(--play-size);
-  height: var(--play-size);
-  border-radius: 50%;
-  font-size: var(--play-glyph-size);
+.playback-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  transition: gap var(--duration) var(--ease-emphasis);
+
+  .play-pause-btn {
+    width: var(--play-size);
+    height: var(--play-size);
+    border-radius: 50%;
+    font-size: var(--play-glyph-size);
+    transition:
+      width var(--duration) var(--ease-emphasis),
+      height var(--duration) var(--ease-emphasis),
+      background-color var(--duration-fast) var(--ease),
+      box-shadow var(--duration-fast) var(--ease);
+  }
+
+  :is(.prev, .next) > button {
+    border-color: transparent;
+    transition:
+      color var(--duration-fast) var(--ease),
+      background-color var(--duration-fast) var(--ease),
+      border-color var(--duration-fast) var(--ease);
+
+    &:hover:not(:disabled) { border-color: var(--border-hover); }
+  }
+
+  /* Shuffle/repeat read as off until they're on — colour is the whole signal. */
+  .mode > button {
+    position: relative;
+    color: var(--text-muted);
+    font-size: var(--text-lg);
+    transition: color var(--duration-fast) var(--ease);
+
+    &:hover:not(:disabled) { color: var(--text); }
+    &[data-active] { color: var(--accent); }
+  }
 }
 
-.playback-controls :is(.prev, .next) > button {
-  border-color: transparent;
-  transition:
-    color var(--duration-fast) var(--ease),
-    background-color var(--duration-fast) var(--ease),
-    border-color var(--duration-fast) var(--ease);
-}
-
-.playback-controls :is(.prev, .next) > button:hover:not(:disabled) { border-color: var(--border-hover); }
-
-/* Shuffle/repeat read as off until they're on — colour is the whole signal. */
-.playback-controls .mode > button { color: var(--text-muted); font-size: var(--text-lg); }
-.playback-controls .mode > button:hover:not(:disabled) { color: var(--text); }
-.playback-controls .mode > button[data-active] { color: var(--accent); }
-.playback-controls .mode > button { position: relative; }
 .mode-badge {
   position: absolute;
   right: var(--sp-0-5);
@@ -386,21 +586,28 @@ body::before {
  * footer bar and the mini tiers have nowhere to put a column of text, and the
  * toggle is hidden there rather than being a control that does nothing.
  */
-.player-actions { display: none; }
-.app-shell[data-view='player'][data-height-tier='normal'] .player-actions {
-  position: absolute;
-  z-index: 2;
-  top: var(--sp-4);
-  right: var(--sp-4);
-  display: flex;
-  gap: var(--sp-2);
+.player-actions {
+  display: none;
+
+  .app-shell[data-view='player'][data-height-tier='normal'] & {
+    position: absolute;
+    z-index: var(--z-sticky);
+    top: var(--sp-4);
+    right: var(--sp-4);
+    display: flex;
+    gap: var(--sp-2);
+  }
+
+  :is(.lyrics-toggle, .player-close) {
+    color: var(--text-muted);
+    transition: color var(--duration-fast) var(--ease);
+
+    &:hover:not(:disabled) { color: var(--text); }
+  }
+
+  .lyrics-toggle[aria-pressed='true'] { color: var(--accent); }
 }
 
-.player-actions :is(.lyrics-toggle, .player-close) { color: var(--text-muted); }
-.player-actions :is(.lyrics-toggle, .player-close):hover:not(:disabled) { color: var(--text); }
-.player-actions .lyrics-toggle[aria-pressed='true'] { color: var(--accent); }
-
-.player-view[data-lyrics] :is(.progress-section, .playback-controls) { display: none; }
 .player-lyrics {
   width: min(100%, 640px);
   min-height: 0;
@@ -409,15 +616,18 @@ body::before {
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--bg-raised) 70%, transparent);
   text-align: center;
+  animation: surface-in var(--duration) var(--ease-emphasis);
+
+  pre {
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: var(--text-base);
+    line-height: 1.8;
+    white-space: pre-wrap;
+  }
 }
 
-.player-lyrics pre {
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: var(--text-base);
-  line-height: 1.8;
-  white-space: pre-wrap;
-}
+/* ─── waveform ─────────────────────────────────────────────────────────── */
 
 .waveform-progress {
   position: relative;
@@ -426,37 +636,33 @@ body::before {
   height: 52px;
   overflow: hidden;
   cursor: pointer;
+  transition: height var(--duration) var(--ease-emphasis);
+
+  &:focus-within { border-radius: var(--radius); box-shadow: var(--focus-ring); }
+  &.compact { height: 28px; }
+
+  &:not([data-loaded]) .waveform-shape { visibility: hidden; }
+  &[data-loaded] .waveform-shape { animation: waveform-rise var(--duration-slow) var(--ease-emphasis) both; }
+  &[data-loaded] .waveform-line { display: none; }
+
+  &.compact .waveform-svg {
+    inset-block: var(--sp-1);
+    height: calc(100% - 2 * var(--sp-1));
+  }
 }
 
-.waveform-progress:focus-within { border-radius: var(--radius); box-shadow: var(--focus-ring); }
-.waveform-progress.compact { height: 28px; }
 .waveform-svg {
   position: absolute;
   inset: calc(var(--sp-1) + var(--sp-0-5)) 0;
   width: 100%;
   height: calc(100% - 2 * (var(--sp-1) + var(--sp-0-5)));
 }
+
 .waveform-unplayed { fill: var(--wf-unplayed); stroke: var(--wf-unplayed); }
 .waveform-played { fill: var(--wf-played); stroke: var(--wf-played); }
-.waveform-shape {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-.waveform-progress:not([data-loaded]) .waveform-shape { visibility: hidden; }
-.waveform-progress[data-loaded] .waveform-shape {
-  animation: waveform-rise var(--duration-slow) var(--ease) both;
-}
-.waveform-line {
-  display: block;
-  vector-effect: non-scaling-stroke;
-  stroke-width: 1px;
-}
-.waveform-progress[data-loaded] .waveform-line { display: none; }
+.waveform-shape { transform-box: fill-box; transform-origin: center; }
+.waveform-line { display: block; vector-effect: non-scaling-stroke; stroke-width: 1px; }
 
-@keyframes waveform-rise {
-  from { transform: scaleY(0.02); }
-  to { transform: scaleY(1); }
-}
 .waveform-input {
   position: absolute;
   inset: 0;
@@ -465,14 +671,22 @@ body::before {
   margin: 0;
   opacity: 0;
   cursor: pointer;
-}
-.waveform-input:disabled { cursor: default; }
-.waveform-progress.compact .waveform-svg {
-  inset-block: var(--sp-1);
-  height: calc(100% - 2 * var(--sp-1));
+
+  &:disabled { cursor: default; }
 }
 
-/* Full-player width and height compression only changes inherited sizing. */
+@keyframes waveform-rise {
+  from { transform: scaleY(0.02); }
+  to { transform: scaleY(1); }
+}
+
+/* ─── player width tiers ───────────────────────────────────────────────── */
+
+/*
+ * `.player-view` *is* the container, so a container query can never style
+ * `.player-view` itself — its own padding and gap hang off the tier
+ * attribute instead. These only change inherited sizing.
+ */
 @container player (max-width: 480px) {
   .player-content {
     --art-size: clamp(60px, 25cqw, 120px);
@@ -525,101 +739,122 @@ body::before {
   .time-row { margin-top: var(--sp-1); }
 }
 
+/* ─── compact + mini tiers ─────────────────────────────────────────────── */
+
 /* Compact: art left, then title; controls and progress share the second row. */
-.app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .player-content {
-  display: grid;
-  align-content: center;
-  gap: var(--sp-2) var(--sp-4);
-  padding: var(--sp-3) var(--sp-4);
-}
-
-.app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .player-art { grid-area: art; }
-.app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .player-info { grid-area: info; text-align: start; }
-.app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .progress-section { grid-area: progress; }
-.app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .playback-controls { grid-area: controls; }
-.app-shell:is([data-height-tier='compact'], [data-height-tier='mini'])
-  .playback-controls .mode { display: none; }
-
-.app-shell[data-height-tier='compact'] .player-content {
-  --art-size: clamp(56px, 60cqh, 140px);
-  --play-size: 36px;
-  --play-glyph-size: var(--text-lg);
-  --title-size: var(--text-sm);
-  grid-template-columns: auto auto 1fr;
-  grid-template-areas: 'art info info' 'art controls progress';
-}
-
-.app-shell[data-height-tier='compact'] .player-info .track-title { margin-bottom: var(--sp-1); }
-.app-shell[data-height-tier='compact'] .playback-controls { gap: var(--sp-2); }
-.app-shell[data-height-tier='compact'] .time-row { margin-top: var(--sp-1); }
-
-@container player (max-width: 260px) {
-  .app-shell[data-height-tier='compact'] .player-art { display: none; }
-  .app-shell[data-height-tier='compact'] .player-content {
-    grid-template-columns: 1fr;
-    grid-template-areas: 'info' 'progress' 'controls';
+.app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) {
+  .player-content {
+    display: grid;
+    align-content: center;
+    gap: var(--sp-2) var(--sp-4);
+    padding: var(--sp-3) var(--sp-4);
   }
 
-  .app-shell[data-height-tier='compact'] .playback-controls { justify-content: center; }
+  .player-art { grid-area: art; }
+  .player-info { grid-area: info; text-align: start; }
+  .progress-section { grid-area: progress; }
+  .playback-controls { grid-area: controls; }
+  .playback-controls .mode { display: none; }
+
+  /* The marquee self-disables when the title fits: the distance computes to 0. */
+  .track-title {
+    container-type: inline-size;
+    text-overflow: clip;
+
+    > span {
+      display: inline-block;
+      white-space: nowrap;
+      animation: title-marquee 12s var(--ease) infinite;
+    }
+  }
+}
+
+.app-shell[data-height-tier='compact'] {
+  .player-content {
+    --art-size: clamp(56px, 60cqh, 140px);
+    --play-size: 36px;
+    --play-glyph-size: var(--text-lg);
+    --title-size: var(--text-sm);
+    grid-template-columns: auto auto 1fr;
+    grid-template-areas: 'art info info' 'art controls progress';
+  }
+
+  .player-info .track-title { margin-bottom: var(--sp-1); }
+  .playback-controls { gap: var(--sp-2); }
+  .time-row { margin-top: var(--sp-1); }
+}
+
+@container player (max-width: 260px) {
+  .app-shell[data-height-tier='compact'] {
+    .player-art { display: none; }
+
+    .player-content {
+      grid-template-columns: 1fr;
+      grid-template-areas: 'info' 'progress' 'controls';
+    }
+
+    .playback-controls { justify-content: center; }
+  }
 }
 
 @container player (max-width: 260px) and (max-height: 200px) {
-  .app-shell[data-height-tier='compact'] .player-info .track-album,
-  .app-shell[data-height-tier='compact'] .time-row { display: none; }
+  .app-shell[data-height-tier='compact'] :is(.player-info .track-album, .time-row) { display: none; }
 }
 
 /* Mini: art, title, and next button; progress becomes a bottom-edge line. */
-.app-shell[data-height-tier='mini'] .player-content {
-  --art-size: clamp(32px, 70cqh, 72px);
-  --title-size: var(--text-sm);
-  grid-template-columns: auto 1fr auto;
-  grid-template-areas: 'art info controls';
-  align-items: center;
-  padding-bottom: var(--sp-3);
-}
+.app-shell[data-height-tier='mini'] {
+  .player-content {
+    --art-size: clamp(32px, 70cqh, 72px);
+    --title-size: var(--text-sm);
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas: 'art info controls';
+    align-items: center;
+    padding-bottom: var(--sp-3);
+  }
 
-.app-shell[data-height-tier='mini'] .player-info .track-title { margin: 0; }
-.app-shell[data-height-tier='mini'] .player-info :is(.track-artist, .track-album) { display: none; }
-.app-shell[data-height-tier='mini'] .playback-controls { gap: 0; }
-.app-shell[data-height-tier='mini'] .playback-controls > :not(.next) { display: none; }
-.app-shell[data-height-tier='mini'] .progress-section {
-  position: absolute;
-  inset: auto 0 0;
-  grid-area: auto;
-  width: 100%;
+  .player-info .track-title { margin: 0; }
+  .player-info :is(.track-artist, .track-album) { display: none; }
+
+  .playback-controls {
+    gap: 0;
+
+    > :not(.next) { display: none; }
+  }
+
+  .progress-section {
+    position: absolute;
+    inset: auto 0 0;
+    grid-area: auto;
+    width: 100%;
+  }
+
+  .time-row { display: none; }
+  .waveform-progress { height: var(--sp-1); min-width: 0; }
+  .waveform-svg { inset: 0; height: 100%; }
+  .waveform-shape { display: none; }
+  .waveform-line { display: block; }
 }
-.app-shell[data-height-tier='mini'] .time-row { display: none; }
-.app-shell[data-height-tier='mini'] .waveform-progress { height: var(--sp-1); min-width: 0; }
-.app-shell[data-height-tier='mini'] .waveform-svg { inset: 0; height: 100%; }
-.app-shell[data-height-tier='mini'] .waveform-shape { display: none; }
-.app-shell[data-height-tier='mini'] .waveform-line { display: block; }
 
 @container player (max-width: 260px) {
-  .app-shell[data-height-tier='mini'] .player-art { display: none; }
-  .app-shell[data-height-tier='mini'] .player-content {
-    grid-template-columns: 1fr auto;
-    grid-template-areas: 'info controls';
+  .app-shell[data-height-tier='mini'] {
+    .player-art { display: none; }
+
+    .player-content {
+      grid-template-columns: 1fr auto;
+      grid-template-areas: 'info controls';
+    }
   }
 }
 
 @container player (max-width: 180px) {
-  .app-shell[data-height-tier='mini'] .playback-controls { display: none; }
-  .app-shell[data-height-tier='mini'] .player-content {
-    grid-template-columns: 1fr;
-    grid-template-areas: 'info';
+  .app-shell[data-height-tier='mini'] {
+    .playback-controls { display: none; }
+
+    .player-content {
+      grid-template-columns: 1fr;
+      grid-template-areas: 'info';
+    }
   }
-}
-
-/* The marquee self-disables when the title fits: the calculated distance is 0. */
-.app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .track-title {
-  container-type: inline-size;
-  text-overflow: clip;
-}
-
-.app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .track-title > span {
-  display: inline-block;
-  white-space: nowrap;
-  animation: title-marquee 12s var(--ease) infinite;
 }
 
 @keyframes title-marquee {
@@ -627,116 +862,124 @@ body::before {
   50%, 65% { transform: translateX(min(0px, calc(100cqw - 100%))); }
 }
 
+/* ─── footer bar ───────────────────────────────────────────────────────── */
+
 /* Normal-height non-player routes arrange the same tree as a footer bar. */
-.app-shell[data-height-tier='normal']:not([data-view='player']) .app-player { flex: 0 0 72px; min-height: 72px; }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .player-view {
-  height: 72px;
-  min-height: 72px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-raised);
-}
-
-.app-shell[data-height-tier='normal']:not([data-view='player']) .album-art-bg { display: none; }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .player-promote {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.app-shell[data-height-tier='normal']:not([data-view='player']) .player-promote:focus-visible {
-  outline: 2px solid var(--border-focus);
-  outline-offset: -2px;
-}
-
-.app-shell[data-height-tier='normal']:not([data-view='player']) .player-content {
-  --art-size: var(--titlebar-h);
-  --play-size: 32px;
-  --play-glyph-size: var(--text-base);
-  --title-size: var(--text-sm);
-  z-index: 3;
-  display: grid;
-  grid-template-columns: var(--titlebar-h) minmax(100px, 1fr) auto minmax(140px, 3fr);
-  grid-template-areas: 'art info controls progress';
-  align-items: center;
-  justify-content: initial;
-  gap: var(--sp-4);
-  padding: var(--sp-2) var(--sp-4);
-  pointer-events: none;
-}
-
-/* Modes don't earn their width in a 72px bar; they live in the full player. */
-.app-shell[data-height-tier='normal']:not([data-view='player']) .playback-controls .mode { display: none; }
-
-.app-shell[data-height-tier='normal']:not([data-view='player'])
-  :is(.player-art, .progress-section, .playback-controls) { pointer-events: auto; }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .player-art { grid-area: art; }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .album-art-card { box-shadow: none; }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .art-fallback { width: var(--text-xl); height: var(--text-xl); }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .player-info { grid-area: info; width: auto; text-align: start; }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .track-title { margin: 0; font-weight: var(--font-medium); }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .track-artist { margin: 0; font-size: var(--text-xs); }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .track-album { display: none; }
-
-.app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section {
-  grid-area: progress;
-  display: grid;
-  grid-template-columns: auto minmax(60px, 1fr) auto;
-  align-items: center;
-  gap: var(--sp-2);
-  min-width: 0;
-}
-
-.app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section .waveform-progress {
-  grid-column: 2;
-  grid-row: 1;
-  height: 28px;
-}
-.app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section .waveform-svg {
-  inset-block: var(--sp-1);
-  height: calc(100% - 2 * var(--sp-1));
-}
-
-.app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section .time-row { display: contents; }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .time-label:first-child { grid-column: 1; grid-row: 1; }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .time-label:last-child { grid-column: 3; grid-row: 1; }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .playback-controls { grid-area: controls; gap: var(--sp-2); }
-
-@container player (max-width: 520px) {
-  .app-shell[data-height-tier='normal']:not([data-view='player']) .player-content {
-    grid-template-columns: var(--titlebar-h) minmax(80px, 1fr) auto minmax(60px, 1fr);
-    gap: var(--sp-2);
+.app-shell[data-height-tier='normal']:not([data-view='player']) {
+  .player-view {
+    height: var(--player-bar-h);
+    min-height: var(--player-bar-h);
+    border-top: 1px solid var(--border);
+    background: var(--bg-raised);
   }
 
-  .app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section { grid-template-columns: minmax(60px, 1fr); }
-  .app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section .waveform-progress { grid-column: 1; }
-  .app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section .time-row { display: none; }
+  .album-art-bg { display: none; }
+
+  .player-promote {
+    position: absolute;
+    z-index: var(--z-sticky);
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+
+    &:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+  }
+
+  .player-content {
+    --art-size: var(--titlebar-h);
+    --play-size: 32px;
+    --play-glyph-size: var(--text-base);
+    --title-size: var(--text-sm);
+    z-index: var(--z-player);
+    display: grid;
+    grid-template-columns: var(--titlebar-h) minmax(100px, 1fr) auto minmax(140px, 3fr);
+    grid-template-areas: 'art info controls progress';
+    align-items: center;
+    justify-content: initial;
+    gap: var(--sp-4);
+    padding: var(--sp-2) var(--sp-4);
+    pointer-events: none;
+  }
+
+  /* Modes don't earn their width in a 72px bar; they live in the full player. */
+  .playback-controls .mode { display: none; }
+
+  :is(.player-art, .progress-section, .playback-controls) { pointer-events: auto; }
+  .player-art { grid-area: art; }
+  .album-art-card { box-shadow: none; }
+  .art-fallback { width: var(--text-xl); height: var(--text-xl); }
+  .player-info { grid-area: info; width: auto; text-align: start; }
+  .track-title { margin: 0; font-weight: var(--font-medium); }
+  .track-artist { margin: 0; font-size: var(--text-xs); }
+  .track-album { display: none; }
+
+  .progress-section {
+    grid-area: progress;
+    display: grid;
+    grid-template-columns: auto minmax(60px, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-2);
+    min-width: 0;
+
+    .waveform-progress { grid-column: 2; grid-row: 1; height: 28px; }
+
+    .waveform-svg {
+      inset-block: var(--sp-1);
+      height: calc(100% - 2 * var(--sp-1));
+    }
+
+    .time-row { display: contents; }
+  }
+
+  .time-label:first-child { grid-column: 1; grid-row: 1; }
+  .time-label:last-child { grid-column: 3; grid-row: 1; }
+  .playback-controls { grid-area: controls; gap: var(--sp-2); }
+}
+
+@container player (max-width: 520px) {
+  .app-shell[data-height-tier='normal']:not([data-view='player']) {
+    .player-content {
+      grid-template-columns: var(--titlebar-h) minmax(80px, 1fr) auto minmax(60px, 1fr);
+      gap: var(--sp-2);
+    }
+
+    .progress-section {
+      grid-template-columns: minmax(60px, 1fr);
+
+      .waveform-progress { grid-column: 1; }
+      .time-row { display: none; }
+    }
+  }
 }
 
 @container player (max-width: 380px) {
-  .app-shell[data-height-tier='normal']:not([data-view='player']) .player-content {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: auto 20px;
-    grid-template-areas: 'info controls' 'progress progress';
-    gap: 0 var(--sp-2);
-  }
+  .app-shell[data-height-tier='normal']:not([data-view='player']) {
+    .player-content {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-rows: auto 20px;
+      grid-template-areas: 'info controls' 'progress progress';
+      gap: 0 var(--sp-2);
+    }
 
-  .app-shell[data-height-tier='normal']:not([data-view='player']) .player-art,
-  .app-shell[data-height-tier='normal']:not([data-view='player']) .track-artist { display: none; }
-  .app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section .waveform-progress {
-    height: var(--text-xl);
-  }
-  .app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section .waveform-svg {
-    inset-block: var(--sp-0-5);
-    height: calc(100% - 2 * var(--sp-0-5));
+    :is(.player-art, .track-artist) { display: none; }
+
+    .progress-section {
+      .waveform-progress { height: var(--text-xl); }
+
+      .waveform-svg {
+        inset-block: var(--sp-0-5);
+        height: calc(100% - 2 * var(--sp-0-5));
+      }
+    }
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root { transition: none; }
+
   .player-info .track-title > span,
   .waveform-progress[data-loaded] .waveform-shape { animation: none; }
+
   .app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .track-title { text-overflow: ellipsis; }
 }
