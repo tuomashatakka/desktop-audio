@@ -6,7 +6,7 @@ import { getGlobalEnsureReady } from './app/contexts/AudioContext'
 import './index.css'
 
 
-const isElectron = typeof window !== 'undefined' && Boolean(window.electronAPI)
+const isElectron                         = typeof window !== 'undefined' && Boolean(window.electronAPI)
 document.documentElement.dataset.runtime = isElectron ? 'electron' : 'browser'
 
 const host = isElectron ? new ElectronHost() : new BrowserHost()
@@ -16,8 +16,8 @@ const container = document.querySelector('#app')
 if (container) {
   const root = createRoot(container)
   root.render(
-    <HostProvider value={host}>
-      <DataProvider value={data}>
+    <HostProvider value={ host }>
+      <DataProvider value={ data }>
         <App />
       </DataProvider>
     </HostProvider>
@@ -28,15 +28,13 @@ if (container) {
 if (!isElectron) {
   const handleFirstPointer = async () => {
     // Initialize WebFS: re-request permissions and scan existing roots
-    if (data instanceof WebFsDataSource) {
+    if (data instanceof WebFsDataSource)
       data.init().catch(console.error)
-    }
 
     // Resume AudioContext if suspended (autoplay policy)
     const ensureReady = getGlobalEnsureReady()
-    if (ensureReady) {
+    if (ensureReady)
       ensureReady().catch(console.error)
-    }
 
     // Remove listener after first invocation
     document.removeEventListener('pointerdown', handleFirstPointer)

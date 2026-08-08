@@ -28,6 +28,22 @@ const QUANT_SHIFT = 4
  */
 const POOL_SIZE = 12
 
+/** Below this alpha a pixel is transparent enough to ignore. */
+const MIN_ALPHA = 128
+
+/** Channel offsets within the RGBA sample buffer. */
+const ALPHA_OFFSET = 3
+
+/** Bit positions that pack the quantised R/G/B into one bucket key. */
+const RED_BUCKET_SHIFT   = 16
+const GREEN_BUCKET_SHIFT = 8
+
+/** A palette is only "colourful" enough to use above this saturation... */
+const MIN_SATURATION = 0.15
+
+/** ...and only if at least this many of its colours clear that bar. */
+const MIN_COLOURFUL_COUNT = 3
+
 const VARS = [ '--ambient-1', '--ambient-2', '--ambient-3' ] as const
 
 type Rgb = readonly [number, number, number]
@@ -55,13 +71,13 @@ function toCss ([ r, g, b ]: Rgb): string {
  */
 async function extractPalette (src: string): Promise<readonly [string, string, string] | null> {
   try {
-    const img = new Image()
+    const img       = new Image()
     img.crossOrigin = 'anonymous'
-    img.src = src
+    img.src         = src
     await img.decode()
 
-    const canvas = document.createElement('canvas')
-    canvas.width = SAMPLE_SIZE
+    const canvas  = document.createElement('canvas')
+    canvas.width  = SAMPLE_SIZE
     canvas.height = SAMPLE_SIZE
 
     const ctx = canvas.getContext('2d', { willReadFrequently: true })
@@ -77,13 +93,15 @@ async function extractPalette (src: string): Promise<readonly [string, string, s
     const buckets = new Map<number, { count: number; r: number; g: number; b: number }>()
 
     for (let i = 0; i < data.length; i += 4) {
-      if (data[i + 3] < 128)
+      if (data[i + ALPHA_OFFSET] < MIN_ALPHA)
         continue
 
-      const r = data[i]
-      const g = data[i + 1]
-      const b = data[i + 2]
-      const key = r >> QUANT_SHIFT << 16 | g >> QUANT_SHIFT << 8 | b >> QUANT_SHIFT
+      const r   = data[i]
+      const g   = data[i + 1]
+      const b   = data[i + 2]
+      const key = r >> QUANT_SHIFT << RED_BUCKET_SHIFT |
+        g >> QUANT_SHIFT << GREEN_BUCKET_SHIFT |
+        b >> QUANT_SHIFT
 
       const bucket = buckets.get(key)
       if (bucket) {
@@ -92,9 +110,8 @@ async function extractPalette (src: string): Promise<readonly [string, string, s
         bucket.g += g
         bucket.b += b
       }
-      else {
+      else
         buckets.set(key, { count: 1, r, g, b })
-      }
     }
 
     if (buckets.size === 0)
@@ -110,15 +127,15 @@ async function extractPalette (src: string): Promise<readonly [string, string, s
     // cover is just a grey wash. Fall back to the raw ranking if the artwork
     // genuinely is monochrome.
     const colourful = averaged.filter(c =>
-      saturation(c) > 0.15)
-    const pool = (colourful.length >= 3 ? colourful : averaged).slice(0, POOL_SIZE)
+      saturation(c) > MIN_SATURATION)
+    const pool = (colourful.length >= MIN_COLOURFUL_COUNT ? colourful : averaged).slice(0, POOL_SIZE)
 
     const chosen = [ ...pool ].sort((a, b) =>
       luminance(a) - luminance(b))
 
-    const dark = chosen[0]
+    const dark  = chosen[0]
     const light = chosen[chosen.length - 1]
-    const mid = chosen[Math.floor(chosen.length / 2)]
+    const mid   = chosen[Math.floor(chosen.length / 2)]
 
     return [ toCss(dark), toCss(mid), toCss(light) ]
   }
@@ -134,13 +151,12 @@ async function extractPalette (src: string): Promise<readonly [string, string, s
 export function useAmbientPalette (): void {
   const { currentTrack } = useAudio()
 
-  const art = currentTrack?.albumArt
+  const art      = currentTrack?.albumArt
   const fallback = currentTrack?.coverColor
 
   useEffect(() => {
     const root = document.documentElement
 
-    // eslint-disable-next-line functional/no-let
     let cancelled = false
 
     const apply = (palette: readonly string[] | null) => {

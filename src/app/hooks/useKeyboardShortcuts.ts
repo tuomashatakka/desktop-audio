@@ -4,6 +4,7 @@ import type { KeybindingAction } from '../../keybindings'
 import { useAudio, useLibrary, useUI } from '../contexts'
 import { useHost } from '../data'
 import { useKeybindings } from './useKeybindings'
+import { listen, collectUnsubscribes } from '../utils/events'
 
 
 const EDITABLE_TARGETS = [
@@ -42,10 +43,10 @@ function shouldIgnoreEvent (
 
 export function useKeyboardShortcuts () {
   const { isPlaying, currentTrack, volume, pause, resume, setVolume, playNext, playPrevious } = useAudio()
-  const { filteredTracks } = useLibrary()
-  const { currentView, previousView, sidebarOpen, setView, toggleSidebar } = useUI()
-  const { bindings } = useKeybindings()
-  const host = useHost()
+  const { filteredTracks }                                                                    = useLibrary()
+  const { currentView, previousView, sidebarOpen, setView, toggleSidebar }                    = useUI()
+  const { bindings }                                                                          = useKeybindings()
+  const host                                                                                  = useHost()
 
   const actions = useMemo<Record<KeybindingAction, () => void>>(() =>
     ({
@@ -73,9 +74,8 @@ export function useKeyboardShortcuts () {
           if (!sidebarOpen)
             toggleSidebar()
         }
-        else {
+        else
           toggleSidebar()
-        }
       },
     }), [
     currentTrack,
@@ -119,24 +119,24 @@ export function useKeyboardShortcuts () {
   }, [ actions, bindings, currentView, previousView, setView ])
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown)
+    const keydown = listen(window, 'keydown', handleKeyDown as EventListener)
     return () =>
-      window.removeEventListener('keydown', handleKeyDown)
+      keydown.dispose()
   }, [ handleKeyDown ])
 
   useEffect(() => {
-    const unsubscribePlay = host.onMediaPlayPause(() => {
-      if (currentTrack)
-        void (isPlaying ? pause() : resume())
-    })
-    const unsubscribeNext = host.onMediaNext(() =>
-      playNext(filteredTracks))
-    const unsubscribePrevious = host.onMediaPrev(() =>
-      playPrevious(filteredTracks))
-    return () => {
-      unsubscribePlay()
-      unsubscribeNext()
-      unsubscribePrevious()
-    }
+    const mediaKeys = collectUnsubscribes(
+      host.onMediaPlayPause(() => {
+        if (currentTrack)
+          void (isPlaying ? pause() : resume())
+      }),
+      host.onMediaNext(() =>
+        playNext(filteredTracks)),
+      host.onMediaPrev(() =>
+        playPrevious(filteredTracks)),
+    )
+
+    return () =>
+      mediaKeys.dispose()
   }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, filteredTracks, host ])
 }

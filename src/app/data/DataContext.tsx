@@ -5,7 +5,9 @@ import { Model } from '../models'
 
 const DataContext = createContext<DataSource | null>(null)
 
-export function DataProvider ({ value, children }: { value: DataSource; children: React.ReactNode }) {
+type DataProviderProps = { value: DataSource; children: React.ReactNode }
+
+export function DataProvider ({ value, children }: DataProviderProps) {
   useEffect(() => {
     // Set the global Model.dataSource for persistence
     Model.dataSource = value
@@ -14,7 +16,7 @@ export function DataProvider ({ value, children }: { value: DataSource; children
     }
   }, [ value ])
 
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>
+  return <DataContext.Provider value={ value }>{children}</DataContext.Provider>
 }
 
 export function useData (): DataSource {

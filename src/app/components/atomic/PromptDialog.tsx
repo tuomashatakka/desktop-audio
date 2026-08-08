@@ -31,23 +31,20 @@ export function PromptDialog ({ open, title, placeholder, onConfirm, onClose }: 
     onClose()
   }
 
-  return (
-    <Dialog open={open} onClose={handleClose} title={title}>
-      <form method='dialog' onSubmit={handleSubmit} className='prompt-form'>
-        <Input
-          placeholder={placeholder}
-          required
-          value={value}
-          onChange={e =>
-            setValue(e.target.value)}
-          autoFocus
-        />
+  return <Dialog open={ open } title={ title } onClose={ handleClose }>
+    <form className='prompt-form' method='dialog' onSubmit={ handleSubmit }>
+      <Input
+        placeholder={ placeholder }
+        required
+        value={ value }
+        autoFocus
+        onChange={ e =>
+          setValue(e.target.value) } />
 
-        <div className='prompt-actions'>
-          <Button variant='ghost' type='button' onClick={handleClose}>Cancel</Button>
-          <Button variant='primary' type='submit' disabled={!value.trim()}>OK</Button>
-        </div>
-      </form>
-    </Dialog>
-  )
+      <div className='prompt-actions'>
+        <Button variant='ghost' type='button' onClick={ handleClose }>Cancel</Button>
+        <Button variant='primary' type='submit' disabled={ !value.trim() }>OK</Button>
+      </div>
+    </form>
+  </Dialog>
 }

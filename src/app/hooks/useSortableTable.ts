@@ -20,10 +20,9 @@ export function useSortableTable (tracks: readonly Track[]): SortableTableResult
   const [ sortDir, setSortDir ] = useState<SortDir>('asc')
 
   const toggleSort = (key: SortKey) => {
-    if (key === sortKey) {
+    if (key === sortKey)
       setSortDir(d =>
         d === 'asc' ? 'desc' : 'asc')
-    }
     else {
       setSortKey(key)
       setSortDir('asc')
@@ -33,14 +32,14 @@ export function useSortableTable (tracks: readonly Track[]): SortableTableResult
   const sorted = useMemo(() =>
     [ ...tracks ].sort((a, b) => {
       if (NUMERIC_KEYS.has(sortKey)) {
-        const an = Number(a[sortKey] ?? 0)
-        const bn = Number(b[sortKey] ?? 0)
+        const an  = Number(a[sortKey] ?? 0)
+        const bn  = Number(b[sortKey] ?? 0)
         const cmp = an - bn
         return sortDir === 'asc' ? cmp : -cmp
       }
 
-      const av = String(a[sortKey] ?? '').toLowerCase()
-      const bv = String(b[sortKey] ?? '').toLowerCase()
+      const av  = String(a[sortKey] ?? '').toLowerCase()
+      const bv  = String(b[sortKey] ?? '').toLowerCase()
       const cmp = av.localeCompare(bv)
       return sortDir === 'asc' ? cmp : -cmp
     }), [ tracks, sortKey, sortDir ])

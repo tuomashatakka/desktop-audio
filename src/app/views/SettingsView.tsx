@@ -46,12 +46,12 @@ export function SettingsView () {
     setTheme, setCustomTheme, exportTheme, importTheme, setDefaultDensity,
     setVolume, setRepeatMode, setShuffle,
     setUiFont, setFontScale, setAccent,
-  } = useSettings()
-  const data = useData()
-  const themeFileRef = useRef<HTMLInputElement>(null)
+  }                                                   = useSettings()
+  const data                                          = useData()
+  const themeFileRef                                  = useRef<HTMLInputElement>(null)
   const { bindings, updateBinding, resetKeybindings } = useKeybindings()
-  const [ shortcutStatus, setShortcutStatus ] = useState('Select a shortcut field, then press the new keys.')
-  const isMac = typeof navigator !== 'undefined' && (/mac/i).test(navigator.userAgent)
+  const [ shortcutStatus, setShortcutStatus ]         = useState('Select a shortcut field, then press the new keys.')
+  const isMac                                         = typeof navigator !== 'undefined' && (/mac/i).test(navigator.userAgent)
 
   useThemeApply(theme, theme === 'custom' ? customTheme : null)
 
@@ -70,7 +70,7 @@ export function SettingsView () {
     if (theme !== 'custom')
       setTheme('custom')
 
-    const updated = exportTheme()
+    const updated       = exportTheme()
     updated.colors[key] = value
     setCustomTheme(updated)
     document.documentElement.style.setProperty(key, value)
@@ -78,17 +78,17 @@ export function SettingsView () {
 
   const handleExportTheme = () => {
     const themeData = exportTheme()
-    const blob = new Blob([ JSON.stringify(themeData, null, 2) ], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${themeData.name || 'custom-theme'}.json`
+    const blob      = new Blob([ JSON.stringify(themeData, null, 2) ], { type: 'application/json' })
+    const url       = URL.createObjectURL(blob)
+    const link      = document.createElement('a')
+    link.href       = url
+    link.download   = `${themeData.name || 'custom-theme'}.json`
     link.click()
     URL.revokeObjectURL(url)
   }
 
   const handleThemeFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0]
+    const file                = event.currentTarget.files?.[0]
     event.currentTarget.value = ''
     if (!file)
       return
@@ -127,303 +127,293 @@ export function SettingsView () {
       setShortcutStatus(clear ? 'Shortcut cleared.' : `Shortcut changed to ${formatShortcut(shortcut, isMac)}.`)
       event.currentTarget.blur()
     }
-    else {
+    else
       setShortcutStatus('That shortcut is already assigned.')
-    }
   }
 
   const currentColors = theme === 'custom' && customTheme ? customTheme.colors : {}
 
-  return (
-    <div className='settings-view'>
-      <nav className='settings-nav' aria-label='Settings sections'>
-        <ul>
-          {SETTINGS_SECTIONS.map(({ id, label }) =>
-            <li key={id}>
-              <a href={`#${id}`}>{label}</a>
-            </li>
-          )}
-        </ul>
-      </nav>
+  return <div className='settings-view'>
+    <nav className='settings-nav' aria-label='Settings sections'>
+      <ul>
+        {SETTINGS_SECTIONS.map(({ id, label }) =>
+          <li key={ id }>
+            <a href={ `#${id}` }>{label}</a>
+          </li>
+        )}
+      </ul>
+    </nav>
 
-      <div className='settings-pane'>
-        <section id='settings-library' aria-labelledby='settings-library-heading'>
-          <h2 id='settings-library-heading'>Library</h2>
-          <p className='section-description'>Library folders to scan for audio files</p>
+    <section className='settings-pane'>
+      <section id='settings-library' aria-labelledby='settings-library-heading'>
+        <h2 id='settings-library-heading'>Library</h2>
+        <p className='section-description'>Library folders to scan for audio files</p>
 
-          {libraryPaths.length === 0
-            ? <p className='status-message'>No library paths added</p>
-            : <ul className='path-list'>
-              {libraryPaths.map(path =>
-                <li key={path} className='path-item'>
-                  <span title={path}>{path}</span>
+        {libraryPaths.length === 0
+          ? <p className='status-message'>No library paths added</p>
+          : <ul className='path-list'>
+            {libraryPaths.map(path =>
+              <li key={ path } className='path-item'>
+                <span title={ path }>{path}</span>
 
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    aria-label={`Remove ${path}`}
-                    onClick={() =>
-                      removeLibraryPath(path)}
-                  >
-                    <Icon name='close' />
-                  </Button>
-                </li>
-              )}
-            </ul>
-          }
-
-          <Button type='button' variant='secondary' onClick={handleAddPath}>Add Folder</Button>
-
-          <label className='field default-density'>
-            <span>Default Row Density</span>
-
-            <select
-              value={defaultDensity}
-              onChange={event =>
-                setDefaultDensity(event.target.value as typeof defaultDensity)}
-            >
-              <option value='compact'>Compact</option>
-              <option value='normal'>Normal</option>
-              <option value='relaxed'>Relaxed</option>
-            </select>
-          </label>
-        </section>
-
-        <section id='settings-appearance' aria-labelledby='settings-appearance-heading'>
-          <h2 id='settings-appearance-heading'>Appearance</h2>
-
-          <label className='field'>
-            <span>Theme</span>
-
-            <select
-              value={theme}
-              onChange={event =>
-                setTheme(event.target.value as Theme)}
-            >
-              <option value='dark'>Dark</option>
-              <option value='light'>Light</option>
-              <option value='custom'>Custom</option>
-            </select>
-          </label>
-
-          <label className='field'>
-            <span>UI Font</span>
-
-            <select
-              value={uiFont}
-              onChange={event =>
-                setUiFont(event.target.value as UiFont)}
-            >
-              {(Object.keys(UI_FONT_LABELS) as UiFont[]).map(font =>
-                <option key={font} value={font}>{UI_FONT_LABELS[font]}</option>
-              )}
-            </select>
-          </label>
-
-          <p className='section-description'>
-            Montserrat ships with the app. Poppins and Helvetica are used only
-            if they are installed on this system.
-          </p>
-
-          <label className='field'>
-            <span>Font Size</span>
-
-            <span className='volume-setting'>
-              <input
-                id='settings-font-scale'
-                type='range'
-                className='slider'
-                min={MIN_FONT_SCALE}
-                max={MAX_FONT_SCALE}
-                step={0.05}
-                value={fontScale}
-                onChange={event =>
-                  setFontScale(Number(event.target.value))}
-              />
-
-              <output htmlFor='settings-font-scale' className='volume-value'>
-                {Math.round(fontScale * 100)}
-                %
-              </output>
-            </span>
-          </label>
-
-          {/* Two swatches, not one: an accent tuned for a near-black surface
-              rarely holds up on a light one, and vice versa. */}
-          <fieldset className='field accent-picker'>
-            <legend>Accent Colour</legend>
-
-            <label>
-              <span>Dark theme</span>
-
-              <input
-                type='color'
-                value={accentDark}
-                onChange={event =>
-                  setAccent('dark', event.target.value)}
-              />
-
-              <span className='color-value'>{accentDark}</span>
-            </label>
-
-            <label>
-              <span>Light theme</span>
-
-              <input
-                type='color'
-                value={accentLight}
-                onChange={event =>
-                  setAccent('light', event.target.value)}
-              />
-
-              <span className='color-value'>{accentLight}</span>
-            </label>
-          </fieldset>
-
-          <div className='theme-editor' hidden={theme !== 'custom'}>
-            <h3>Custom Theme Colors</h3>
-
-            <ul className='color-grid'>
-              {THEME_COLORS.map(({ key, label }) =>
-                <li key={key} className='color-field'>
-                  <label>
-                    <span>{label}</span>
-
-                    <input
-                      type='color'
-                      value={currentColors[key] || '#000000'}
-                      onChange={event =>
-                        handleColorChange(key, event.target.value)}
-                    />
-
-                    <span className='color-value'>{currentColors[key] || ''}</span>
-                  </label>
-                </li>
-              )}
-            </ul>
-
-            <menu className='theme-actions'>
-              <li><Button type='button' variant='secondary' size='sm' onClick={handleSaveTheme}>Save</Button></li>
-              <li><Button type='button' variant='secondary' size='sm' onClick={handleExportTheme}>Export</Button></li>
-
-              <li>
-                <Button type='button'
-                  variant='secondary'
+                <Button
+                  aria-label={ `Remove ${path}` }
+                  type='button'
+                  variant='ghost'
                   size='sm'
-                  onClick={() =>
-                    themeFileRef.current?.click()}>
-                  Import
+                  onClick={ () =>
+                    removeLibraryPath(path) }>
+                  <Icon name='close' />
                 </Button>
               </li>
-            </menu>
-
-            <input
-              ref={themeFileRef}
-              type='file'
-              accept='.json,application/json'
-              aria-label='Import custom theme'
-              hidden
-              onChange={handleThemeFile}
-            />
-          </div>
-        </section>
-
-        <section id='settings-playback' aria-labelledby='settings-playback-heading'>
-          <h2 id='settings-playback-heading'>Playback</h2>
-
-          <label className='field'>
-            <span>Default Volume</span>
-
-            <span className='volume-setting'>
-              <input
-                id='settings-volume'
-                type='range'
-                className='slider'
-                min={0}
-                max={1}
-                step={0.01}
-                value={volume}
-                onChange={event =>
-                  setVolume(Number(event.target.value))}
-              />
-
-              <output htmlFor='settings-volume' className='volume-value'>
-                {Math.round(volume * 100)}
-                %
-              </output>
-            </span>
-          </label>
-
-          <label className='field'>
-            <span>Repeat Mode</span>
-
-            <select
-              value={repeatMode}
-              onChange={event =>
-                setRepeatMode(event.target.value as RepeatMode)}
-            >
-              <option value='none'>No Repeat</option>
-              <option value='one'>Repeat One</option>
-              <option value='all'>Repeat All</option>
-            </select>
-          </label>
-
-          <label className='field checkbox-field'>
-            <input
-              type='checkbox'
-              checked={shuffle}
-              onChange={event =>
-                setShuffle(event.target.checked)}
-            />
-
-            <span>Shuffle</span>
-          </label>
-        </section>
-
-        <section id='settings-hotkeys' aria-labelledby='settings-hotkeys-heading'>
-          <h2 id='settings-hotkeys-heading'>Hotkeys</h2>
-
-          <p className='section-description'>
-            Focus a shortcut and press its replacement. Backspace or Delete clears it.
-          </p>
-
-          <fieldset className='hotkey-list'>
-            <legend className='sr-only'>Keyboard shortcuts</legend>
-
-            {bindings.map(binding =>
-              <label className='hotkey-field' key={binding.id}>
-                <span>{binding.label}</span>
-
-                <input
-                  type='text'
-                  readOnly
-                  value={formatShortcut(binding.shortcut, isMac)}
-                  aria-describedby='shortcut-status'
-                  onFocus={event =>
-                    event.currentTarget.select()}
-                  onKeyDown={event =>
-                    handleShortcutKey(binding.id, event)}
-                />
-              </label>
             )}
-          </fieldset>
+          </ul>
+        }
 
-          <output id='shortcut-status' className='hotkey-status' aria-live='polite'>
-            {shortcutStatus}
-          </output>
+        <Button type='button' variant='secondary' onClick={ handleAddPath }>Add Folder</Button>
 
-          <Button type='button' variant='secondary' size='sm' onClick={resetKeybindings}>
-            Reset shortcuts
-          </Button>
-        </section>
+        <label className='field default-density'>
+          <span>Default Row Density</span>
 
-        <section id='settings-about' aria-labelledby='settings-about-heading'>
-          <h2 id='settings-about-heading'>About</h2>
-          <p>Desktop Audio Player v1.0.0</p>
-          <p>Built with Electron + React</p>
-        </section>
-      </div>
-    </div>
-  )
+          <select
+            value={ defaultDensity }
+            onChange={ event =>
+              setDefaultDensity(event.target.value as typeof defaultDensity) }>
+            <option value='compact'>Compact</option>
+            <option value='normal'>Normal</option>
+            <option value='relaxed'>Relaxed</option>
+          </select>
+        </label>
+      </section>
+
+      <section id='settings-appearance' aria-labelledby='settings-appearance-heading'>
+        <h2 id='settings-appearance-heading'>Appearance</h2>
+
+        <label className='field'>
+          <span>Theme</span>
+
+          <select
+            value={ theme }
+            onChange={ event =>
+              setTheme(event.target.value as Theme) }>
+            <option value='dark'>Dark</option>
+            <option value='light'>Light</option>
+            <option value='custom'>Custom</option>
+          </select>
+        </label>
+
+        <label className='field'>
+          <span>UI Font</span>
+
+          <select
+            value={ uiFont }
+            onChange={ event =>
+              setUiFont(event.target.value as UiFont) }>
+            {(Object.keys(UI_FONT_LABELS) as UiFont[]).map(font =>
+              <option key={ font } value={ font }>{UI_FONT_LABELS[font]}</option>
+            )}
+          </select>
+        </label>
+
+        <p className='section-description'>
+          Montserrat ships with the app. Poppins and Helvetica are used only
+          if they are installed on this system.
+        </p>
+
+        <label className='field'>
+          <span>Font Size</span>
+
+          <span className='volume-setting'>
+            <input
+              className='slider'
+              id='settings-font-scale'
+              type='range'
+              min={ MIN_FONT_SCALE }
+              max={ MAX_FONT_SCALE }
+              step={ 0.05 }
+              value={ fontScale }
+              onChange={ event =>
+                setFontScale(Number(event.target.value)) } />
+
+            <output className='volume-value' htmlFor='settings-font-scale'>
+              {Math.round(fontScale * 100)}
+              %
+            </output>
+          </span>
+        </label>
+
+        {/* Two swatches, not one: an accent tuned for a near-black surface
+              rarely holds up on a light one, and vice versa. */}
+        <fieldset className='field accent-picker'>
+          <legend>Accent Colour</legend>
+
+          <label>
+            <span>Dark theme</span>
+
+            <input
+              type='color'
+              value={ accentDark }
+              onChange={ event =>
+                setAccent('dark', event.target.value) } />
+
+            <span className='color-value'>{accentDark}</span>
+          </label>
+
+          <label>
+            <span>Light theme</span>
+
+            <input
+              type='color'
+              value={ accentLight }
+              onChange={ event =>
+                setAccent('light', event.target.value) } />
+
+            <span className='color-value'>{accentLight}</span>
+          </label>
+        </fieldset>
+
+        <div className='theme-editor' hidden={ theme !== 'custom' }>
+          <h3>Custom Theme Colors</h3>
+
+          <ul className='color-grid'>
+            {THEME_COLORS.map(({ key, label }) =>
+              <li key={ key } className='color-field'>
+                <label>
+                  <span>{label}</span>
+
+                  <input
+                    type='color'
+                    value={ currentColors[key] || '#000000' }
+                    onChange={ event =>
+                      handleColorChange(key, event.target.value) } />
+
+                  <span className='color-value'>{currentColors[key] || ''}</span>
+                </label>
+              </li>
+            )}
+          </ul>
+
+          <menu className='theme-actions'>
+            <li>
+              <Button type='button' variant='secondary' size='sm' onClick={ handleSaveTheme }>Save</Button>
+            </li>
+
+            <li>
+              <Button type='button' variant='secondary' size='sm' onClick={ handleExportTheme }>Export</Button>
+            </li>
+
+            <li>
+              <Button
+                type='button'
+                variant='secondary'
+                size='sm'
+                onClick={ () =>
+                  themeFileRef.current?.click() }>
+                Import
+              </Button>
+            </li>
+          </menu>
+
+          <input
+            ref={ themeFileRef }
+            aria-label='Import custom theme'
+            type='file'
+            accept='.json,application/json'
+            hidden
+            onChange={ handleThemeFile } />
+        </div>
+      </section>
+
+      <section id='settings-playback' aria-labelledby='settings-playback-heading'>
+        <h2 id='settings-playback-heading'>Playback</h2>
+
+        <label className='field'>
+          <span>Default Volume</span>
+
+          <span className='volume-setting'>
+            <input
+              className='slider'
+              id='settings-volume'
+              type='range'
+              min={ 0 }
+              max={ 1 }
+              step={ 0.01 }
+              value={ volume }
+              onChange={ event =>
+                setVolume(Number(event.target.value)) } />
+
+            <output className='volume-value' htmlFor='settings-volume'>
+              {Math.round(volume * 100)}
+              %
+            </output>
+          </span>
+        </label>
+
+        <label className='field'>
+          <span>Repeat Mode</span>
+
+          <select
+            value={ repeatMode }
+            onChange={ event =>
+              setRepeatMode(event.target.value as RepeatMode) }>
+            <option value='none'>No Repeat</option>
+            <option value='one'>Repeat One</option>
+            <option value='all'>Repeat All</option>
+          </select>
+        </label>
+
+        <label className='field checkbox-field'>
+          <input
+            type='checkbox'
+            checked={ shuffle }
+            onChange={ event =>
+              setShuffle(event.target.checked) } />
+
+          <span>Shuffle</span>
+        </label>
+      </section>
+
+      <section id='settings-hotkeys' aria-labelledby='settings-hotkeys-heading'>
+        <h2 id='settings-hotkeys-heading'>Hotkeys</h2>
+
+        <p className='section-description'>
+          Focus a shortcut and press its replacement. Backspace or Delete clears it.
+        </p>
+
+        <fieldset className='hotkey-list'>
+          <legend className='sr-only'>Keyboard shortcuts</legend>
+
+          {bindings.map(binding =>
+            <label key={ binding.id } className='hotkey-field'>
+              <span>{binding.label}</span>
+
+              <input
+                aria-describedby='shortcut-status'
+                type='text'
+                readOnly
+                value={ formatShortcut(binding.shortcut, isMac) }
+                onFocus={ event =>
+                  event.currentTarget.select() }
+                onKeyDown={ event =>
+                  handleShortcutKey(binding.id, event) } />
+            </label>
+          )}
+        </fieldset>
+
+        <output className='hotkey-status' id='shortcut-status' aria-live='polite'>
+          {shortcutStatus}
+        </output>
+
+        <Button type='button' variant='secondary' size='sm' onClick={ resetKeybindings }>
+          Reset shortcuts
+        </Button>
+      </section>
+
+      <section id='settings-about' aria-labelledby='settings-about-heading'>
+        <h2 id='settings-about-heading'>About</h2>
+        <p>Desktop Audio Player v1.0.0</p>
+        <p>Built with Electron + React</p>
+      </section>
+    </section>
+  </div>
 }

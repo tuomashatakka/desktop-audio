@@ -15,8 +15,14 @@
  * row → columnheader/cell); a real `<table>` can't be virtualized or
  * column-resized without fighting table layout.
  */
+/* eslint-disable react-strict/no-style-prop -- Every `style` here carries a
+   value CSS cannot know: virtualizer row offsets, the user's resized column
+   template, and per-track cover colours. They are geometry and data, not
+   presentation choices that belong in a stylesheet. */
+
 import { useRef, useState, useMemo, useEffect, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import type { VirtualItem } from '@tanstack/react-virtual'
 import { useSortableTable } from '../../hooks/useSortableTable'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import type { ColumnKey, ColumnConfig } from '../../hooks/useColumnConfig'
@@ -30,6 +36,7 @@ import { Icon } from '../atomic/Icon'
 import { Breadcrumbs } from './Breadcrumbs'
 import type { SortKey } from '../../hooks/useSortableTable'
 import { formatTime, isoDuration } from '../../utils/time'
+import { listenAll } from '../../utils/events'
 
 
 const ROW_HEIGHT_BY_DENSITY: Record<Density, number> = {
@@ -39,6 +46,26 @@ const ROW_HEIGHT_BY_DENSITY: Record<Density, number> = {
 }
 
 const SKELETON_ROW_COUNT = 20
+
+/** Placeholder bar width for a text cell while the row is loading. */
+const SKELETON_TEXT_WIDTH = '60%'
+
+/** Rows rendered beyond the viewport, so fast scrolling doesn't show gaps. */
+const ROW_OVERSCAN = 12
+
+/** A column narrower than this can no longer show its own label. */
+const MIN_COLUMN_WIDTH = 48
+
+/** Bytes per unit, for the size column. */
+const BYTES_PER_KB = 1024
+const BYTES_PER_MB = BYTES_PER_KB * BYTES_PER_KB
+
+/** Below one full megabyte the size column falls back to kilobytes. */
+const MIN_MB_FOR_MB_UNIT = 1
+
+/** ARIA row indices are 1-based; the header occupies the first row. */
+const ARIA_HEADER_ROW_INDEX = 1
+const ARIA_BODY_ROW_OFFSET  = ARIA_HEADER_ROW_INDEX + 1
 
 function withTableSemantics<T> (enabled: boolean, value: T): T | undefined {
   return enabled ? value : undefined
@@ -60,8 +87,10 @@ function formatSize (bytes: number): string {
   if (!bytes)
     return '—'
 
-  const mb = bytes / (1024 * 1024)
-  return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`
+  const mb = bytes / BYTES_PER_MB
+  return mb >= MIN_MB_FOR_MB_UNIT
+    ? `${mb.toFixed(1)} MB`
+    : `${Math.round(bytes / BYTES_PER_KB)} KB`
 }
 
 /** The directory holding `path`, handling both `/` and `\\` separators. */
@@ -76,9 +105,11 @@ function isSortableKey (key: ColumnKey): key is SortKey {
 }
 
 /** Always square, always cropped — see `.album-art` in views.css. */
-function AlbumArt ({ src, color }: { readonly src?: string; readonly color?: string }) {
+type AlbumArtProps = { readonly src?: string; readonly color?: string }
+
+function AlbumArt ({ src, color }: AlbumArtProps) {
   return src
-    ? <img className='album-art' src={src} alt='' loading='lazy' />
+    ? <img className='album-art' src={ src } alt='' loading='lazy' />
     : <span className='album-art' style={{ background: color }} />
 }
 
@@ -87,7 +118,7 @@ type CellRenderer = (track: Track, index: number, density: Density) => React.Rea
 /** Column renderers keep adding a column from inflating one giant switch. */
 const CELL_RENDERERS: Record<ColumnKey, CellRenderer> = {
   art: track =>
-    <AlbumArt src={track.albumArt} color={track.coverColor} />,
+    <AlbumArt src={ track.albumArt } color={ track.coverColor } />,
   index: (_track, index) =>
     index + 1,
   title: (track, _index, density) =>
@@ -110,7 +141,7 @@ const CELL_RENDERERS: Record<ColumnKey, CellRenderer> = {
   genre: track =>
     track.genre ?? '',
   duration: track =>
-    <time dateTime={isoDuration(track.duration)}>{formatTime(track.duration)}</time>,
+    <time dateTime={ isoDuration(track.duration) }>{formatTime(track.duration)}</time>,
   format: track =>
     track.format?.toUpperCase() ?? '',
   size: track =>
@@ -140,7 +171,7 @@ interface HeaderCellProps {
 
 /** One column header: click to sort, drag to reorder, drag the edge to resize. */
 function HeaderCell ({ col, sortKey, sortDir, toggleSort, onResize, onReorder, tableSemantics, onContextMenu }: HeaderCellProps) {
-  const ref = useRef<HTMLDivElement>(null)
+  const ref      = useRef<HTMLDivElement>(null)
   const sortable = isSortableKey(col.key)
   const isSorted = sortable && col.key === sortKey
 
@@ -173,19 +204,18 @@ function HeaderCell ({ col, sortKey, sortDir, toggleSort, onResize, onReorder, t
     e.preventDefault()
     e.stopPropagation()
 
-    const startX = e.clientX
+    const startX     = e.clientX
     const startWidth = ref.current?.getBoundingClientRect().width ?? 0
 
-    const onMove = (ev: MouseEvent) => {
-      const next = Math.max(48, Math.round(startWidth + (ev.clientX - startX)))
-      onResize(col.key, `${next}px`)
-    }
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    // Bound for the gesture only; the mouseup handler disposes both at once.
+    const drag = listenAll(window, {
+      mousemove: event => {
+        const delta = (event as MouseEvent).clientX - startX
+        onResize(col.key, `${Math.max(MIN_COLUMN_WIDTH, Math.round(startWidth + delta))}px`)
+      },
+      mouseup: () =>
+        drag.dispose(),
+    })
   }
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -194,74 +224,70 @@ function HeaderCell ({ col, sortKey, sortDir, toggleSort, onResize, onReorder, t
       onContextMenu({ x: e.clientX, y: e.clientY })
   }
 
-  return (
-    <div
-      ref={ref}
-      role={tableSemantics ? 'columnheader' : sortable ? 'button' : undefined}
-      draggable
-      className={`track-column-header col-${col.key} ${isSorted ? 'sorted' : ''}`}
-      onClick={handleClick}
-      onContextMenu={handleContextMenu}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      aria-sort={tableSemantics && isSorted ? sortDir === 'asc' ? 'ascending' : 'descending' : undefined}
-      tabIndex={sortable ? 0 : undefined}
-      onKeyDown={e => {
-        if (sortable && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault()
-          toggleSort(col.key as SortKey)
-        }
-      }}
-    >
-      <span className='label'>{col.label}</span>
-
-      {isSorted &&
-        <Icon className={sortDir === 'asc' ? 'sort-ascending' : 'sort-descending'} name='chevron-right' />
+  return <div
+    ref={ ref }
+    className={ `track-column-header col-${col.key} ${isSorted ? 'sorted' : ''}` }
+    aria-sort={ tableSemantics && isSorted ? sortDir === 'asc' ? 'ascending' : 'descending' : undefined }
+    role={ tableSemantics ? 'columnheader' : sortable ? 'button' : undefined }
+    draggable
+    tabIndex={ sortable ? 0 : undefined }
+    onClick={ handleClick }
+    onContextMenu={ handleContextMenu }
+    onDragStart={ handleDragStart }
+    onDragOver={ handleDragOver }
+    onDrop={ handleDrop }
+    onKeyDown={ e => {
+      if (sortable && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault()
+        toggleSort(col.key as SortKey)
       }
+    } }>
+    <span className='label'>{col.label}</span>
 
-      <span className='resize-handle' onMouseDown={handleResizeStart} aria-hidden='true' />
-    </div>
-  )
+    {isSorted &&
+        <Icon className={ sortDir === 'asc' ? 'sort-ascending' : 'sort-descending' } name='chevron-right' />
+    }
+
+    <span className='resize-handle' aria-hidden='true' onMouseDown={ handleResizeStart } />
+  </div>
 }
 
 /** Pointer-positioned popover listing every column, plus a reset button. */
+type ColumnMenuProps = {
+  readonly point:        PopoverPoint | null
+  readonly columns:      readonly ColumnConfig[]
+  readonly toggleColumn: (key: ColumnKey) => void
+  readonly resetColumns: () => void
+  readonly onClose:      () => void
+}
+
 function ColumnMenu ({
   point,
   columns,
   toggleColumn,
   resetColumns,
   onClose,
-}: {
-  readonly point:        PopoverPoint | null
-  readonly columns:      readonly ColumnConfig[]
-  readonly toggleColumn: (key: ColumnKey) => void
-  readonly resetColumns: () => void
-  readonly onClose:      () => void
-}) {
-  return (
-    <Popover open={point !== null} point={point} onClose={onClose}>
-      <fieldset className='config-menu'>
-        <legend>Columns</legend>
+}: ColumnMenuProps) {
+  return <Popover open={ point !== null } point={ point } onClose={ onClose }>
+    <fieldset className='config-menu'>
+      <legend>Columns</legend>
 
-        {columns.map(c =>
-          <label key={c.key}>
-            <input
-              type='checkbox'
-              checked={c.visible}
-              disabled={c.fixed}
-              onChange={() =>
-                toggleColumn(c.key)}
-            />
+      {columns.map(c =>
+        <label key={ c.key }>
+          <input
+            type='checkbox'
+            checked={ c.visible }
+            disabled={ c.fixed }
+            onChange={ () =>
+              toggleColumn(c.key) } />
 
-            {c.label || c.key}
-          </label>
-        )}
+          {c.label || c.key}
+        </label>
+      )}
 
-        <Button type='button' variant='ghost' size='sm' onClick={resetColumns}>Reset</Button>
-      </fieldset>
-    </Popover>
-  )
+      <Button type='button' variant='ghost' size='sm' onClick={ resetColumns }>Reset</Button>
+    </fieldset>
+  </Popover>
 }
 
 /** Group identity for a track under the active grouping mode. */
@@ -290,25 +316,24 @@ interface GroupBlock {
  * into a `<summary>` — nesting interactive content there nests buttons in the
  * accessibility tree. One button next to the heading works for all three.
  */
-function GroupToggle ({ open, controls, label, onToggle }: {
+type GroupToggleProps = {
   readonly open:     boolean
   readonly controls: string
   readonly label:    string
   readonly onToggle: (toggleAll: boolean) => void
-}) {
-  return (
-    <button
-      type='button'
-      className='group-toggle'
-      aria-expanded={open}
-      aria-controls={controls}
-      aria-label={`${open ? 'Collapse' : 'Expand'} ${label}`}
-      onClick={event =>
-        onToggle(event.altKey)}
-    >
-      <Icon name='chevron-right' />
-    </button>
-  )
+}
+
+function GroupToggle ({ open, controls, label, onToggle }: GroupToggleProps) {
+  return <button
+    className='group-toggle'
+    aria-expanded={ open }
+    aria-controls={ controls }
+    aria-label={ `${open ? 'Collapse' : 'Expand'} ${label}` }
+    type='button'
+    onClick={ event =>
+      onToggle(event.altKey) }>
+    <Icon name='chevron-right' />
+  </button>
 }
 
 function groupLabel (track: Track, grouping: Grouping, path: string): string {
@@ -317,6 +342,136 @@ function groupLabel (track: Track, grouping: Grouping, path: string): string {
   if (grouping === 'artist')
     return track.artist || 'Unknown Artist'
   return path
+}
+
+/** Absolute placement for one virtualized row inside the spacer. */
+function virtualRowStyle (start: number, size: number): React.CSSProperties {
+  return {
+    position:    'absolute',
+    insetInline: 0,
+    top:         0,
+    height:      size,
+    transform:   `translateY(${start}px)`,
+  }
+}
+
+interface SkeletonRowProps {
+  readonly columns: readonly ColumnConfig[]
+  readonly index:   number
+  readonly style:   React.CSSProperties
+}
+
+/** Placeholder row shown while the list is still empty and a scan is running. */
+function SkeletonRow ({ columns, index, style }: SkeletonRowProps) {
+  return <div
+    className='track-row'
+    style={ style }
+    aria-rowindex={ index + ARIA_BODY_ROW_OFFSET }
+    aria-label='Loading track'
+    role='row'>
+    {columns.map(col =>
+      <span key={ col.key } className={ `col-${col.key}` } role='cell'>
+        <Skeleton
+          width={ col.key === 'art' ? 'var(--art)' : SKELETON_TEXT_WIDTH }
+          height={ col.key === 'art' ? 'var(--art)' : undefined } />
+      </span>
+    )}
+  </div>
+}
+
+interface TrackGroupProps {
+  readonly group:       GroupBlock
+  readonly grouping:    Grouping
+  readonly headingId:   string
+  readonly collapsed:   boolean
+  readonly roots:       readonly string[]
+  readonly renderRow:   (track: Track, index: number) => React.ReactNode
+  readonly indexOf:     (track: Track, fallback: number) => number
+  readonly onToggle:    (key: string, toggleAll: boolean) => void
+  readonly onNavigate?: (path: string | null) => void
+}
+
+/**
+ * One labelled group of rows.
+ *
+ * The three grouping modes differ only in their heading: album groups put
+ * artwork beside it, path groups put an interactive breadcrumb trail inside
+ * it, and artist groups use a plain title.
+ */
+function TrackGroup ({
+  group, grouping, headingId, collapsed, roots, renderRow, indexOf, onToggle, onNavigate,
+}: TrackGroupProps) {
+  const rowsId = `${headingId}-rows`
+
+  // A collapsed group renders no rows at all rather than hiding them: with a
+  // large library that is the difference between a few hundred DOM nodes and
+  // a few thousand.
+  const rows = collapsed
+    ? null
+    : group.tracks.map((track, i) =>
+      renderRow(track, indexOf(track, i)))
+
+  const toggle =
+    <GroupToggle
+      open={ !collapsed }
+      controls={ rowsId }
+      label={ group.label }
+      onToggle={ toggleAll =>
+        onToggle(group.key, toggleAll) } />
+
+  const body = <div className='group-rows' id={ rowsId } hidden={ collapsed }>{rows}</div>
+
+  if (grouping === 'album')
+    return <section
+      className='track-group album'
+      data-collapsed={ collapsed || undefined }
+      aria-labelledby={ headingId }>
+      <AlbumArt src={ group.tracks[0].albumArt } color={ group.tracks[0].coverColor } />
+
+      <header>
+        {toggle}
+        <h3 id={ headingId }>{group.label}</h3>
+        <small>{group.subtitle}</small>
+      </header>
+
+      {body}
+    </section>
+
+  // Path groups head with a clickable trail rather than a plain heading, so
+  // the folder they represent stays navigable.
+  if (grouping === 'path')
+    return <section
+      className='track-group'
+      data-collapsed={ collapsed || undefined }
+      aria-label={ group.key }>
+      <header>
+        {toggle}
+
+        <Breadcrumbs
+          path={ group.key }
+          roots={ roots }
+          label='Group folder'
+          onNavigate={ path =>
+            onNavigate?.(path) } />
+
+        <small>{group.subtitle}</small>
+      </header>
+
+      {body}
+    </section>
+
+  return <section
+    className='track-group'
+    data-collapsed={ collapsed || undefined }
+    aria-labelledby={ headingId }>
+    <header>
+      {toggle}
+      <h3 className='group-title' id={ headingId }>{group.label}</h3>
+      <small>{group.subtitle}</small>
+    </header>
+
+    {body}
+  </section>
 }
 
 /** Buckets an already-sorted list into labelled groups; empty when ungrouped. */
@@ -337,7 +492,7 @@ function buildGroups (sorted: readonly Track[], grouping: Grouping): readonly Gr
     const first = tracks[0]
     const label = groupLabel(first, grouping, key)
 
-    const count = `${tracks.length} track${tracks.length === 1 ? '' : 's'}`
+    const count    = `${tracks.length} track${tracks.length === 1 ? '' : 's'}`
     const subtitle = grouping === 'album'
       ? `${first.artist || 'Unknown Artist'} · ${count}`
       : count
@@ -358,7 +513,7 @@ export function TrackTable ({
   onNavigate,
   roots = [],
 }: TrackTableProps) {
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollRef             = useRef<HTMLDivElement>(null)
   const { density, grouping } = useUI()
   const {
     columns,
@@ -368,16 +523,17 @@ export function TrackTable ({
     resizeColumn,
     reorderColumn,
     resetColumns,
-  } = useColumnConfig()
+  }                                              = useColumnConfig()
   const { sorted, sortKey, sortDir, toggleSort } = useSortableTable(tracks)
 
-  const [ menuPoint, setMenuPoint ] = useState<PopoverPoint | null>(null)
+  const [ menuPoint, setMenuPoint ]       = useState<PopoverPoint | null>(null)
   const [ focusedIndex, setFocusedIndex ] = useState(0)
 
   // Collapsed rather than expanded state: groups default to open, and a set
   // of exceptions survives regrouping and re-sorting without having to be
   // rebuilt every time the group list changes.
-  const [ collapsedGroups, setCollapsedGroups ] = useState<ReadonlySet<string>>(new Set())
+  const [ collapsedGroups, setCollapsedGroups ] = useState<ReadonlySet<string>>(() =>
+    new Set())
 
   const groups = useMemo(() =>
     buildGroups(sorted, grouping), [ sorted, grouping ])
@@ -403,8 +559,8 @@ export function TrackTable ({
   const rowHeight = ROW_HEIGHT_BY_DENSITY[density]
 
   /** Skeletons stand in for an empty list only — never over cached rows. */
-  const showSkeleton = isLoading && sorted.length === 0
-  const flat = grouping === 'none' || showSkeleton
+  const showSkeleton   = isLoading && sorted.length === 0
+  const flat           = grouping === 'none' || showSkeleton
   const tableSemantics = flat
 
   const virtualizer = useVirtualizer({
@@ -413,12 +569,12 @@ export function TrackTable ({
       scrollRef.current,
     estimateSize: () =>
       rowHeight,
-    overscan: 12,
+    overscan: ROW_OVERSCAN,
   })
 
   const style = useMemo(() =>
     ({ '--track-grid': gridTemplate }) as React.CSSProperties,
-  [ gridTemplate ])
+                        [ gridTemplate ])
 
   useEffect(() => {
     const currentIndex = currentTrack
@@ -444,7 +600,7 @@ export function TrackTable ({
   }, [ flat, sorted.length, virtualizer ])
 
   const renderRow = useCallback((track: Track, index: number, rowStyle?: React.CSSProperties) => {
-    const active = currentTrack?.id === track.id
+    const active   = currentTrack?.id === track.id
     const activate = () => {
       setFocusedIndex(index)
       onPlay(track, index)
@@ -479,56 +635,48 @@ export function TrackTable ({
     }
     const cells = visible.map(col =>
       <span
-        key={col.key}
-        role={tableSemantics ? 'cell' : undefined}
-        className={`col-${col.key}`}
-      >
+        key={ col.key }
+        className={ `col-${col.key}` }
+        role={ tableSemantics ? 'cell' : undefined }>
         {col.key === 'index' && active && isPlaying
           ? <Icon name='play' />
           : cellValue(track, col.key, index, density)}
       </span>
     )
 
-    if (!tableSemantics) {
-      return (
-        <button
-          key={track.id}
-          type='button'
-          data-track-index={index}
-          style={rowStyle}
-          className={`track-row ${active ? 'active' : ''}`}
-          onClick={activate}
-          onContextMenu={openContextMenu}
-          onFocus={() =>
-            setFocusedIndex(index)}
-          onKeyDown={handleKeyDown}
-          tabIndex={index === focusedIndex ? 0 : -1}
-          aria-current={active ? 'true' : undefined}
-        >
-          {cells}
-        </button>
-      )
-    }
-
-    return (
-      <div
-        key={track.id}
-        role='row'
-        aria-rowindex={index + 2}
-        data-track-index={index}
-        style={rowStyle}
-        className={`track-row ${active ? 'active' : ''}`}
-        onClick={activate}
-        onContextMenu={openContextMenu}
-        onFocus={() =>
-          setFocusedIndex(index)}
-        onKeyDown={handleKeyDown}
-        tabIndex={index === focusedIndex ? 0 : -1}
-        aria-selected={active}
-      >
+    if (!tableSemantics)
+      return <button
+        key={ track.id }
+        style={ rowStyle }
+        className={ `track-row ${active ? 'active' : ''}` }
+        data-track-index={ index }
+        aria-current={ active ? 'true' : undefined }
+        type='button'
+        tabIndex={ index === focusedIndex ? 0 : -1 }
+        onClick={ activate }
+        onContextMenu={ openContextMenu }
+        onFocus={ () =>
+          setFocusedIndex(index) }
+        onKeyDown={ handleKeyDown }>
         {cells}
-      </div>
-    )
+      </button>
+
+    return <div
+      key={ track.id }
+      style={ rowStyle }
+      className={ `track-row ${active ? 'active' : ''}` }
+      aria-rowindex={ index + ARIA_BODY_ROW_OFFSET }
+      data-track-index={ index }
+      aria-selected={ active }
+      role='row'
+      tabIndex={ index === focusedIndex ? 0 : -1 }
+      onClick={ activate }
+      onContextMenu={ openContextMenu }
+      onFocus={ () =>
+        setFocusedIndex(index) }
+      onKeyDown={ handleKeyDown }>
+      {cells}
+    </div>
   }, [ tableSemantics, visible, density, currentTrack, isPlaying, onPlay, onContextMenu, focusedIndex, moveRowFocus, sorted.length ])
 
   // Keep the playing track in view (flat list only — grouped views aren't
@@ -552,174 +700,78 @@ export function TrackTable ({
 
   const bodyRowCount = showSkeleton ? SKELETON_ROW_COUNT : sorted.length
 
-  return (
-    <section
-      className='track-table'
-      data-density={density}
-      style={style}
-      role={withTableSemantics(tableSemantics, 'table')}
-      aria-label='Tracks'
-      aria-colcount={withTableSemantics(tableSemantics, visible.length)}
-      aria-rowcount={withTableSemantics(tableSemantics, bodyRowCount + 1)}
-      aria-busy={isLoading || undefined}
-    >
-      <div ref={scrollRef} className='track-scroll' role={withTableSemantics(tableSemantics, 'presentation')}>
+  /** One virtualized row, placed absolutely at the offset the virtualizer gives. */
+  const renderVirtualRow = useCallback((vrow: VirtualItem) => {
+    const track = sorted[vrow.index]
+    return track
+      ? renderRow(track, vrow.index, virtualRowStyle(vrow.start, vrow.size))
+      : null
+  }, [ renderRow, sorted ])
 
-        <div className='track-header' role={withTableSemantics(tableSemantics, 'rowgroup')}>
-          <div className='track-header-row' role={withTableSemantics(tableSemantics, 'row')} aria-rowindex={withTableSemantics(tableSemantics, 1)}>
-            {visible.map(col =>
-              <HeaderCell
-                key={col.key}
-                col={col}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                toggleSort={toggleSort}
-                onResize={resizeColumn}
-                onReorder={reorderColumn}
-                tableSemantics={tableSemantics}
-                onContextMenu={setMenuPoint}
-              />
-            )}
-          </div>
+  return <section
+    className='track-table'
+    style={ style }
+    data-density={ density }
+    aria-label='Tracks'
+    aria-colcount={ withTableSemantics(tableSemantics, visible.length) }
+    aria-rowcount={ withTableSemantics(tableSemantics, bodyRowCount + ARIA_HEADER_ROW_INDEX) }
+    aria-busy={ isLoading || undefined }
+    role={ withTableSemantics(tableSemantics, 'table') }>
+    <div ref={ scrollRef } className='track-scroll' role={ withTableSemantics(tableSemantics, 'presentation') }>
+
+      <header className='track-header' role={ withTableSemantics(tableSemantics, 'rowgroup') }>
+        <div className='track-header-row' aria-rowindex={ withTableSemantics(tableSemantics, ARIA_HEADER_ROW_INDEX) } role={ withTableSemantics(tableSemantics, 'row') }>
+          {visible.map(col =>
+            <HeaderCell
+              key={ col.key }
+              col={ col }
+              sortKey={ sortKey }
+              sortDir={ sortDir }
+              toggleSort={ toggleSort }
+              tableSemantics={ tableSemantics }
+              onResize={ resizeColumn }
+              onReorder={ reorderColumn }
+              onContextMenu={ setMenuPoint } />
+          )}
+        </div>
+      </header>
+
+      {flat
+        ? <div className='track-body' style={{ height: virtualizer.getTotalSize() }} role='rowgroup'>
+          {virtualizer.getVirtualItems().map(vrow =>
+            showSkeleton
+              ? <SkeletonRow
+                key={ vrow.key }
+                style={ virtualRowStyle(vrow.start, vrow.size) }
+                columns={ visible }
+                index={ vrow.index } />
+              : renderVirtualRow(vrow))}
         </div>
 
-        {flat
-          ? <div className='track-body' role='rowgroup' style={{ height: virtualizer.getTotalSize() }}>
-            {virtualizer.getVirtualItems().map(vrow => {
-              const rowStyle: React.CSSProperties = {
-                position:    'absolute',
-                insetInline: 0,
-                top:         0,
-                height:      vrow.size,
-                transform:   `translateY(${vrow.start}px)`,
-              }
+        : <div className='track-body grouped'>
+          {groups.map((group, groupIndex) =>
+            <TrackGroup
+              key={ group.key }
+              group={ group }
+              grouping={ grouping }
+              headingId={ `track-group-${grouping}-${groupIndex}` }
+              collapsed={ collapsedGroups.has(group.key) }
+              roots={ roots }
+              renderRow={ renderRow }
+              indexOf={ indexOf }
+              onToggle={ toggleGroup }
+              onNavigate={ onNavigate } />
+          )}
+        </div>
+      }
+    </div>
 
-              if (showSkeleton)
-                return (
-                  <div
-                    key={vrow.key}
-                    className='track-row'
-                    style={rowStyle}
-                    role='row'
-                    aria-rowindex={vrow.index + 2}
-                    aria-label='Loading track'
-                  >
-                    {visible.map(col =>
-                      <span key={col.key} role='cell' className={`col-${col.key}`}>
-                        <Skeleton
-                          width={col.key === 'art' ? 'var(--art)' : '60%'}
-                          height={col.key === 'art' ? 'var(--art)' : undefined}
-                        />
-                      </span>
-                    )}
-                  </div>
-                )
-
-              const track = sorted[vrow.index]
-              return track ? renderRow(track, vrow.index, rowStyle) : null
-            })}
-          </div>
-
-          : <div className='track-body grouped'>
-            {groups.map((g, groupIndex) => {
-              const headingId = `track-group-${grouping}-${groupIndex}`
-              const rowsId = `${headingId}-rows`
-              const collapsed = collapsedGroups.has(g.key)
-
-              // A collapsed group renders no rows at all rather than hiding
-              // them: with a large library that is the difference between a
-              // few hundred DOM nodes and a few thousand.
-              const rows = collapsed
-                ? null
-                : g.tracks.map((t, i) =>
-                  renderRow(t, indexOf(t, i)))
-
-              const toggle =
-                <GroupToggle
-                  open={!collapsed}
-                  controls={rowsId}
-                  label={g.label}
-                  onToggle={toggleAll =>
-                    toggleGroup(g.key, toggleAll)}
-                />
-
-              if (grouping === 'album')
-                return (
-                  <section
-                    key={g.key}
-                    className='track-group album'
-                    data-collapsed={collapsed || undefined}
-                    aria-labelledby={headingId}
-                  >
-                    <AlbumArt src={g.tracks[0].albumArt} color={g.tracks[0].coverColor} />
-
-                    <header>
-                      {toggle}
-                      <h3 id={headingId}>{g.label}</h3>
-                      <small>{g.subtitle}</small>
-                    </header>
-
-                    <div className='group-rows' id={rowsId} hidden={collapsed}>{rows}</div>
-                  </section>
-                )
-
-              // Path groups head with a clickable trail rather than a plain
-              // heading, so the folder they represent stays navigable.
-              if (grouping === 'path')
-                return (
-                  <section
-                    key={g.key}
-                    className='track-group'
-                    data-collapsed={collapsed || undefined}
-                    aria-label={g.key}
-                  >
-                    <header>
-                      {toggle}
-
-                      <Breadcrumbs
-                        path={g.key}
-                        roots={roots}
-                        onNavigate={p =>
-                          onNavigate?.(p)}
-                        label='Group folder'
-                      />
-
-                      <small>{g.subtitle}</small>
-                    </header>
-
-                    <div className='group-rows' id={rowsId} hidden={collapsed}>{rows}</div>
-                  </section>
-                )
-
-              return (
-                <section
-                  key={g.key}
-                  className='track-group'
-                  data-collapsed={collapsed || undefined}
-                  aria-labelledby={headingId}
-                >
-                  <header>
-                    {toggle}
-                    <h3 className='group-title' id={headingId}>{g.label}</h3>
-                    <small>{g.subtitle}</small>
-                  </header>
-
-                  <div className='group-rows' id={rowsId} hidden={collapsed}>{rows}</div>
-                </section>
-              )
-            })}
-          </div>
-        }
-      </div>
-
-      <ColumnMenu
-        point={menuPoint}
-        columns={columns}
-        toggleColumn={toggleColumn}
-        resetColumns={resetColumns}
-        onClose={() =>
-          setMenuPoint(null)}
-      />
-    </section>
-  )
+    <ColumnMenu
+      point={ menuPoint }
+      columns={ columns }
+      toggleColumn={ toggleColumn }
+      resetColumns={ resetColumns }
+      onClose={ () =>
+        setMenuPoint(null) } />
+  </section>
 }

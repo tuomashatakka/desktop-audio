@@ -1,4 +1,5 @@
-import type { DataSource, DataEvent, TrackDTO, LibraryRoot, AudioMetadata } from '../../src/app/data/DataSource'
+import { Disposable } from 'disposable-events'
+import type { DataSource, DataEvent, TrackDTO, AudioMetadata } from '../../src/app/data/DataSource'
 
 export function makeMockDataSource(overrides: Partial<DataSource> = {}): DataSource {
   const listeners: DataListener[] = []
@@ -6,10 +7,6 @@ export function makeMockDataSource(overrides: Partial<DataSource> = {}): DataSou
   
   const mockDataSource: DataSource = {
     addRoot: vi.fn().mockResolvedValue('mock-root-id'),
-    removeRoot: vi.fn().mockResolvedValue(undefined),
-    listRoots: vi.fn().mockResolvedValue([
-      { id: 'mock-root-1', label: 'Mock Music' }
-    ] as LibraryRoot[]),
     scan: vi.fn().mockImplementation((rootIds: readonly string[]) => {
       // Simulate async scan by emitting batch and done events
       setTimeout(() => {
@@ -21,13 +18,19 @@ export function makeMockDataSource(overrides: Partial<DataSource> = {}): DataSou
         }, 10)
       }, 0)
     }),
-    load: vi.fn().mockResolvedValue(mockTracks),
+    load: vi.fn().mockImplementation(() => {
+      // Mirrors the real sources: hydrate rows stream in as events.
+      setTimeout(() => {
+        listeners.forEach(l => l({ type: 'hydrate-batch', tracks: mockTracks } as DataEvent))
+        listeners.forEach(l => l({ type: 'hydrate-done', totalCount: mockTracks.length } as DataEvent))
+      }, 0)
+    }),
     subscribe: vi.fn().mockImplementation((l: DataListener) => {
       listeners.push(l)
-      return () => {
+      return new Disposable(() => {
         const index = listeners.indexOf(l)
         if (index > -1) listeners.splice(index, 1)
-      }
+      })
     }),
     readBytes: vi.fn().mockResolvedValue(new ArrayBuffer(1024)),
     readMetadata: vi.fn().mockResolvedValue({

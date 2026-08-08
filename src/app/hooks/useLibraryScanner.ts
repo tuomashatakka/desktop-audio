@@ -12,13 +12,11 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLibrary, useSettings, useAudio } from '../contexts'
-import { Track } from '../models'
-import type { TrackDTO, FolderNode } from '../services/types'
+import { Track, FolderEntry } from '../models'
+import type { TrackDTO } from '../services/types'
 import type { DataEvent } from '../data/DataSource'
 import { useData } from '../data'
-
-// Track is already imported from '../models'
-import { FolderEntry } from '../models'
+import { generateId } from '../utils/generateId'
 
 
 const log = {
@@ -26,11 +24,6 @@ const log = {
     console.log(`ⓘ [useLibraryScanner] ${msg}`),
   debug: (msg: string) =>
     console.log(`⌗ [useLibraryScanner] ${msg}`),
-}
-
-function generateId (): string {
-  return Math.random().toString(36)
-    .slice(2, 11)
 }
 
 function buildFolderTree (rootPaths: string[], files: string[]): FolderEntry[] {
@@ -43,9 +36,8 @@ function buildFolderTree (rootPaths: string[], files: string[]): FolderEntry[] {
 
     for (const file of rootFiles) {
       const relative = file.slice(rootPath.length).replace(/^[\\/]/, '')
-      const parts = relative.split(/[/\\]/)
+      const parts    = relative.split(/[/\\]/)
 
-      // eslint-disable-next-line functional/no-let
       let current = rootPath
       for (let i = 0; i < parts.length - 1; i++) {
         const parent = current
@@ -61,7 +53,7 @@ function buildFolderTree (rootPaths: string[], files: string[]): FolderEntry[] {
 
     function buildNode (nodePath: string, isRoot: boolean): FolderEntry {
       const childPaths = childrenMap.get(nodePath) ?? []
-      const name = nodePath.split(/[/\\]/).pop() || nodePath
+      const name       = nodePath.split(/[/\\]/).pop() || nodePath
       return FolderEntry.fromFolderNode({
         id:       generateId(),
         name,
@@ -85,12 +77,9 @@ function buildFolderTree (rootPaths: string[], files: string[]): FolderEntry[] {
  */
 const trackCache = new Map<string, Track>()
 
-// eslint-disable-next-line functional/no-let
-let hydrated = false
-// eslint-disable-next-line functional/no-let
+let hydrated                      = false
 let lastScannedKey: string | null = null
-// eslint-disable-next-line functional/no-let
-let initialLoadResolved = false
+let initialLoadResolved           = false
 
 function byTitle (a: Track, b: Track): number {
   return a.title.localeCompare(b.title)
@@ -98,14 +87,14 @@ function byTitle (a: Track, b: Track): number {
 
 export function useLibraryScanner () {
   const { setFolders, setTracks, setLoading } = useLibrary()
-  const { libraryPaths } = useSettings()
-  const { play } = useAudio()
-  const data = useData()
+  const { libraryPaths }                      = useSettings()
+  const { play }                              = useAudio()
+  const data                                  = useData()
 
   const trackMap = useRef(trackCache)
 
   /** Ids seen during the in-flight scan; empty when no scan is running. */
-  const seenThisScan = useRef(new Set<string>())
+  const seenThisScan    = useRef(new Set<string>())
   const libraryPathsRef = useRef(libraryPaths)
 
   /** True until hydration or the first scan resolves — whichever comes first. */
@@ -139,22 +128,47 @@ export function useLibraryScanner () {
     setFolders(buildFolderTree(libraryPathsRef.current as string[], paths))
   }, [ setFolders ])
 
-  // Subscribe to scan events once — persistent for lifetime of component
+  /** Merges a batch of DTOs into the cache; returns how many arrived. */
+  const mergeTracks = useCallback((tracks: readonly TrackDTO[]): number => {
+    for (const t of tracks)
+      trackMap.current.set(t.id, Track.fromDTO(t))
+    return tracks.length
+  }, [])
+
+  // Subscribe to scan and hydrate events once — persistent for lifetime of
+  // component.
   useEffect(() => {
     log.info('⏻ subscribing to library events')
 
-    // eslint-disable-next-line functional/no-let
-    let batchCount = 0
+    let batchCount   = 0
+    let hydrateCount = 0
     const t0 = Date.now()
 
-    const unsubscribe = data.subscribe((event: DataEvent) => {
-      if (event.type === 'batch') {
+    const subscription = data.subscribe((event: DataEvent) => {
+      // Hydrate batches stream the persisted library in. They deliberately do
+      // not touch `seenThisScan`: that set is the *scan's* prune bookkeeping,
+      // and a concurrent scan's `done` must not treat a hydrated row as
+      // rediscovered.
+      if (event.type === 'hydrate-batch') {
+        hydrateCount++
+        mergeTracks(event.tracks as TrackDTO[])
+        log.debug(`▤ hydrate batch #${hydrateCount} — ${event.tracks.length} tracks (map size: ${trackMap.current.size})`)
+        publish()
+        // Rows are on screen; there is nothing left for a spinner to wait on.
+        markInitialResolved()
+      }
+      else if (event.type === 'hydrate-done') {
+        log.info(`▤ DB hydrated — ${trackMap.current.size} tracks · ◴ ${Date.now() - t0}ms`)
+        publishFolders()
+        markInitialResolved()
+      }
+      else if (event.type === 'batch') {
         batchCount++
 
-        for (const t of event.tracks as TrackDTO[]) {
-          trackMap.current.set(t.id, Track.fromDTO(t))
+        mergeTracks(event.tracks as TrackDTO[])
+        for (const t of event.tracks as TrackDTO[])
           seenThisScan.current.add(t.id)
-        }
+
         log.debug(`⇘ batch #${batchCount} — ${event.tracks.length} tracks (map size: ${trackMap.current.size})`)
         publish()
         setLoading(true)
@@ -162,11 +176,10 @@ export function useLibraryScanner () {
       else if (event.type === 'done') {
         // Prune rows the scan didn't rediscover — but only if it actually
         // found something, so a failed scan can't wipe the cache.
-        if (seenThisScan.current.size > 0) {
+        if (seenThisScan.current.size > 0)
           for (const id of [ ...trackMap.current.keys() ])
             if (!seenThisScan.current.has(id))
               trackMap.current.delete(id)
-        }
         seenThisScan.current.clear()
 
         log.info(`✓ scan done — ${trackMap.current.size} tracks · ◴ ${Date.now() - t0}ms`)
@@ -185,11 +198,17 @@ export function useLibraryScanner () {
 
     return () => {
       log.info('⊖ unsubscribing from library events')
-      unsubscribe()
+      subscription.dispose()
     }
-  }, [ data, publish, publishFolders, setLoading, markInitialResolved ])
+  }, [ data, mergeTracks, publish, publishFolders, setLoading, markInitialResolved ])
 
-  // Cache hydration — replay what we already have, then read the DB once.
+  // Cache hydration — replay what we already have, then ask for the DB once.
+  //
+  // `data.load()` is fire-and-forget: rows come back as `hydrate-batch`
+  // events handled above, so the renderer paints while the read is still
+  // running instead of waiting on one big array. A first run with an empty
+  // DB simply yields `hydrate-done` with nothing, and `isInitialLoading`
+  // stays up for the auto-rescan below (or the empty-state card preempts it).
   useEffect(() => {
     if (trackMap.current.size > 0) {
       publish()
@@ -200,28 +219,8 @@ export function useLibraryScanner () {
       return
     hydrated = true
 
-    data.load().then((tracks: readonly TrackDTO[]) => {
-      if (tracks.length > 0) {
-        log.info(`▤ DB hydrated — ${tracks.length} tracks`)
-        for (const t of tracks)
-          trackMap.current.set(t.id, Track.fromDTO(t))
-        publish()
-        publishFolders()
-        // Cached rows already exist — nothing for a spinner to wait on.
-        markInitialResolved()
-      }
-      else {
-        // First run with nothing cached: leave isInitialLoading up to the
-        // scan the auto-rescan effect is about to trigger (or, if there are
-        // no library paths at all, the empty-state card preempts it anyway).
-        log.info('▤ DB empty (first run)')
-      }
-    })
-      .catch((err: unknown) => {
-        hydrated = false
-        console.error('[useLibraryScanner] DB load failed:', err)
-      })
-  }, [ data, publish, publishFolders, markInitialResolved ])
+    data.load()
+  }, [ data, publish, publishFolders ])
 
   const scanLibrary = useCallback(() => {
     if (libraryPaths.length === 0)
@@ -243,7 +242,7 @@ export function useLibraryScanner () {
   }, [ libraryPaths, scanLibrary ])
 
   const addAndScan = useCallback(async () =>
-    await data.addRoot() ?? null, [])
+    await data.addRoot() ?? null, [ data ])
 
   const playTrack = useCallback((track: Track) => {
     play(track)

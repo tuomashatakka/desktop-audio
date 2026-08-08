@@ -22,9 +22,8 @@ export class WaveformCache {
   }
 
   set (trackId: string, waveform: Float32Array): void {
-    if (this.#cache.has(trackId)) {
+    if (this.#cache.has(trackId))
       this.#cache.delete(trackId)
-    }
     else if (this.#cache.size >= this.#maxEntries) {
       // Evict least recently used
       const firstKey = this.#cache.keys().next().value

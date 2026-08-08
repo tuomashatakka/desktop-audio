@@ -1,6 +1,8 @@
 import { Model } from './Model'
 
 
+type NodeType = { id: string; name: string; path: string; children: readonly FolderEntry[]; expanded: boolean }
+
 export class FolderEntry extends Model {
   private _name!:     string
   private _path!:     string
@@ -45,10 +47,10 @@ export class FolderEntry extends Model {
     }
   }
 
-  static fromFolderNode (node: { id: string; name: string; path: string; children: readonly FolderEntry[]; expanded: boolean }): FolderEntry {
-    const entry = new FolderEntry(node.id)
-    entry._name = node.name
-    entry._path = node.path
+  static fromFolderNode (node: NodeType): FolderEntry {
+    const entry     = new FolderEntry(node.id)
+    entry._name     = node.name
+    entry._path     = node.path
     entry._children = [ ...node.children ]
     entry._expanded = node.expanded
     return entry

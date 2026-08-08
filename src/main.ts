@@ -17,25 +17,36 @@ import { rowToDto } from './track-schema'
 import type { MediaState, SerializableMenuItem } from './app/services/types'
 
 
-if (started) {
+if (started)
   app.quit()
-}
 
-// eslint-disable-next-line functional/no-let
-let mainWindow: BrowserWindow | null = null
-// eslint-disable-next-line functional/no-let
+/** Frameless windows paint their own background; the shell supplies the rest. */
+const TRANSPARENT_BACKGROUND = '#00000000'
+
+const MAIN_WINDOW_WIDTH  = 1200
+const MAIN_WINDOW_HEIGHT = 800
+
+/** Small enough to let the mini player tier be reachable by dragging. */
+const MAIN_WINDOW_MIN_WIDTH  = 60
+const MAIN_WINDOW_MIN_HEIGHT = 60
+
+/** Placeholder bounds only — `contextmenu:show` sets the real ones per menu. */
+const POPOVER_WINDOW_WIDTH  = 240
+const POPOVER_WINDOW_HEIGHT = 160
+
+let mainWindow: BrowserWindow | null    = null
 let popoverWindow: BrowserWindow | null = null
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
     icon:            path.join(__dirname, '..', 'assets', 'icon.png'),
-    width:           1200,
-    height:          800,
-    minWidth:        60,
-    minHeight:       60,
+    width:           MAIN_WINDOW_WIDTH,
+    height:          MAIN_WINDOW_HEIGHT,
+    minWidth:        MAIN_WINDOW_MIN_WIDTH,
+    minHeight:       MAIN_WINDOW_MIN_HEIGHT,
     frame:           false,
     transparent:     true,
-    backgroundColor: '#00000000',
+    backgroundColor: TRANSPARENT_BACKGROUND,
     webPreferences:  {
       preload:          path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -43,14 +54,12 @@ const createWindow = () => {
     },
   })
 
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL)
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL)
-  }
-  else {
+  else
     mainWindow.loadFile(
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     )
-  }
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -59,12 +68,12 @@ const createWindow = () => {
 
 const createPopoverWindow = () => {
   popoverWindow = new BrowserWindow({
-    width:           240,
-    height:          160,
+    width:           POPOVER_WINDOW_WIDTH,
+    height:          POPOVER_WINDOW_HEIGHT,
     show:            false,
     frame:           false,
     transparent:     true,
-    backgroundColor: '#00000000',
+    backgroundColor: TRANSPARENT_BACKGROUND,
     alwaysOnTop:     true,
     skipTaskbar:     true,
     resizable:       false,
@@ -75,14 +84,12 @@ const createPopoverWindow = () => {
     },
   })
 
-  if (CONTEXT_MENU_WINDOW_VITE_DEV_SERVER_URL) {
+  if (CONTEXT_MENU_WINDOW_VITE_DEV_SERVER_URL)
     popoverWindow.loadURL(CONTEXT_MENU_WINDOW_VITE_DEV_SERVER_URL)
-  }
-  else {
+  else
     popoverWindow.loadFile(
       path.join(__dirname, `../renderer/${CONTEXT_MENU_WINDOW_VITE_NAME}/index.html`),
     )
-  }
 
   popoverWindow.on('blur', () =>
     popoverWindow?.hide())
@@ -104,16 +111,14 @@ app.on('will-quit', () =>
 app.on('window-all-closed', () => {
   const userWindows = BrowserWindow.getAllWindows().filter(w =>
     w !== popoverWindow)
-  if (process.platform !== 'darwin' && userWindows.length === 0) {
+  if (process.platform !== 'darwin' && userWindows.length === 0)
     app.quit()
-  }
 })
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().filter(w =>
-    w !== popoverWindow).length === 0) {
+    w !== popoverWindow).length === 0)
     createWindow()
-  }
 })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -135,9 +140,8 @@ ipcMain.handle('file:select', async () => {
   const result = await dialog.showOpenDialog({
     properties: [ 'openDirectory' ],
   })
-  if (result.canceled || result.filePaths.length === 0) {
+  if (result.canceled || result.filePaths.length === 0)
     return null
-  }
   return result.filePaths[0]
 })
 
@@ -147,9 +151,8 @@ ipcMain.handle('file:music-dir', () =>
 ipcMain.handle('file:metadata', async (_event, filePath: string) => {
   try {
     const metadata = await mm.parseFile(filePath)
-    const picture = metadata.common.picture?.[0]
+    const picture  = metadata.common.picture?.[0]
 
-    // eslint-disable-next-line functional/no-let
     let albumArt: string | undefined
     if (picture) {
       const base64 = Buffer.from(picture.data).toString('base64')
@@ -189,78 +192,108 @@ const log = {
     console.warn(`◬ [main] ${msg}`),
 }
 
-// ─── Library handlers ─────────────────────────────────────────────────────────
-
-// Fast startup: return all persisted tracks from SQLite without scanning
-ipcMain.handle('library:load', () => {
-  const dbPath = libraryDbPath()
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3')
-    const db = new Database(dbPath, { readonly: true, fileMustExist: true })
-    const rows = db.prepare('SELECT * FROM tracks ORDER BY title ASC').all() as Record<string, unknown>[]
-    db.close()
-    log.info(`▤ library:load → ${rows.length} tracks from DB`)
-    return rows.map(mapTrack)
-  }
-  catch {
-    log.info('▤ library:load → DB not yet created (first run)')
-    return [] // DB not yet created (first run)
-  }
-})
-
-// ─── Scanner worker ───────────────────────────────────────────────────────────
+// ─── Worker supervision ───────────────────────────────────────────────────────
 
 type WorkerMessage =
   { type: 'batch'; tracks: unknown[] } |
   { type: 'done'; totalCount: number } |
   { type: 'error'; message: string }
 
+/** Worker entry points, spawned as `<name>.js` beside this file. */
+const WORKER_SCANNER = 'scanner-worker'
+const WORKER_READER  = 'db-reader'
+const WORKER_WRITER  = 'db-writer'
+
+type WorkerName = typeof WORKER_SCANNER | typeof WORKER_READER | typeof WORKER_WRITER
+
 /**
  * `worker.terminate()` emits 'exit' with code 1, not 0 — a deliberate
  * shutdown is indistinguishable from a crash without tracking intent.
  * Without this, every quit prints a spurious "exited with code 1".
  */
-// eslint-disable-next-line functional/no-let
 let quitting = false
 
-// eslint-disable-next-line functional/no-let
-let scanWorker: Worker | null = null
+const workers = new Map<WorkerName, Worker>()
 
-function getScanWorker (): Worker {
-  if (scanWorker)
-    return scanWorker
+/**
+ * Lazily spawns each worker and keeps one instance per name. They all share
+ * the same database, so they all take the same `dbPath` in `workerData` —
+ * re-deriving it worker-side is what once had the writer writing to a file
+ * nothing read back.
+ */
+function getWorker (name: WorkerName): Worker {
+  const existing = workers.get(name)
+  if (existing)
+    return existing
 
-  const dbPath = libraryDbPath()
-  scanWorker = new Worker(
-    path.join(__dirname, 'scanner-worker.js'),
-    { workerData: { dbPath }}
+  const worker = new Worker(
+    path.join(__dirname, `${name}.js`),
+    { workerData: { dbPath: libraryDbPath() }}
   )
-  scanWorker.on('error', err =>
-    console.error('[scanner-worker]', err))
-  scanWorker.on('exit', code => {
+
+  worker.on('error', err =>
+    console.error(`[${name}]`, err))
+  worker.on('exit', code => {
     if (code !== 0 && !quitting)
-      console.error('[scanner-worker] exited with code', code)
-    scanWorker = null
+      console.error(`[${name}] exited with code`, code)
+    workers.delete(name)
   })
-  return scanWorker
+
+  workers.set(name, worker)
+  return worker
 }
 
 app.on('before-quit', () => {
   quitting = true
-  scanWorker?.terminate()
+  for (const worker of workers.values())
+    void worker.terminate()
+})
+
+// ─── Library handlers ─────────────────────────────────────────────────────────
+
+/**
+ * Streaming hydrate — the persisted library, read on the reader thread and
+ * relayed batch by batch.
+ *
+ * This used to be an `ipcMain.handle` that opened SQLite synchronously here
+ * and returned the whole table in one array: the main process stalled for the
+ * length of the query and the renderer painted nothing until it finished.
+ */
+ipcMain.on('library:load', event => {
+  const t0     = Date.now()
+  const worker = getWorker(WORKER_READER)
+
+  let batchCount = 0
+
+  const handle = (msg: WorkerMessage) => {
+    if (msg.type === 'batch') {
+      batchCount++
+      log.debug(`⇗ hydrate batch #${batchCount} → renderer (${msg.tracks.length} tracks)`)
+      event.sender.send('library:hydrate-batch', msg.tracks)
+      return
+    }
+
+    worker.off('message', handle)
+    if (msg.type === 'error')
+      log.warn(`⨂ hydrate error from worker: ${msg.message}`)
+    else
+      log.info(`▤ library:load done — ${msg.totalCount} tracks in ${batchCount} batches · ◴ ${Date.now() - t0}ms`)
+
+    event.sender.send('library:hydrate-done')
+  }
+
+  worker.on('message', handle)
+  worker.postMessage({ type: 'load' })
 })
 
 // Streaming scan — delegates all work to the scanner worker
 ipcMain.on('library:scan', (event, dirPaths: string[]) => {
   const t0     = Date.now()
-  const worker = getScanWorker()
+  const worker = getWorker(WORKER_SCANNER)
 
   log.info(`⟲ library:scan — ${dirPaths.length} path(s): ${dirPaths.join(', ')}`)
 
-  // eslint-disable-next-line functional/no-let
   let batchCount = 0
-  // eslint-disable-next-line functional/no-let
   let totalSent  = 0
 
   const handle = (msg: WorkerMessage) => {
@@ -273,12 +306,10 @@ ipcMain.on('library:scan', (event, dirPaths: string[]) => {
     }
     else if (msg.type === 'done' || msg.type === 'error') {
       worker.off('message', handle)
-      if (msg.type === 'error') {
+      if (msg.type === 'error')
         log.warn(`⨂ scan error from worker: ${msg.message}`)
-      }
-      else {
+      else
         log.info(`✓ library:scan done — ${totalSent} tracks in ${batchCount} batches · ◴ ${Date.now() - t0}ms`)
-      }
       event.sender.send('library:done')
     }
   }
@@ -295,12 +326,10 @@ ipcMain.on('window:minimize', () => {
 
 ipcMain.on('window:maximize', () => {
   const win = BrowserWindow.getFocusedWindow()
-  if (win?.isMaximized()) {
+  if (win?.isMaximized())
     win.unmaximize()
-  }
-  else {
+  else
     win?.maximize()
-  }
 })
 
 ipcMain.on('window:close', () => {
@@ -319,15 +348,15 @@ ipcMain.on('window:set-size', (_e, width: number, height: number) => {
   const win = BrowserWindow.getFocusedWindow()
   if (!win)
     return
-  if (win.isMaximized()) {
+  if (win.isMaximized())
     win.unmaximize()
-  }
   win.setContentSize(Math.round(width), Math.round(height), true)
 })
 
 // ─── Context menu handlers ────────────────────────────────────────────────────
 
-ipcMain.on('contextmenu:show', (_event, payload: {
+/** Bounds plus the theme the separate menu window has to paint itself with. */
+interface ContextMenuRequest {
   items:   SerializableMenuItem[]
   x:       number
   y:       number
@@ -335,7 +364,14 @@ ipcMain.on('contextmenu:show', (_event, payload: {
   height:  number
   theme?:  string
   accent?: string
-}) => {
+}
+
+/** Which entry of the menu the user picked. */
+interface ContextMenuSelection {
+  index: number
+}
+
+ipcMain.on('contextmenu:show', (_event, payload: ContextMenuRequest) => {
   if (!popoverWindow)
     return
   popoverWindow.setBounds({
@@ -359,7 +395,7 @@ ipcMain.on('contextmenu:show', (_event, payload: {
 ipcMain.on('contextmenu:hide', () =>
   popoverWindow?.hide())
 
-ipcMain.on('contextmenu:action', (_event, { index }: { index: number }) => {
+ipcMain.on('contextmenu:action', (_event, { index }: ContextMenuSelection) => {
   mainWindow?.webContents.send('contextmenu:action', { index })
   popoverWindow?.hide()
 })
@@ -369,59 +405,12 @@ ipcMain.on('contextmenu:action', (_event, { index }: { index: number }) => {
 ipcMain.on('media:state-update', (_event, state: MediaState) =>
   mediaControls.updateState(state))
 
-// ─── DB Writer worker ───────────────────────────────────────────────────────
-
-type WriterMessage =
-  { type: 'ready' } |
-  { type: 'done' } |
-  { type: 'error'; message: string }
-
-// eslint-disable-next-line functional/no-let
-let dbWriter: Worker | null = null
-
-function getDbWriter (): Worker {
-  if (dbWriter)
-    return dbWriter
-
-  const dbPath = libraryDbPath()
-  dbWriter = new Worker(
-    path.join(__dirname, 'db-writer.js'),
-    { workerData: { dbPath }}
-  )
-  dbWriter.on('error', err =>
-    console.error('[db-writer]', err))
-  dbWriter.on('exit', code => {
-    if (code !== 0 && !quitting)
-      console.error('[db-writer] exited with code', code)
-    dbWriter = null
-  })
-  return dbWriter
-}
-
-app.on('before-quit', () => {
-  quitting = true
-  dbWriter?.terminate()
-})
-
 // ─── Model write handlers ───────────────────────────────────────────────────
 
-ipcMain.handle('models:upsert', (_event, kind: string, payload: Record<string, unknown>) => {
-  const worker = getDbWriter()
-  return new Promise<void>((resolve, reject) => {
-    const handler = (msg: WorkerMessage) => {
-      worker.off('message', handler)
-      if (msg.type === 'error')
-        reject(new Error(msg.message))
-      else
-        resolve()
-    }
-    worker.on('message', handler)
-    worker.postMessage({ type: 'upsert', kind, payload })
-  })
-})
+/** Round-trips one write through the writer worker as a promise. */
+function requestWrite (message: Record<string, unknown>): Promise<void> {
+  const worker = getWorker(WORKER_WRITER)
 
-ipcMain.handle('models:delete', (_event, kind: string, id: string) => {
-  const worker = getDbWriter()
   return new Promise<void>((resolve, reject) => {
     const handler = (msg: WorkerMessage) => {
       worker.off('message', handler)
@@ -430,7 +419,14 @@ ipcMain.handle('models:delete', (_event, kind: string, id: string) => {
       else
         resolve()
     }
+
     worker.on('message', handler)
-    worker.postMessage({ type: 'delete', kind, id })
+    worker.postMessage(message)
   })
-})
+}
+
+ipcMain.handle('models:upsert', (_event, kind: string, payload: Record<string, unknown>) =>
+  requestWrite({ type: 'upsert', kind, payload }))
+
+ipcMain.handle('models:delete', (_event, kind: string, id: string) =>
+  requestWrite({ type: 'delete', kind, id }))

@@ -4,8 +4,10 @@ import type { HostBridge } from './HostBridge'
 
 const HostContext = createContext<HostBridge | null>(null)
 
-export function HostProvider ({ value, children }: { value: HostBridge; children: React.ReactNode }) {
-  return <HostContext.Provider value={value}>{children}</HostContext.Provider>
+type HostProviderProps = { value: HostBridge; children: React.ReactNode }
+
+export function HostProvider ({ value, children }: HostProviderProps) {
+  return <HostContext.Provider value={ value }>{children}</HostContext.Provider>
 }
 
 export function useHost (): HostBridge {

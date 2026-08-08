@@ -1,3 +1,5 @@
+/* eslint-disable react-strict/no-style-prop -- `--level` is the node's depth
+   in an arbitrarily deep tree, which no fixed set of classes can express. */
 import type { FolderNode } from '../../contexts'
 import { Icon } from '../atomic'
 
@@ -22,52 +24,45 @@ interface FolderTreeProps {
 
 /** See the interface docs above; recurses one level per nested folder. */
 export function FolderTree ({ folders, selectedPath, onSelect, onToggle, level = 0 }: FolderTreeProps) {
-  return (
-    <ul className='folder-tree' style={{ '--level': level } as React.CSSProperties}>
-      {folders.map(folder => {
-        const hasChildren = folder.children.length > 0
-        const selected = selectedPath === folder.path
+  return <ul className='folder-tree' style={{ '--level': level } as React.CSSProperties}>
+    {folders.map(folder => {
+      const hasChildren = folder.children.length > 0
+      const selected    = selectedPath === folder.path
 
-        return (
-          <li key={folder.id}>
-            <div className={`folder-row ${selected ? 'active' : ''}`}>
-              {hasChildren
-                ? <button
-                  type='button'
-                  className={`disclosure ${folder.expanded ? 'open' : ''}`}
-                  onClick={() =>
-                    onToggle(folder.path)}
-                  aria-expanded={folder.expanded}
-                  aria-label={`${folder.expanded ? 'Collapse' : 'Expand'} ${folder.name}`}
-                >
-                  <Icon name='chevron-right' />
-                </button>
-                : null
-              }
+      return <li key={ folder.id }>
+        <div className={ `folder-row ${selected ? 'active' : ''}` }>
+          {hasChildren
+            ? <button
+              className={ `disclosure ${folder.expanded ? 'open' : ''}` }
+              aria-expanded={ folder.expanded }
+              aria-label={ `${folder.expanded ? 'Collapse' : 'Expand'} ${folder.name}` }
+              type='button'
+              onClick={ () =>
+                onToggle(folder.path) }>
+              <Icon name='chevron-right' />
+            </button>
+            : null
+          }
 
-              <button
-                type='button'
-                className='folder-name'
-                aria-current={selected || undefined}
-                onClick={() =>
-                  onSelect(folder.path)}
-              >
-                {folder.name}
-              </button>
-            </div>
+          <button
+            className='folder-name'
+            aria-current={ selected || undefined }
+            type='button'
+            onClick={ () =>
+              onSelect(folder.path) }>
+            {folder.name}
+          </button>
+        </div>
 
-            {folder.expanded && hasChildren &&
+        {folder.expanded && hasChildren &&
               <FolderTree
-                folders={folder.children}
-                selectedPath={selectedPath}
-                onSelect={onSelect}
-                onToggle={onToggle}
-                level={level + 1}
-              />
-            }
-          </li>
-        )
-      })}
-    </ul>
-  )
+                folders={ folder.children }
+                selectedPath={ selectedPath }
+                level={ level + 1 }
+                onSelect={ onSelect }
+                onToggle={ onToggle } />
+        }
+      </li>
+    })}
+  </ul>
 }

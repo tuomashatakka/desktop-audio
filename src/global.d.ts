@@ -2,11 +2,13 @@ import type { AudioMetadata, MediaState } from './app/services/types'
 
 
 interface ElectronAPI {
-  // Library
-  scanLibrary:    (dirPaths: string[]) => void
-  loadLibrary:    () => Promise<unknown[]>
-  onLibraryBatch: (cb: (tracks: unknown[]) => void) => () => void
-  onLibraryDone:  (cb: () => void) => () => void
+  // Library. Results stream back as events; neither call returns data.
+  scanLibrary:           (dirPaths: string[]) => void
+  loadLibrary:           () => void
+  onLibraryBatch:        (cb: (tracks: unknown[]) => void) => () => void
+  onLibraryDone:         (cb: () => void) => () => void
+  onLibraryHydrateBatch: (cb: (tracks: unknown[]) => void) => () => void
+  onLibraryHydrateDone:  (cb: () => void) => () => void
 
   // Files
   selectDirectory:  () => Promise<string | null>
@@ -40,6 +42,15 @@ interface ElectronAPI {
   deleteModel: (kind: string, id: string) => Promise<unknown>
 }
 
-declare interface Window {
-  electronAPI?: ElectronAPI
+declare global {
+  interface Window {
+
+    /**
+     * Absent in the browser build (`VITE_BRIDGE=browser`), which is why every
+     * caller reaches it through optional chaining.
+     */
+    electronAPI?: ElectronAPI
+  }
 }
+
+export type { ElectronAPI }

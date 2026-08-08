@@ -5,8 +5,7 @@ import '../../index.css'
 
 
 const container = document.querySelector('#context-menu-root')
-if (container) {
+if (container)
   createRoot(container).render(
     <ContextMenuApp />
   )
-}

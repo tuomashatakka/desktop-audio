@@ -10,28 +10,48 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { SerializableMenuItem, MediaState } from './app/services/types'
 
 
+/** Which entry of the context menu the user picked. */
+interface ContextMenuSelection {
+  index: number
+}
+
+
+/**
+ * Subscribes to a channel and hands back the unsubscribe, dropping Electron's
+ * `IpcRendererEvent` first so renderer callbacks only see the payload.
+ *
+ * Every `on*` method below is this same four-line dance; `CLAUDE.md` requires
+ * these to return unsubscribers for `useEffect` cleanup, so it is worth one
+ * helper rather than a dozen copies.
+ */
+function subscribe<Args extends unknown[]> (
+  channel: string,
+  cb: (...args: Args) => void
+): () => void {
+  const handler = (_event: unknown, ...args: Args) =>
+    cb(...args)
+
+  ipcRenderer.on(channel, handler)
+  return () => {
+    ipcRenderer.removeListener(channel, handler)
+  }
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Library
+  // Library. Both `scanLibrary` and `loadLibrary` are fire-and-forget sends —
+  // their results arrive as streamed batch/done events, not as return values.
   scanLibrary: (dirPaths: string[]) =>
     ipcRenderer.send('library:scan', dirPaths),
   loadLibrary: () =>
-    ipcRenderer.invoke('library:load'),
-  onLibraryBatch: (cb: (tracks: unknown[]) => void) => {
-    const handler = (_: unknown, tracks: unknown[]) =>
-      cb(tracks)
-    ipcRenderer.on('library:batch', handler)
-    return () => {
-      ipcRenderer.removeListener('library:batch', handler)
-    }
-  },
-  onLibraryDone: (cb: () => void) => {
-    const handler = () =>
-      cb()
-    ipcRenderer.on('library:done', handler)
-    return () => {
-      ipcRenderer.removeListener('library:done', handler)
-    }
-  },
+    ipcRenderer.send('library:load'),
+  onLibraryBatch: (cb: (tracks: unknown[]) => void) =>
+    subscribe('library:batch', cb),
+  onLibraryDone: (cb: () => void) =>
+    subscribe('library:done', cb),
+  onLibraryHydrateBatch: (cb: (tracks: unknown[]) => void) =>
+    subscribe('library:hydrate-batch', cb),
+  onLibraryHydrateDone: (cb: () => void) =>
+    subscribe('library:hydrate-done', cb),
 
   // Files
   selectDirectory: () =>
@@ -54,30 +74,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('window:is-maximized'),
   setWindowSize: (width: number, height: number) =>
     ipcRenderer.send('window:set-size', width, height),
-  onMediaPlayPause: (cb: () => void) => {
-    const h = () =>
-      cb()
-    ipcRenderer.on('media:play-pause', h)
-    return () => {
-      ipcRenderer.removeListener('media:play-pause', h)
-    }
-  },
-  onMediaNext: (cb: () => void) => {
-    const h = () =>
-      cb()
-    ipcRenderer.on('media:next', h)
-    return () => {
-      ipcRenderer.removeListener('media:next', h)
-    }
-  },
-  onMediaPrev: (cb: () => void) => {
-    const h = () =>
-      cb()
-    ipcRenderer.on('media:prev', h)
-    return () => {
-      ipcRenderer.removeListener('media:prev', h)
-    }
-  },
+  onMediaPlayPause: (cb: () => void) =>
+    subscribe('media:play-pause', cb),
+  onMediaNext: (cb: () => void) =>
+    subscribe('media:next', cb),
+  onMediaPrev: (cb: () => void) =>
+    subscribe('media:prev', cb),
 
   // Context menu — `theme`/`accent` ride along so the separate menu window
   // can paint itself in the app's current theme instead of guessing.
@@ -89,26 +91,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('contextmenu:show', { items, x, y, width, height, theme, accent }),
   hideContextMenu: () =>
     ipcRenderer.send('contextmenu:hide'),
-  onContextMenuAction: (cb: (index: number) => void) => {
-    const h = (_: unknown, { index }: { index: number }) =>
-      cb(index)
-    ipcRenderer.on('contextmenu:action', h)
-    return () => {
-      ipcRenderer.removeListener('contextmenu:action', h)
-    }
-  },
+  onContextMenuAction: (cb: (index: number) => void) =>
+    subscribe('contextmenu:action', ({ index }: ContextMenuSelection) =>
+      cb(index)),
 
   // Media state
   updateMediaState: (state: MediaState) =>
     ipcRenderer.send('media:state-update', state),
-  onMediaSeek: (cb: (delta: number) => void) => {
-    const h = (_: unknown, delta: number) =>
-      cb(delta)
-    ipcRenderer.on('media:seek', h)
-    return () => {
-      ipcRenderer.removeListener('media:seek', h)
-    }
-  },
+  onMediaSeek: (cb: (delta: number) => void) =>
+    subscribe('media:seek', cb),
 
   // Write IPC — `invoke`, not `send`: both channels are registered with
   // `ipcMain.handle`, so a fire-and-forget send never reaches a handler.

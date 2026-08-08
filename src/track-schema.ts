@@ -115,7 +115,7 @@ export function migrate (db: SqliteLike): void {
 
 /** `INSERT … ON CONFLICT DO UPDATE` over every column plus `mtime_ms`. */
 export function upsertSql (): string {
-  const names = [ ...TRACK_COLUMN_NAMES, MTIME_COLUMN ]
+  const names       = [ ...TRACK_COLUMN_NAMES, MTIME_COLUMN ]
   const assignments = names
     .filter(name =>
       name !== 'id')
@@ -163,8 +163,7 @@ export function rowToDto (row: Record<string, unknown>): Record<string, unknown>
 /** Renderer DTO → bound statement parameters; missing fields bind as `null`. */
 export function dtoToParams (dto: Record<string, unknown>): Record<string, unknown> {
   const params: Record<string, unknown> = {}
-  for (const [ column, field ] of CAMEL_BY_COLUMN) {
+  for (const [ column, field ] of CAMEL_BY_COLUMN)
     params[column] = dto[field] ?? null
-  }
   return params
 }

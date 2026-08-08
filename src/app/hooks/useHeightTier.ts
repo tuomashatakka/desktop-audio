@@ -8,6 +8,7 @@
  * and every layout rule hangs off that attribute.
  */
 import { useState, useEffect } from 'react'
+import { listen } from '../utils/events'
 
 
 /** Window-height bucket driving the player layout. */
@@ -59,10 +60,9 @@ export function useHeightTier (): HeightTier {
     // Re-check on mount: the window may have been resized before hydration.
     handler()
 
-    window.addEventListener('resize', handler)
-    return () => {
-      window.removeEventListener('resize', handler)
-    }
+    const resize = listen(window, 'resize', handler)
+    return () =>
+      resize.dispose()
   }, [])
 
   return tier

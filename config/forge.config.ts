@@ -1,5 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+
+/** This file lives in config/, so every repo-relative path climbs one level. */
+const projectRoot = path.join(__dirname, '..');
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
@@ -26,7 +29,7 @@ function dependencyClosure (roots: string[]): Set<string> {
     if (seen.has(name))
       return;
 
-    const manifest = path.join(__dirname, 'node_modules', name, 'package.json');
+    const manifest = path.join(projectRoot, 'node_modules', name, 'package.json');
     if (!fs.existsSync(manifest))
       return;
 
@@ -141,7 +144,7 @@ function stripNativeBuildInputs (buildPath: string): void {
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    icon: './assets/icon',
+    icon: path.join(projectRoot, 'assets', 'icon'),
     ignore: ignorePackagedFile,
     ...macOsPackagerConfig,
   },
@@ -169,33 +172,45 @@ const config: ForgeConfig = {
         {
           // `entry` is just an alias for `build.lib.entry` in the corresponding file of `config`.
           entry: 'src/main.ts',
-          config: 'vite.main.config.ts',
+          config: 'config/vite/main.config.ts',
           target: 'main',
         },
         {
           entry: 'src/preload.ts',
-          config: 'vite.preload.config.ts',
+          config: 'config/vite/preload.config.ts',
           target: 'preload',
         },
         {
           entry: 'src/context-menu-preload.ts',
-          config: 'vite.preload.config.ts',
+          config: 'config/vite/preload.config.ts',
           target: 'preload',
         },
+        // Every worker main.ts spawns has to be built, or `new Worker(...)`
+        // points at a file that does not exist.
         {
           entry: 'src/scanner-worker.ts',
-          config: 'vite.worker.config.ts',
+          config: 'config/vite/worker.config.ts',
+          target: 'main',
+        },
+        {
+          entry: 'src/db-reader.ts',
+          config: 'config/vite/worker.config.ts',
+          target: 'main',
+        },
+        {
+          entry: 'src/db-writer.ts',
+          config: 'config/vite/worker.config.ts',
           target: 'main',
         },
       ],
       renderer: [
         {
           name: 'main_window',
-          config: 'vite.renderer.config.ts',
+          config: 'config/vite/renderer.config.ts',
         },
         {
           name: 'context_menu_window',
-          config: 'vite.context-menu.config.ts',
+          config: 'config/vite/context-menu.config.ts',
         },
       ],
     }),

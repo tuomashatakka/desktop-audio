@@ -26,23 +26,20 @@ interface MenuListProps {
  * keyboard model instead of claiming the stricter ARIA menu pattern.
  */
 export function MenuList ({ items, onSelect }: MenuListProps) {
-  return (
-    <menu className='context-menu-list'>
-      {items.map((item, index) =>
-        item.separator
-          ? <li key={index} className='context-menu-separator' aria-hidden='true' />
-          : <li key={index}>
-            <button
-              type='button'
-              className={`context-menu-item ${item.danger ? 'danger' : ''}`}
-              onClick={() =>
-                onSelect(index)}
-            >
-              {item.icon && <Icon className='context-menu-icon' name={item.icon} />}
-              {item.label}
-            </button>
-          </li>
-      )}
-    </menu>
-  )
+  return <menu className='context-menu-list'>
+    {items.map((item, index) =>
+      item.separator
+        ? <li key={ index } className='context-menu-separator' aria-hidden='true' />
+        : <li key={ index }>
+          <button
+            className={ `context-menu-item ${item.danger ? 'danger' : ''}` }
+            type='button'
+            onClick={ () =>
+              onSelect(index) }>
+            {item.icon && <Icon className='context-menu-icon' name={ item.icon } />}
+            {item.label}
+          </button>
+        </li>
+    )}
+  </menu>
 }

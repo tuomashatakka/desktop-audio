@@ -74,14 +74,15 @@ const extractTrackNumber = (noExt: string): number | undefined => {
   return Number.isNaN(n) ? undefined : n
 }
 
-const parseTitleArtist = (noExt: string): { title: string; artist: string } => {
+type ParseTitleArtistReturnType = { title: string; artist: string }
+
+const parseTitleArtist = (noExt: string): ParseTitleArtistReturnType => {
   const dashIdx = noExt.indexOf(' - ')
-  if (dashIdx <= 0) {
+  if (dashIdx <= 0)
     return {
       title:  noExt.replace(/^\d+\.?\s+/, '') || noExt,
       artist: 'Unknown Artist',
     }
-  }
   return {
     artist: noExt.slice(0, dashIdx).trim(),
     title:  noExt.slice(dashIdx + 3).trim()
@@ -243,17 +244,13 @@ const log = {
 // ─── Scan logic ───────────────────────────────────────────────────────────────
 
 async function scanDirs (dirPaths: string[]): Promise<void> {
-  const t0        = Date.now()
-  const seenPaths = new Set<string>()
+  const t0                      = Date.now()
+  const seenPaths               = new Set<string>()
   const pending: ScannedTrack[] = []
-  // eslint-disable-next-line functional/no-let
-  let totalCount = 0
-  // eslint-disable-next-line functional/no-let
-  let cacheHits = 0
-  // eslint-disable-next-line functional/no-let
+  let totalCount  = 0
+  let cacheHits   = 0
   let cacheMisses = 0
-  // eslint-disable-next-line functional/no-let
-  let batchCount = 0
+  let batchCount  = 0
 
   log.info(`⏻ scan start — ${dirPaths.length} path(s): ${dirPaths.join(', ')}`)
 
@@ -267,12 +264,11 @@ async function scanDirs (dirPaths: string[]): Promise<void> {
 
   const walk = async (dir: string): Promise<void> => {
     try {
-      const entries = await readdir(dir, { withFileTypes: true })
+      const entries      = await readdir(dir, { withFileTypes: true })
       const audioEntries = entries.filter(e =>
         e.isFile() && AUDIO_EXTENSIONS_SET.has(path.extname(e.name).toLowerCase()))
-      if (audioEntries.length > 0) {
+      if (audioEntries.length > 0)
         log.debug(`⌕ ${dir} — ${entries.length} entries, ${audioEntries.length} audio`)
-      }
 
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name)
@@ -291,7 +287,6 @@ async function scanDirs (dirPaths: string[]): Promise<void> {
             const mtimeMs  = stats.mtimeMs
             const existing = stmtGetMtime.get(fullPath)
 
-            // eslint-disable-next-line functional/no-let
             let track: ScannedTrack
             if (existing && existing.mtime_ms === mtimeMs) {
               // mtime unchanged → skip re-parse, serve from DB
@@ -332,7 +327,6 @@ async function scanDirs (dirPaths: string[]): Promise<void> {
 
   // Prune stale rows: delete paths under scanned dirs that no longer exist on disk
   const seenJson = JSON.stringify([ ...seenPaths ])
-  // eslint-disable-next-line functional/no-let
   let pruned = 0
   for (const dirPath of dirPaths) {
     const result = db.prepare(
@@ -355,9 +349,8 @@ async function scanDirs (dirPaths: string[]): Promise<void> {
 // ─── Message loop ─────────────────────────────────────────────────────────────
 
 parentPort!.on('message', (msg: MainMessage) => {
-  if (msg.type === 'scan') {
+  if (msg.type === 'scan')
     scanDirs(msg.dirPaths).catch(err => {
       parentPort!.postMessage({ type: 'error', message: String(err) })
     })
-  }
 })

@@ -7,7 +7,7 @@
  * data host (localStorage in the browser, IPC + disk in Electron).
  */
 import type { ReactNode } from 'react'
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import { useHost } from '../data'
 
 
@@ -178,10 +178,12 @@ const SettingsContext = createContext<SettingsContextValue | null>(null)
  * Loads settings from the data host on mount, exposes them via context,
  * and writes back on change. Renders children only after initial load.
  */
-export function SettingsProvider ({ children }: { readonly children: ReactNode }) {
-  const [ settings, setSettings ] = useState<Settings>(defaultSettings)
+type SettingsProviderProps = { readonly children: ReactNode }
+
+export function SettingsProvider ({ children }: SettingsProviderProps) {
+  const [ settings, setSettings ]       = useState<Settings>(defaultSettings)
   const [ initialized, setInitialized ] = useState(false)
-  const host = useHost()
+  const host                            = useHost()
 
   /** Hydrate settings on mount and resolve the default music dir if needed. */
   useEffect(() => {
@@ -297,39 +299,54 @@ export function SettingsProvider ({ children }: { readonly children: ReactNode }
       ({ ...s, expandedSize }))
   }, [])
 
-  return (
-    <SettingsContext.Provider
-      value={{
-        ...settings,
-        accent: settings.theme === 'light' ? settings.accentLight : settings.accentDark,
-        addLibraryPath,
-        removeLibraryPath,
-        setTheme,
-        setCustomTheme,
-        exportTheme,
-        importTheme,
-        setDefaultDensity,
-        setVolume,
-        setRepeatMode,
-        setShuffle,
-        setCompactSize,
-        setExpandedSize,
-        setUiFont,
-        setFontScale,
-        setAccent,
-      }}
-    >
-      {children}
-    </SettingsContext.Provider>
-  )
+  const value = useMemo(() =>
+    ({
+      ...settings,
+      accent: settings.theme === 'light' ? settings.accentLight : settings.accentDark,
+      addLibraryPath,
+      removeLibraryPath,
+      setTheme,
+      setCustomTheme,
+      exportTheme,
+      importTheme,
+      setDefaultDensity,
+      setVolume,
+      setRepeatMode,
+      setShuffle,
+      setCompactSize,
+      setExpandedSize,
+      setUiFont,
+      setFontScale,
+      setAccent,
+    }), [
+    settings,
+    addLibraryPath,
+    removeLibraryPath,
+    setTheme,
+    setCustomTheme,
+    exportTheme,
+    importTheme,
+    setDefaultDensity,
+    setVolume,
+    setRepeatMode,
+    setShuffle,
+    setCompactSize,
+    setExpandedSize,
+    setUiFont,
+    setFontScale,
+    setAccent,
+  ])
+
+  return <SettingsContext.Provider value={ value }>
+    {children}
+  </SettingsContext.Provider>
 }
 
 async function loadSettings (): Promise<Settings> {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
+    if (stored)
       return { ...defaultSettings, ...JSON.parse(stored) }
-    }
   }
   catch {
     // Ignore errors
@@ -341,9 +358,8 @@ async function loadSettings (): Promise<Settings> {
 /** Access settings + actions. Throws if used outside {@link SettingsProvider}. */
 export function useSettings () {
   const context = useContext(SettingsContext)
-  if (!context) {
+  if (!context)
     throw new Error('useSettings must be used within SettingsProvider')
-  }
   return context
 }
 

@@ -11,7 +11,7 @@
 - `npm run make`    → create distributable installers (deb, rpm, zip, …)
 
 ## Build nuances
-- Main‑process bundling (`vite.main.config.ts`) marks `better‑sqlite3` and `mpris‑service` as **external** – they are loaded from the built app, not bundled.
+- Main‑process bundling (`config/vite/main.config.ts`) marks `better‑sqlite3` and `mpris‑service` as **external** – they are loaded from the built app, not bundled.
 - Renderer, preload and worker Vite configs live alongside but are invoked automatically by Forge; no manual steps needed.
 
 ## Testing quirks

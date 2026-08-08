@@ -44,12 +44,11 @@ export class Model {
 
   // Protected: dispatch event to all listeners
   dispatchEvent (type: string): void {
-    for (const listener of this.#listeners) {
+    for (const listener of this.#listeners)
       try {
         listener(type)
       }
       catch {}
-    }
   }
 
   markDirty (): void {
@@ -96,14 +95,13 @@ export class Model {
       // Try to get the value - check prototype chain
       const descriptor = Object.getOwnPropertyDescriptor(this, key) ||
                         Object.getOwnPropertyDescriptor(Object.getPrototypeOf(this), key)
-      if (descriptor && typeof descriptor.get === 'function') {
+      if (descriptor && typeof descriptor.get === 'function')
         try {
           result[key] = descriptor.get.call(this)
         }
         catch {
-          // Skip properties that throw when accessed
+        // Skip properties that throw when accessed
         }
-      }
     }
     return result
   }
@@ -114,11 +112,10 @@ export class Model {
     this.#dirty = false
     if (Model.dataSource) {
       const payload = this.toJSON()
-      const kind = this.constructor.name.toLowerCase()
+      const kind    = this.constructor.name.toLowerCase()
       // Use upsertTrack for tracks
-      if (kind === 'track') {
+      if (kind === 'track')
         Model.dataSource.upsertTrack(payload as never).catch(console.error)
-      }
     }
     this.dispatchEvent('flush')
   }

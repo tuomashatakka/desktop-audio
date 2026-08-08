@@ -8,15 +8,19 @@ describe('IpcDataSource', () => {
   let mockElectronAPI: any
   let batchListeners: Function[]
   let doneListeners: Function[]
-  
+  let hydrateBatchListeners: Function[]
+  let hydrateDoneListeners: Function[]
+
   beforeEach(() => {
     batchListeners = []
     doneListeners = []
+    hydrateBatchListeners = []
+    hydrateDoneListeners = []
     
     mockElectronAPI = {
       selectDirectory: vi.fn().mockResolvedValue('/test/music'),
       scanLibrary: vi.fn(),
-      loadLibrary: vi.fn().mockResolvedValue([]),
+      loadLibrary: vi.fn(),
       readFile: vi.fn().mockResolvedValue(new ArrayBuffer(1024)),
       getAudioMetadata: vi.fn().mockResolvedValue({
         title: 'Test Song',
@@ -41,6 +45,18 @@ describe('IpcDataSource', () => {
         return () => {
           doneListeners = doneListeners.filter(cb => cb !== callback)
         }
+      }),
+      onLibraryHydrateBatch: vi.fn((callback: Function) => {
+        hydrateBatchListeners.push(callback)
+        return () => {
+          hydrateBatchListeners = hydrateBatchListeners.filter(cb => cb !== callback)
+        }
+      }),
+      onLibraryHydrateDone: vi.fn((callback: Function) => {
+        hydrateDoneListeners.push(callback)
+        return () => {
+          hydrateDoneListeners = hydrateDoneListeners.filter(cb => cb !== callback)
+        }
       })
     }
     
@@ -55,6 +71,8 @@ describe('IpcDataSource', () => {
     vi.clearAllMocks()
     batchListeners = []
     doneListeners = []
+    hydrateBatchListeners = []
+    hydrateDoneListeners = []
   })
   
   it('addRoot calls selectDirectory', async () => {
@@ -80,32 +98,16 @@ describe('IpcDataSource', () => {
     expect(mockElectronAPI.scanLibrary).toHaveBeenCalledWith(rootIds)
   })
   
-  it('load calls loadLibrary', async () => {
-    const mockTracks: TrackDTO[] = [
-      {
-        id: 'track-1',
-        path: '/music/song1.mp3',
-        title: 'Song 1',
-        artist: 'Artist 1',
-        album: 'Album 1',
-        duration: 180,
-        format: 'mp3',
-        size: 1024,
-        coverColor: '#ff0000'
-      }
-    ]
-    mockElectronAPI.loadLibrary.mockResolvedValue(mockTracks)
-    
-    const result = await ds.load()
-    
+  it('load asks the main process to stream the library', () => {
+    ds.load()
+
     expect(mockElectronAPI.loadLibrary).toHaveBeenCalledTimes(1)
-    expect(result).toEqual(mockTracks)
   })
 
-  // Regression: tracks restored from SQLite arrive via load(), not via a
-  // scan batch. load() used to skip indexing, so on every app restart the
+  // Regression: tracks restored from SQLite arrive as hydrate batches, not as
+  // scan batches. Hydration used to skip indexing, so on every app restart the
   // library rendered fine but playback threw "No path found for trackId".
-  it('load indexes track paths so playback works without a rescan', async () => {
+  it('indexes track paths from hydrate batches so playback works without a rescan', async () => {
     const mockTracks: TrackDTO[] = [
       {
         id: '/music/song1.mp3',
@@ -119,11 +121,12 @@ describe('IpcDataSource', () => {
         coverColor: '#ff0000'
       }
     ]
-    mockElectronAPI.loadLibrary.mockResolvedValue(mockTracks)
 
-    await ds.load()
+    ds.subscribe(() => {})
+    ds.load()
+    hydrateBatchListeners.forEach(callback => callback(mockTracks))
 
-    // No subscribe(), no batch event — exactly the cold-start path
+    // No scan batch at all — exactly the cold-start path
     await ds.readBytes('/music/song1.mp3')
     expect(mockElectronAPI.readFile).toHaveBeenCalledWith('/music/song1.mp3')
 
@@ -131,11 +134,26 @@ describe('IpcDataSource', () => {
     expect(mockElectronAPI.getAudioMetadata).toHaveBeenCalledWith('/music/song1.mp3')
   })
 
+  it('relays hydrate batches and the hydrate done event', () => {
+    const events: DataEvent[] = []
+    ds.subscribe((e) => events.push(e))
+
+    const mockBatch = [
+      { id: 'track-1', path: '/music/song1.mp3', title: 'Song 1', artist: 'Artist 1', album: 'Album 1', duration: 180, format: 'mp3', size: 1024, coverColor: '#ff0000' }
+    ]
+
+    hydrateBatchListeners.forEach(callback => callback(mockBatch))
+    hydrateDoneListeners.forEach(callback => callback())
+
+    expect(events.map(e => e.type)).toEqual([ 'hydrate-batch', 'hydrate-done' ])
+    expect(events[0].tracks).toEqual(mockBatch)
+  })
+
   it('subscribe receives batch events', async () => {
     const events: DataEvent[] = []
-    const unsubscribe = ds.subscribe((e) => events.push(e))
-    
-    expect(typeof unsubscribe).toBe('function')
+    const subscription = ds.subscribe((e) => events.push(e))
+
+    expect(typeof subscription.dispose).toBe('function')
     
     // Simulate batch event from IPC
     const mockBatch = [
@@ -148,9 +166,9 @@ describe('IpcDataSource', () => {
     expect(events[0].type).toBe('batch')
     expect(events[0].tracks).toEqual(mockBatch)
     
-    unsubscribe()
+    subscription.dispose()
   })
-  
+
   it('subscribe receives done event', async () => {
     const events: DataEvent[] = []
     ds.subscribe((e) => events.push(e))
@@ -267,28 +285,13 @@ describe('IpcDataSource', () => {
     expect(mockElectronAPI.deleteModel).toHaveBeenCalledWith('track', trackId)
   })
   
-  it('removeRoot is a no-op (logs to console)', async () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-
-    await ds.removeRoot('root-1')
-
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('removeRoot called with'), 'root-1')
-
-    consoleSpy.mockRestore()
-  })
-  
-  it('listRoots returns empty array (not implemented)', async () => {
-    const roots = await ds.listRoots()
-    
-    expect(roots).toEqual([])
-  })
   
   it('subscribe returns unsubscribe function that removes listeners', async () => {
     const listener1 = vi.fn()
     const listener2 = vi.fn()
     
-    const unsub1 = ds.subscribe(listener1)
-    const unsub2 = ds.subscribe(listener2)
+    const sub1 = ds.subscribe(listener1)
+    const sub2 = ds.subscribe(listener2)
     
     // Simulate events
     batchListeners.forEach(callback => callback([{ id: 'test' }]))
@@ -297,7 +300,7 @@ describe('IpcDataSource', () => {
     expect(listener2).toHaveBeenCalled()
     
     // Unsubscribe first listener
-    unsub1()
+    sub1.dispose()
     
     // Clear mock calls
     ;(listener1 as any).mockClear()
@@ -309,7 +312,7 @@ describe('IpcDataSource', () => {
     expect(listener1).not.toHaveBeenCalled()
     expect(listener2).toHaveBeenCalled()
     
-    unsub2()
+    sub2.dispose()
   })
   
   it('handles multiple batch events correctly', async () => {

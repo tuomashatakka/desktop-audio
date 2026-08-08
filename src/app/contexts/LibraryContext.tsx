@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useMemo } from 'react'
 import { ModelRegistry, Track, FolderEntry } from '../models'
 import type { Playlist } from '../services/types'
+import { generateId } from '../utils/generateId'
 
 
 export type { Track, Playlist } from '../services/types'
@@ -49,7 +50,7 @@ interface LibraryContextValue extends LibraryState {
 const LibraryContext = createContext<LibraryContextValue | null>(null)
 
 function toggleFolderBranch (folder: FolderEntry, path: string): FolderEntry {
-  if (folder.path === path) {
+  if (folder.path === path)
     return FolderEntry.fromFolderNode({
       id:       folder.id,
       name:     folder.name,
@@ -57,7 +58,6 @@ function toggleFolderBranch (folder: FolderEntry, path: string): FolderEntry {
       children: folder.children,
       expanded: !folder.expanded,
     })
-  }
 
   const children = folder.children.map(child =>
     toggleFolderBranch(child, path))
@@ -75,14 +75,17 @@ function toggleFolderBranch (folder: FolderEntry, path: string): FolderEntry {
 }
 
 /** Provides {@link LibraryContextValue}; pair with {@link useLibraryScanner} to populate. */
-export function LibraryProvider ({ children }: { readonly children: ReactNode }) {
-  const [ state, setState ] = useState<LibraryState>({
-    registry:           new ModelRegistry(),
-    playlists:          [],
-    searchQuery:        '',
-    selectedTrackIndex: null,
-    isLoading:          false,
-  })
+type LibraryProviderProps = { readonly children: ReactNode }
+
+export function LibraryProvider ({ children }: LibraryProviderProps) {
+  const [ state, setState ] = useState<LibraryState>(() =>
+    ({
+      registry:           new ModelRegistry(),
+      playlists:          [],
+      searchQuery:        '',
+      selectedTrackIndex: null,
+      isLoading:          false,
+    }))
 
   const setFolders = useCallback((folders: FolderEntry[]) => {
     setState(s => {
@@ -136,8 +139,7 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
   }, [])
 
   const addPlaylist = useCallback((name: string) => {
-    const id = Math.random().toString(36)
-      .slice(2, 11)
+    const id = generateId()
     setState(s =>
       ({ ...s, playlists: [ ...s.playlists, { id, name, tracks: []}]}))
   }, [])
@@ -166,9 +168,8 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
 
   const filteredTracks = useMemo(() => {
     const tracks = state.registry.getAllTracks()
-    if (!state.searchQuery.trim()) {
+    if (!state.searchQuery.trim())
       return tracks
-    }
 
     const query = state.searchQuery.toLowerCase()
     return tracks.filter(
@@ -179,32 +180,45 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
     )
   }, [ state.registry, state.searchQuery ])
 
-  return (
-    <LibraryContext.Provider
-      value={{
-        ...state,
-        setFolders,
-        setTracks,
-        setSearchQuery,
-        selectTrack,
-        toggleFolder,
-        setLoading,
-        filteredTracks,
-        addPlaylist,
-        removePlaylist,
-        addTracksToPlaylist,
-      }}
-    >
-      {children}
-    </LibraryContext.Provider>
-  )
+  // Memoised: a fresh object here re-renders every consumer on every render
+  // of this provider, which for the track list means rebuilding the whole
+  // table on unrelated state changes.
+  const value = useMemo(() =>
+    ({
+      ...state,
+      setFolders,
+      setTracks,
+      setSearchQuery,
+      selectTrack,
+      toggleFolder,
+      setLoading,
+      filteredTracks,
+      addPlaylist,
+      removePlaylist,
+      addTracksToPlaylist,
+    }), [
+    state,
+    setFolders,
+    setTracks,
+    setSearchQuery,
+    selectTrack,
+    toggleFolder,
+    setLoading,
+    filteredTracks,
+    addPlaylist,
+    removePlaylist,
+    addTracksToPlaylist,
+  ])
+
+  return <LibraryContext.Provider value={ value }>
+    {children}
+  </LibraryContext.Provider>
 }
 
 /** Access the library. Throws if used outside {@link LibraryProvider}. */
 export function useLibrary () {
   const context = useContext(LibraryContext)
-  if (!context) {
+  if (!context)
     throw new Error('useLibrary must be used within LibraryProvider')
-  }
   return context
 }

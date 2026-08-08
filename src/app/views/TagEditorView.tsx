@@ -1,3 +1,5 @@
+/* eslint-disable react-strict/no-style-prop -- The artwork preview paints the
+   track's own image data or its generated cover colour. */
 /**
  * TagEditorView — edits every tag the library stores for a track.
  *
@@ -25,7 +27,13 @@ import { formatTime, isoDuration } from '../utils/time'
 
 
 /** Label and input type per editable field. Numeric fields parse on save. */
-const FIELD_META: Record<TagField, { label: string; type: 'text' | 'number' | 'multiline' }> = {
+/** How a tag field is presented: its visible label and which control it gets. */
+interface TagFieldMeta {
+  label: string
+  type:  'text' | 'number' | 'multiline'
+}
+
+const FIELD_META: Record<TagField, TagFieldMeta> = {
   title:       { label: 'Title', type: 'text' },
   artist:      { label: 'Artist', type: 'text' },
   album:       { label: 'Album', type: 'text' },
@@ -54,12 +62,16 @@ type FormState = Record<TagField, string>
 
 const ALL_FIELDS: readonly TagField[] = [ ...PRIMARY_TAG_FIELDS, ...EXTENDED_TAG_FIELDS ]
 
+/** Textarea heights: lyrics get a real column, other free text a few lines. */
+const LYRICS_ROWS    = 10
+const MULTILINE_ROWS = 3
+
 function readForm (track: Track): FormState {
   const source = track as unknown as Record<string, unknown>
-  const state = {} as FormState
+  const state  = {} as FormState
 
   for (const field of ALL_FIELDS) {
-    const value = source[field]
+    const value  = source[field]
     state[field] = value === undefined || value === null ? '' : String(value)
   }
   return state
@@ -78,57 +90,67 @@ function parseField (field: TagField, value: string): string | number | undefine
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
-function TagInputs ({ fields, form, onChange }: {
+type TagInputsProps = {
   readonly fields:   readonly TagField[]
   readonly form:     FormState
   readonly onChange: (field: TagField, value: string) => void
-}) {
-  return (
-    <>
-      {fields.map(field => {
-        const { label, type } = FIELD_META[field]
+}
 
-        if (type === 'multiline')
-          return (
-            <label key={field} className='field'>
-              <span>{label}</span>
+type TagInputProps = {
+  readonly field:    TagField
+  readonly value:    string
+  readonly onChange: (field: TagField, value: string) => void
+}
 
-              <textarea
-                rows={field === 'lyrics' ? 10 : 3}
-                value={form[field]}
-                onChange={event =>
-                  onChange(field, event.target.value)}
-              />
-            </label>
-          )
+/**
+ * One tag row. Split out of `TagInputs` so the map callback stays a plain
+ * projection rather than a component definition inlined in JSX.
+ */
+function TagInput ({ field, value, onChange }: TagInputProps) {
+  const { label, type } = FIELD_META[field]
 
-        return (
-          <Input
-            key={field}
-            label={label}
-            type={type}
-            value={form[field]}
-            onChange={event =>
-              onChange(field, event.target.value)}
-          />
-        )
-      })}
-    </>
-  )
+  const handleChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    onChange(field, event.target.value)
+
+  if (type === 'multiline')
+    return <label className='field'>
+      <span>{label}</span>
+
+      <textarea
+        rows={ field === 'lyrics' ? LYRICS_ROWS : MULTILINE_ROWS }
+        value={ value }
+        onChange={ handleChange } />
+    </label>
+
+  return <Input
+    label={ label }
+    type={ type }
+    value={ value }
+    onChange={ handleChange } />
+}
+
+function TagInputs ({ fields, form, onChange }: TagInputsProps) {
+  return <>
+    {fields.map(field =>
+      <TagInput key={ field } field={ field } value={ form[field] } onChange={ onChange } />
+    )}
+  </>
 }
 
 /** Artwork preview plus its replace/remove controls. */
-function ArtworkField ({ art, color, album, onPick, onClear }: {
+type ArtworkFieldProps = {
   readonly art?:    string
   readonly color?:  string
   readonly album:   string
   readonly onPick:  (dataUrl: string) => void
   readonly onClear: () => void
-}) {
+}
+
+function ArtworkField ({ art, color, album, onPick, onClear }: ArtworkFieldProps) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0]
+    const file                = event.currentTarget.files?.[0]
     event.currentTarget.value = ''
     if (!file)
       return
@@ -144,43 +166,41 @@ function ArtworkField ({ art, color, album, onPick, onClear }: {
     reader.readAsDataURL(file)
   }
 
-  return (
-    <div className='artwork-field'>
-      <figure className='art-preview' style={{ backgroundColor: color }}>
-        {art
-          ? <img src={art} alt={`Album artwork for ${album}`} />
-          : <Icon name='music' />
-        }
-      </figure>
+  return <div className='artwork-field'>
+    <figure className='art-preview' style={{ backgroundColor: color }}>
+      {art
+        ? <img src={ art } alt={ `Album artwork for ${album}` } />
+        : <Icon name='music' />
+      }
+    </figure>
 
-      <menu className='artwork-actions'>
-        <li>
-          <Button type='button'
-            variant='secondary'
-            size='sm'
-            onClick={() =>
-              fileRef.current?.click()}>
-            {art ? 'Replace' : 'Add artwork'}
-          </Button>
-        </li>
+    <menu className='artwork-actions'>
+      <li>
+        <Button
+          type='button'
+          variant='secondary'
+          size='sm'
+          onClick={ () =>
+            fileRef.current?.click() }>
+          {art ? 'Replace' : 'Add artwork'}
+        </Button>
+      </li>
 
-        <li>
-          <Button type='button' variant='ghost' size='sm' disabled={!art} onClick={onClear}>
-            Remove
-          </Button>
-        </li>
-      </menu>
+      <li>
+        <Button type='button' variant='ghost' size='sm' disabled={ !art } onClick={ onClear }>
+          Remove
+        </Button>
+      </li>
+    </menu>
 
-      <input
-        ref={fileRef}
-        type='file'
-        accept='image/*'
-        aria-label='Choose album artwork'
-        hidden
-        onChange={handleFile}
-      />
-    </div>
-  )
+    <input
+      ref={ fileRef }
+      aria-label='Choose album artwork'
+      type='file'
+      accept='image/*'
+      hidden
+      onChange={ handleFile } />
+  </div>
 }
 
 interface TagEditorFormProps {
@@ -190,10 +210,10 @@ interface TagEditorFormProps {
 }
 
 function TagEditorForm ({ track, onClose, onSaved }: TagEditorFormProps) {
-  const data = useData()
+  const data              = useData()
   const [ form, setForm ] = useState<FormState>(() =>
     readForm(track))
-  const [ art, setArt ] = useState<string | undefined>(track.albumArt)
+  const [ art, setArt ]       = useState<string | undefined>(track.albumArt)
   const [ status, setStatus ] = useState<string | null>(null)
 
   const setField = (field: TagField, value: string) =>
@@ -222,55 +242,56 @@ function TagEditorForm ({ track, onClose, onSaved }: TagEditorFormProps) {
     }
   }
 
-  return (
-    <article className='tag-editor-view'>
-      <header className='tag-editor-header'>
-        <h2>Edit Tags</h2>
-        <Button type='button' variant='ghost' onClick={onClose}>← Back</Button>
-      </header>
+  return <article className='tag-editor-view'>
+    <header className='tag-editor-header'>
+      <h2>Edit Tags</h2>
+      <Button type='button' variant='ghost' onClick={ onClose }>← Back</Button>
+    </header>
 
-      <form onSubmit={handleSave}>
-        <div className='editor-layout'>
-          <ArtworkField
-            art={art}
-            color={track.coverColor}
-            album={track.album}
-            onPick={setArt}
-            onClear={() =>
-              setArt(undefined)}
-          />
+    <form onSubmit={ handleSave }>
+      <div className='editor-layout'>
+        <ArtworkField
+          art={ art }
+          color={ track.coverColor }
+          album={ track.album }
+          onPick={ setArt }
+          onClear={ () =>
+            setArt(undefined) } />
 
-          <div className='form-stack'>
-            <TagInputs fields={PRIMARY_TAG_FIELDS} form={form} onChange={setField} />
+        <section className='form-stack'>
+          <TagInputs fields={ PRIMARY_TAG_FIELDS } form={ form } onChange={ setField } />
 
-            <details className='tag-extended'>
-              <summary>
-                <Icon name='chevron-right' />
-                More tags
-              </summary>
+          <details className='tag-extended'>
+            <summary>
+              <Icon name='chevron-right' />
+              More tags
+            </summary>
 
-              <div className='form-stack'>
-                <TagInputs fields={EXTENDED_TAG_FIELDS} form={form} onChange={setField} />
-              </div>
-            </details>
+            <fieldset className='form-stack'>
+              <TagInputs fields={ EXTENDED_TAG_FIELDS } form={ form } onChange={ setField } />
+            </fieldset>
+          </details>
 
-            <dl className='file-info'>
-              <div>
-                <dt>File</dt>
-                <dd>{track.path}</dd>
-              </div>
+          <dl className='file-info'>
+            <div>
+              <dt>File</dt>
+              <dd>{track.path}</dd>
+            </div>
 
-              <div>
-                <dt>Format</dt>
-                <dd>{track.format}</dd>
-              </div>
+            <div>
+              <dt>Format</dt>
+              <dd>{track.format}</dd>
+            </div>
 
-              <div>
-                <dt>Duration</dt>
-                <dd><time dateTime={isoDuration(track.duration)}>{formatTime(track.duration)}</time></dd>
-              </div>
+            <div>
+              <dt>Duration</dt>
 
-              {track.bitrate !== undefined &&
+              <dd>
+                <time dateTime={ isoDuration(track.duration) }>{formatTime(track.duration)}</time>
+              </dd>
+            </div>
+
+            {track.bitrate !== undefined &&
                 <div>
                   <dt>Bitrate</dt>
 
@@ -280,9 +301,9 @@ function TagEditorForm ({ track, onClose, onSaved }: TagEditorFormProps) {
                     kbps
                   </dd>
                 </div>
-              }
+            }
 
-              {track.sampleRate !== undefined &&
+            {track.sampleRate !== undefined &&
                 <div>
                   <dt>Sample rate</dt>
 
@@ -292,54 +313,47 @@ function TagEditorForm ({ track, onClose, onSaved }: TagEditorFormProps) {
                     Hz
                   </dd>
                 </div>
-              }
+            }
 
-              {track.channels !== undefined &&
+            {track.channels !== undefined &&
                 <div>
                   <dt>Channels</dt>
                   <dd>{track.channels}</dd>
                 </div>
-              }
-            </dl>
-          </div>
-        </div>
+            }
+          </dl>
+        </section>
+      </div>
 
-        <footer className='footer-actions'>
-          {status && <p className='status-note' role='status'>{status}</p>}
-          <Button type='button' variant='ghost' onClick={onClose}>Cancel</Button>
-          <Button type='submit' variant='primary'>Save Changes</Button>
-        </footer>
-      </form>
-    </article>
-  )
+      <footer className='footer-actions'>
+        {status && <p className='status-note' role='status'>{status}</p>}
+        <Button type='button' variant='ghost' onClick={ onClose }>Cancel</Button>
+        <Button type='submit' variant='primary'>Save Changes</Button>
+      </footer>
+    </form>
+  </article>
 }
 
 export function TagEditorView () {
   const { setView, editingTrackId } = useUI()
-  const { registry, setTracks } = useLibrary()
-  const tracks = registry.getAllTracks()
-  const track = tracks.find(candidate =>
+  const { registry, setTracks }     = useLibrary()
+  const tracks                      = registry.getAllTracks()
+  const track                       = tracks.find(candidate =>
     candidate.id === editingTrackId) || tracks[0]
 
-  if (!track) {
-    return (
-      <article className='tag-editor-view empty-state'>
-        <p>No track selected</p>
-      </article>
-    )
-  }
+  if (!track)
+    return <article className='tag-editor-view empty-state'>
+      <p>No track selected</p>
+    </article>
 
-  return (
-    <TagEditorForm
-      key={track.id}
-      track={track}
-      onClose={() =>
-        setView('library')}
-      onSaved={() =>
-        // The models were edited in place, so nothing downstream has changed
-        // identity. Republishing them is what tells React to re-render the
-        // library with the new titles.
-        setTracks(registry.getAllTracks())}
-    />
-  )
+  return <TagEditorForm
+    key={ track.id }
+    track={ track }
+    onClose={ () =>
+      setView('library') }
+    onSaved={ () =>
+    // The models were edited in place, so nothing downstream has changed
+    // identity. Republishing them is what tells React to re-render the
+    // library with the new titles.
+      setTracks(registry.getAllTracks()) } />
 }

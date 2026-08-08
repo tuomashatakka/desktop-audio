@@ -2,7 +2,7 @@ import { globalShortcut, BrowserWindow } from 'electron'
 import type { MediaState } from './app/services/types'
 
 
-// eslint-disable-next-line functional/no-let, @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let mprisPlayer: any = null
 
 export function init (win: BrowserWindow): void {
@@ -53,7 +53,7 @@ export function updateState (state: MediaState): void {
       : {},
   }
   mprisPlayer.playbackStatus = state.isPlaying ? 'Playing' : 'Paused'
-  mprisPlayer.position = state.position * 1e6
+  mprisPlayer.position       = state.position * 1e6
 }
 
 export function teardown (): void {

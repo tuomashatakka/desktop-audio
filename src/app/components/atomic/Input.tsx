@@ -19,12 +19,10 @@ export function Input ({
 }: InputProps) {
   const inputId = id || label?.toLowerCase().replace(/\s+/g, '-')
 
-  return (
-    <label className={`field ${error ? 'error' : ''} ${wrapperClass}`.trim()}>
-      {label && <span>{label}</span>}
-      {startAdornment}
-      <input id={inputId} className={className || undefined} {...props} />
-      {error && <small>{error}</small>}
-    </label>
-  )
+  return <label className={ `field ${error ? 'error' : ''} ${wrapperClass}`.trim() }>
+    {label && <span>{label}</span>}
+    {startAdornment}
+    <input id={ inputId } className={ className || undefined } { ...props } />
+    {error && <small>{error}</small>}
+  </label>
 }

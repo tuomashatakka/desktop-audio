@@ -25,7 +25,7 @@ const BASE_FONT_PX = 16
  */
 function luminance (hex: string): number {
   const value = hex.replace('#', '')
-  const full = value.length === 3
+  const full  = value.length === 3
     ? value.split('').map(c =>
       c + c)
       .join('')
