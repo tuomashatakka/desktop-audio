@@ -83,8 +83,6 @@ describe('WebFsDataSource', () => {
   it('has required DataSource methods', () => {
     const ds = new WebFsDataSource()
     expect(typeof ds.addRoot).toBe('function')
-    expect(typeof ds.removeRoot).toBe('function')
-    expect(typeof ds.listRoots).toBe('function')
     expect(typeof ds.scan).toBe('function')
     expect(typeof ds.load).toBe('function')
     expect(typeof ds.subscribe).toBe('function')
@@ -94,22 +92,22 @@ describe('WebFsDataSource', () => {
     expect(typeof ds.deleteTrack).toBe('function')
   })
 
-  it('subscribe returns unsubscribe function', () => {
+  it('subscribe returns a disposable subscription', () => {
     const ds = new WebFsDataSource()
     const listener = vi.fn()
-    const unsub = ds.subscribe(listener)
-    
-    expect(typeof unsub).toBe('function')
-    unsub()
-    // Double unsubscribe should be safe
-    expect(() => unsub()).not.toThrow()
+    const subscription = ds.subscribe(listener)
+
+    expect(typeof subscription.dispose).toBe('function')
+    subscription.dispose()
+    // Disposal is idempotent by contract
+    expect(() => subscription.dispose()).not.toThrow()
   })
 
   it.skip('addRoot returns null when user cancels picker', async () => {
     // This test requires proper File System Access API mocking
   })
   
-  it.skip('load returns an array', async () => {
+  it.skip('load streams hydrate events', async () => {
     // This test requires proper IndexedDB mocking
   })
 

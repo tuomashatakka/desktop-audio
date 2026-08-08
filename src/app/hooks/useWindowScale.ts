@@ -15,8 +15,8 @@ import { CHROME_MAX_HEIGHT } from './useHeightTier'
 /** Returns a callback that toggles the window between compact and expanded. */
 export function useWindowScale () {
   const { compactSize, expandedSize, setCompactSize, setExpandedSize } = useSettings()
-  const { previousView, setView } = useUI()
-  const host = useHost()
+  const { previousView, setView }                                      = useUI()
+  const host                                                           = useHost()
 
   return useCallback(() => {
     const current = { width: window.innerWidth, height: window.innerHeight }

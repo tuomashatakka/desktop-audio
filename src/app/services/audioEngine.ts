@@ -15,16 +15,15 @@ export class AudioEngine {
   private constructor () {}
 
   static getInstance (): AudioEngine {
-    if (!AudioEngine.instance) {
+    if (!AudioEngine.instance)
       AudioEngine.instance = new AudioEngine()
-    }
     return AudioEngine.instance
   }
 
   ensureContext (): AudioContext {
     if (!this.audioContext) {
-      this.audioContext = new AudioContext()
-      this.analyser = this.audioContext.createAnalyser()
+      this.audioContext     = new AudioContext()
+      this.analyser         = this.audioContext.createAnalyser()
       this.analyser.fftSize = 256
       this.analyser.connect(this.audioContext.destination)
     }
@@ -38,7 +37,7 @@ export class AudioEngine {
 
   async loadAudio (url: string): Promise<HTMLAudioElement> {
     if (!this.audioElement) {
-      this.audioElement = new Audio()
+      this.audioElement             = new Audio()
       this.audioElement.crossOrigin = 'anonymous'
     }
 
@@ -55,9 +54,8 @@ export class AudioEngine {
   }
 
   async play (url?: string): Promise<void> {
-    if (url && this.audioElement?.src !== url) {
+    if (url && this.audioElement?.src !== url)
       await this.loadAudio(url)
-    }
     await this.audioElement?.play()
   }
 
@@ -66,15 +64,13 @@ export class AudioEngine {
   }
 
   seek (time: number): void {
-    if (this.audioElement) {
+    if (this.audioElement)
       this.audioElement.currentTime = time
-    }
   }
 
   setVolume (volume: number): void {
-    if (this.audioElement) {
+    if (this.audioElement)
       this.audioElement.volume = Math.max(0, Math.min(1, volume))
-    }
   }
 
   getCurrentTime (): number {
@@ -108,23 +104,21 @@ export class AudioEngine {
   }
 
   async getWaveformData (samples: number = 100): Promise<Float32Array> {
-    if (!this.analyser || !this.audioElement) {
+    if (!this.analyser || !this.audioElement)
       return new Float32Array(samples)
-    }
 
     const bufferLength = this.analyser.frequencyBinCount
-    const dataArray = new Uint8Array(bufferLength)
+    const dataArray    = new Uint8Array(bufferLength)
 
     return new Promise(resolve => {
       const draw = () => {
         this.analyser?.getByteFrequencyData(dataArray)
 
-        const step = Math.floor(bufferLength / samples)
+        const step     = Math.floor(bufferLength / samples)
         const waveform = new Float32Array(samples)
 
-        for (let i = 0; i < samples; i++) {
+        for (let i = 0; i < samples; i++)
           waveform[i] = dataArray[i * step] / 255
-        }
 
         resolve(waveform)
       }
@@ -144,22 +138,20 @@ export class AudioEngine {
       return
 
     const { width, height } = canvas
-    const barWidth = width / waveformData.length
-    const progressIndex = Math.floor(waveformData.length * progress)
+    const barWidth          = width / waveformData.length
+    const progressIndex     = Math.floor(waveformData.length * progress)
 
     ctx.clearRect(0, 0, width, height)
 
     for (const [ index, value ] of waveformData.entries()) {
       const barHeight = value * height * 0.8
-      const x = index * barWidth
-      const y = (height - barHeight) / 2
+      const x         = index * barWidth
+      const y         = (height - barHeight) / 2
 
-      if (showProgress && index < progressIndex) {
+      if (showProgress && index < progressIndex)
         ctx.fillStyle = '#ff5500'
-      }
-      else {
+      else
         ctx.fillStyle = '#666666'
-      }
 
       ctx.fillRect(x, y, barWidth - 1, barHeight)
     }
@@ -170,6 +162,6 @@ export class AudioEngine {
     this.audioElement = null
     this.audioContext?.close().catch(console.error)
     this.audioContext = null
-    this.analyser = null
+    this.analyser     = null
   }
 }

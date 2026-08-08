@@ -10,16 +10,16 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "eslint ./src",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:ui": "vitest --ui",
-    "test:e2e": "playwright test",
-    "test:coverage": "vitest run --coverage",
+    "lint": "eslint ./src --config config/eslint.config.mjs",
+    "test": "vitest run --config config/vitest.config.ts",
+    "test:watch": "vitest --config config/vitest.config.ts",
+    "test:ui": "vitest --ui --config config/vitest.config.ts",
+    "test:e2e": "playwright test --config config/playwright/playwright.config.ts",
+    "test:coverage": "vitest run --coverage --config config/vitest.config.ts",
     "typecheck": "tsc --noEmit",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
-    "dev:web": "VITE_BRIDGE=browser vite --config vite.renderer.config.ts",
-    "build:web": "VITE_BRIDGE=browser vite build --config vite.renderer.config.ts"
+    "dev:web": "VITE_BRIDGE=browser vite --config config/vite/renderer.config.ts",
+    "build:web": "VITE_BRIDGE=browser vite build --config config/vite/renderer.config.ts"
   },
   "keywords": [],
   "author": {
@@ -42,19 +42,17 @@
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
+    "@tuomashatakka/eslint-config": "^4.0.1",
     "@types/animejs": "3.1.13",
     "@types/better-sqlite3": "^7.6.13",
     "@types/electron-squirrel-startup": "1.0.2",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@typescript-eslint/eslint-plugin": "5.62.0",
-    "@typescript-eslint/parser": "5.62.0",
     "@vitejs/plugin-react": "6.0.1",
     "@vitest/coverage-v8": "4.1.5",
     "electron": "41.0.1",
     "electron-rebuild": "^3.2.9",
     "eslint": "10.1.0",
-    "eslint-plugin-import": "2.32.0",
     "jsdom": "28.1.0",
     "playwright": "1.58.2",
     "typescript": "^6.0.3",
@@ -62,21 +60,20 @@
     "vitest": "4.1.5"
   },
   "dependencies": {
-    "@stylistic/eslint-plugin": "5.10.0",
     "@tanstack/react-virtual": "3.13.23",
-    "@tuomashatakka/eslint-config": "^3.1.0",
     "better-sqlite3": "^12.8.0",
+    "disposable-events": "^1.0.0",
     "electron-squirrel-startup": "1.0.1",
-    "eslint-plugin-functional": "9.0.4",
-    "eslint-plugin-unicorn": "63.0.0",
     "mpris-service": "^2.1.2",
     "music-metadata": "11.12.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "typescript-eslint": "8.58.0",
     "vite-plugin-mkcert": "^2.0.0"
   },
   "patchedDependencies": {
     "fd-slicer@1.1.0": "patches/fd-slicer@1.1.0.patch"
+  },
+  "config": {
+    "forge": "./config/forge.config.ts"
   }
 }

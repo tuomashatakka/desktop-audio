@@ -20,29 +20,26 @@ interface AppLayoutProps {
  */
 export function AppLayout ({ titlebar, sidebar, main, player }: AppLayoutProps) {
   const { sidebarOpen, currentView } = useUI()
-  const heightTier = useHeightTier()
+  const heightTier                   = useHeightTier()
 
-  return (
-    <div
-      className='app-shell'
-      data-height-tier={heightTier}
-      data-view={currentView}
-      data-sidebar-open={sidebarOpen || undefined}
-    >
-      {titlebar && <header className='titlebar'>{titlebar}</header>}
+  return <div
+    className='app-shell'
+    data-height-tier={ heightTier }
+    data-view={ currentView }
+    data-sidebar-open={ sidebarOpen || undefined }>
+    {titlebar && <header className='titlebar'>{titlebar}</header>}
 
-      <div className='app-workspace'>
-        {sidebar &&
-          <aside className='app-sidebar' aria-hidden={!sidebarOpen} inert={!sidebarOpen}>
+    <section className='app-workspace'>
+      {sidebar &&
+          <aside className='app-sidebar' aria-hidden={ !sidebarOpen } inert={ !sidebarOpen }>
             {sidebar}
           </aside>
-        }
+      }
 
-        <div className='app-content'>
-          <main className='app-main view-content'>{main}</main>
-          {player && <footer className='app-player'>{player}</footer>}
-        </div>
-      </div>
-    </div>
-  )
+      <section className='app-content'>
+        <main className='app-main view-content'>{main}</main>
+        {player && <footer className='app-player'>{player}</footer>}
+      </section>
+    </section>
+  </div>
 }

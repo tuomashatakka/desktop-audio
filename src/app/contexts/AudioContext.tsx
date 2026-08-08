@@ -7,12 +7,13 @@
  * is delegated by callers passing the current track list.
  */
 import type { ReactNode } from 'react'
-import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import type { Track } from './LibraryContext'
 import { useOptionalSettings } from './SettingsContext'
 import type { RepeatMode } from './SettingsContext'
 import { useHost, useData } from '../data'
 import { noop } from '../utils/noop'
+import { listenAll } from '../utils/events'
 
 
 /** Read-only playback state. */
@@ -92,27 +93,24 @@ async function decodeWaveformBars (
   barCount: number,
   audioCtx: globalThis.AudioContext
 ): Promise<Float32Array> {
-  const decoded = await audioCtx.decodeAudioData(buffer)
-  const channel = decoded.getChannelData(0)
+  const decoded       = await audioCtx.decodeAudioData(buffer)
+  const channel       = decoded.getChannelData(0)
   const samplesPerBar = Math.floor(channel.length / barCount)
-  const bars = new Float32Array(barCount)
+  const bars          = new Float32Array(barCount)
 
   for (let i = 0; i < barCount; i++) {
     const start = i * samplesPerBar
-    // eslint-disable-next-line functional/no-let
     let sum = 0
-    for (let j = start; j < start + samplesPerBar; j++) {
+    for (let j = start; j < start + samplesPerBar; j++)
       sum += channel[j] * channel[j]
-    }
     bars[i] = Math.sqrt(sum / samplesPerBar)
   }
 
   // Normalise to [0.07, 1.0]
   const max = bars.reduce((a, b) =>
     Math.max(a, b), 0.001)
-  for (let i = 0; i < barCount; i++) {
+  for (let i = 0; i < barCount; i++)
     bars[i] = Math.max(0.07, bars[i] / max)
-  }
 
   return bars
 }
@@ -120,7 +118,6 @@ async function decodeWaveformBars (
 const AudioContext = createContext<AudioContextValue | null>(null)
 
 /** Global reference to ensureReady function, set by AudioProvider on mount */
-// eslint-disable-next-line functional/no-let
 let globalEnsureReady: (() => Promise<void>) | null = null
 
 // Register the renderer-wide `ensureReady` so non-React code (e.g. the
@@ -142,10 +139,10 @@ export function getGlobalEnsureReady (): (() => Promise<void>) | null {
  * the refs are still shared, mutable objects either way.
  */
 function useMediaSessionRefs (currentTrack: Track | null) {
-  const pauseRef = useRef<() => void>(noop)
-  const resumeRef = useRef<() => void>(noop)
-  const seekRef = useRef<(time: number) => void>(noop)
-  const playNextRef = useRef<(tracks: readonly Track[]) => void>(noop)
+  const pauseRef        = useRef<() => void>(noop)
+  const resumeRef       = useRef<() => void>(noop)
+  const seekRef         = useRef<(time: number) => void>(noop)
+  const playNextRef     = useRef<(tracks: readonly Track[]) => void>(noop)
   const playPreviousRef = useRef<(tracks: readonly Track[]) => void>(noop)
 
   /** What to do when a track runs out. Reassigned every render, see below. */
@@ -186,9 +183,8 @@ function useMediaSessionRefs (currentTrack: Track | null) {
       playNextRef.current(currentQueueRef.current)
     })
     navigator.mediaSession.setActionHandler('seekto', details => {
-      if (details.seekTime !== undefined) {
+      if (details.seekTime !== undefined)
         seekRef.current(details.seekTime)
-      }
     })
   }, [ currentTrack ])
 
@@ -208,7 +204,9 @@ function useMediaSessionRefs (currentTrack: Track | null) {
  * Hosts the lazily-initialized Web Audio graph and exposes transport actions
  * via {@link useAudio}. Resumes the audio context on first user gesture.
  */
-export function AudioProvider ({ children }: { readonly children: ReactNode }) {
+type AudioProviderProps = { readonly children: ReactNode }
+
+export function AudioProvider ({ children }: AudioProviderProps) {
   const [ state, setState ] = useState<AudioState>({
     isPlaying:    false,
     currentTime:  0,
@@ -221,17 +219,17 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
 
   // Playback preferences are read, never written, from here — the toggles in
   // the player write straight to settings, which is where they persist.
-  const settings = useOptionalSettings()
+  const settings   = useOptionalSettings()
   const repeatMode = settings?.repeatMode ?? 'none'
-  const shuffle = settings?.shuffle ?? false
+  const shuffle    = settings?.shuffle ?? false
 
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const analyzerRef = useRef<AnalyserNode | null>(null)
-  const audioContextRef = useRef<globalThis.AudioContext | null>(null)
-  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null)
+  const audioRef                  = useRef<HTMLAudioElement | null>(null)
+  const analyzerRef               = useRef<AnalyserNode | null>(null)
+  const audioContextRef           = useRef<globalThis.AudioContext | null>(null)
+  const sourceRef                 = useRef<MediaElementAudioSourceNode | null>(null)
   const [ analyzer, setAnalyzer ] = useState<AnalyserNode | null>(null)
-  const host = useHost()
-  const data = useData()
+  const host                      = useHost()
+  const data                      = useData()
 
   const {
     pauseRef, resumeRef, seekRef, playNextRef, playPreviousRef,
@@ -240,7 +238,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
 
   useEffect(() => {
     if (!audioRef.current) {
-      audioRef.current = new Audio()
+      audioRef.current        = new Audio()
       audioRef.current.volume = state.volume
     }
 
@@ -249,13 +247,12 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     const handleTimeUpdate = () => {
       setState(s =>
         ({ ...s, currentTime: audio.currentTime }))
-      if (navigator.mediaSession && state.currentTrack) {
+      if (navigator.mediaSession && state.currentTrack)
         navigator.mediaSession.setPositionState({
           duration:     state.duration,
           playbackRate: 1,
           position:     audio.currentTime
         })
-      }
     }
 
     const handleDurationChange = () => {
@@ -279,33 +276,28 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
         ({ ...s, isLoading: false }))
     }
 
-    audio.addEventListener('timeupdate', handleTimeUpdate)
-    audio.addEventListener('durationchange', handleDurationChange)
-    audio.addEventListener('ended', handleEnded)
-    audio.addEventListener('loadstart', handleLoadStart)
-    audio.addEventListener('canplay', handleCanPlay)
+    const listeners = listenAll(audio, {
+      timeupdate:     handleTimeUpdate,
+      durationchange: handleDurationChange,
+      ended:          handleEnded,
+      loadstart:      handleLoadStart,
+      canplay:        handleCanPlay,
+    })
 
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate)
-      audio.removeEventListener('durationchange', handleDurationChange)
-      audio.removeEventListener('ended', handleEnded)
-      audio.removeEventListener('loadstart', handleLoadStart)
-      audio.removeEventListener('canplay', handleCanPlay)
-    }
+    return () =>
+      listeners.dispose()
   }, [])
 
   useEffect(() => {
-    if (audioRef.current) {
+    if (audioRef.current)
       audioRef.current.volume = state.volume
-    }
   }, [ state.volume ])
 
   useEffect(() =>
     () => {
       const audio = audioRef.current
-      if (audio && audio.src.startsWith('blob:')) {
+      if (audio && audio.src.startsWith('blob:'))
         URL.revokeObjectURL(audio.src)
-      }
       if (navigator.mediaSession) {
         navigator.mediaSession.setActionHandler('play', null)
         navigator.mediaSession.setActionHandler('pause', null)
@@ -352,7 +344,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
       if (!audio)
         return
 
-      const newTime = Math.max(0, audio.currentTime + delta / 1e6)
+      const newTime     = Math.max(0, audio.currentTime + delta / 1e6)
       audio.currentTime = newTime
       setState(s =>
         ({ ...s, currentTime: newTime }))
@@ -362,13 +354,12 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     if (!audioRef.current)
       return analyzerRef.current
 
-    if (!audioContextRef.current) {
+    if (!audioContextRef.current)
       audioContextRef.current = new globalThis.AudioContext()
-    }
 
     const ctx = audioContextRef.current
     if (!analyzerRef.current) {
-      analyzerRef.current = ctx.createAnalyser()
+      analyzerRef.current         = ctx.createAnalyser()
       analyzerRef.current.fftSize = 256
       analyzerRef.current.connect(ctx.destination)
       setAnalyzer(analyzerRef.current)
@@ -394,23 +385,21 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
       setupAnalyzer()
 
       const buffer = await data.readBytes(track.id)
-      if (!buffer) {
+      if (!buffer)
         throw new Error('Failed to read file')
-      }
 
-      const blob = new Blob([ buffer ])
+      const blob     = new Blob([ buffer ])
       const audioUrl = URL.createObjectURL(blob)
 
       const oldUrl = audio.src
-      if (oldUrl && oldUrl.startsWith('blob:')) {
+      if (oldUrl && oldUrl.startsWith('blob:'))
         URL.revokeObjectURL(oldUrl)
-      }
 
       audio.src = audioUrl
       await audio.play()
 
       const ctx = audioContextRef.current
-      if (ctx) {
+      if (ctx)
         blob.arrayBuffer()
           .then(ab =>
             decodeWaveformBars(ab, 400, ctx))
@@ -418,7 +407,6 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
             setState(s =>
               ({ ...s, waveformBars: bars })))
           .catch(noop)
-      }
     }
     catch (error) {
       console.error('Error playing audio:', error)
@@ -434,9 +422,8 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     setState(s =>
       ({ ...s, isPlaying: false }))
 
-    if (navigator.mediaSession) {
+    if (navigator.mediaSession)
       navigator.mediaSession.playbackState = 'paused'
-    }
   }, [])
 
   const resume = useCallback(() => {
@@ -448,9 +435,8 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     setState(s =>
       ({ ...s, isPlaying: true }))
 
-    if (navigator.mediaSession) {
+    if (navigator.mediaSession)
       navigator.mediaSession.playbackState = 'playing'
-    }
   }, [])
 
   const stop = useCallback(() => {
@@ -461,9 +447,8 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     audio.pause()
     audio.currentTime = 0
 
-    if (audio.src.startsWith('blob:')) {
+    if (audio.src.startsWith('blob:'))
       URL.revokeObjectURL(audio.src)
-    }
 
     setState(s =>
       ({
@@ -475,7 +460,7 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
 
     if (navigator.mediaSession) {
       navigator.mediaSession.playbackState = 'none'
-      navigator.mediaSession.metadata = null
+      navigator.mediaSession.metadata      = null
     }
   }, [])
 
@@ -541,16 +526,15 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
   // Ensure audio context is ready (resume if suspended due to autoplay policy)
   const ensureReady = useCallback(async () => {
     const ctx = audioContextRef.current
-    if (ctx && ctx.state === 'suspended') {
+    if (ctx && ctx.state === 'suspended')
       await ctx.resume()
-    }
   }, [])
 
   // Sync refs after all callbacks are defined
-  pauseRef.current = pause
-  resumeRef.current = resume
-  seekRef.current = seek
-  playNextRef.current = playNext
+  pauseRef.current        = pause
+  resumeRef.current       = resume
+  seekRef.current         = seek
+  playNextRef.current     = playNext
   playPreviousRef.current = playPrevious
 
   // Register global ensureReady for first-pointer-event handler
@@ -561,33 +545,44 @@ export function AudioProvider ({ children }: { readonly children: ReactNode }) {
     }
   }, [ ensureReady ])
 
-  return (
-    <AudioContext.Provider
-      value={{
-        ...state,
-        play,
-        pause,
-        resume,
-        stop,
-        seek,
-        setVolume,
-        playNext,
-        playPrevious,
-        analyzer,
-        setCurrentQueue,
-        ensureReady,
-      }}
-    >
-      {children}
-    </AudioContext.Provider>
-  )
+  const value = useMemo(() =>
+    ({
+      ...state,
+      play,
+      pause,
+      resume,
+      stop,
+      seek,
+      setVolume,
+      playNext,
+      playPrevious,
+      analyzer,
+      setCurrentQueue,
+      ensureReady,
+    }), [
+    state,
+    play,
+    pause,
+    resume,
+    stop,
+    seek,
+    setVolume,
+    playNext,
+    playPrevious,
+    analyzer,
+    setCurrentQueue,
+    ensureReady,
+  ])
+
+  return <AudioContext.Provider value={ value }>
+    {children}
+  </AudioContext.Provider>
 }
 
 /** Access playback state + transport. Throws if used outside {@link AudioProvider}. */
 export function useAudio () {
   const context = useContext(AudioContext)
-  if (!context) {
+  if (!context)
     throw new Error('useAudio must be used within AudioProvider')
-  }
   return context
 }

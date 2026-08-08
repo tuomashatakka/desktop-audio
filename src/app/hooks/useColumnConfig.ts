@@ -127,7 +127,7 @@ export function useColumnConfig (): ColumnConfigApi {
       if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx)
         return cols
 
-      const next = [ ...cols ]
+      const next      = [ ...cols ]
       const [ moved ] = next.splice(fromIdx, 1)
       next.splice(toIdx, 0, moved)
       return next

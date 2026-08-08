@@ -21,14 +21,11 @@ export function IconButton ({
     className,
   ].filter(Boolean).join(' ')
 
-  return (
-    <button
-      aria-label={label}
-      className={classes}
-      disabled={disabled}
-      {...props}
-    >
-      {children}
-    </button>
-  )
+  return <button
+    className={ classes }
+    aria-label={ label }
+    disabled={ disabled }
+    { ...props }>
+    {children}
+  </button>
 }

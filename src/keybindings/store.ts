@@ -51,7 +51,6 @@ export function createKeybindingStore (
   storage?: KeybindingStorage,
   defaults: readonly Keybinding[] = DEFAULT_KEYBINDINGS
 ): KeybindingStore {
-  // eslint-disable-next-line functional/no-let
   let bindings = hydrate(defaults, storage)
   const listeners = new Set<() => void>()
 

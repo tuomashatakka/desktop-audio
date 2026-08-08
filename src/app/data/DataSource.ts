@@ -17,23 +17,45 @@ export interface LibraryRoot {
   readonly label: string
 }
 
-/** Streaming events emitted while a scan runs. */
+/**
+ * Streaming events emitted while a scan or a hydrate runs.
+ *
+ * `batch`/`done` belong to {@link DataSource.scan}; `hydrate-batch`/
+ * `hydrate-done` to {@link DataSource.load}. They are deliberately distinct:
+ * a scan's `done` prunes rows it did not rediscover, and a hydrate must never
+ * feed that bookkeeping.
+ */
 export type DataEvent =
   | { readonly type: 'batch'; readonly tracks: readonly TrackDTO[] } |
   { readonly type: 'done'; readonly totalCount: number } |
+  { readonly type: 'hydrate-batch'; readonly tracks: readonly TrackDTO[] } |
+  { readonly type: 'hydrate-done'; readonly totalCount: number } |
   { readonly type: 'error'; readonly message: string }
 
 /** Subscriber for {@link DataEvent}s. Subscribe via {@link DataSource.subscribe}. */
 export type DataListener = (e: DataEvent) => void
 
+/**
+ * The disposal half of a subscription.
+ *
+ * Structural rather than `Disposable` from `disposable-events`, because
+ * `DisposableCollection` carries the same `dispose()` contract without
+ * extending `Disposable` — an implementation returns whichever fits.
+ */
+export interface Subscription {
+  dispose (): void
+}
+
 /** See module docstring. */
 export interface DataSource {
-  readonly addRoot:      () => Promise<string | null>
-  readonly removeRoot:   (rootId: string) => Promise<void>
-  readonly listRoots:    () => Promise<readonly LibraryRoot[]>
-  readonly scan:         (rootIds: readonly string[]) => void
-  readonly load:         () => Promise<readonly TrackDTO[]>
-  readonly subscribe:    (l: DataListener) => () => void
+  readonly addRoot: () => Promise<string | null>
+  readonly scan:    (rootIds: readonly string[]) => void
+
+  /** Fire-and-forget, like {@link DataSource.scan}: rows arrive as events. */
+  readonly load: () => void
+
+  /** Dispose the returned handle to unsubscribe — safe to call more than once. */
+  readonly subscribe:    (l: DataListener) => Subscription
   readonly readBytes:    (trackId: string) => Promise<ArrayBuffer>
   readonly readMetadata: (trackId: string) => Promise<AudioMetadata>
   readonly upsertTrack:  (track: TrackDTO) => Promise<void>

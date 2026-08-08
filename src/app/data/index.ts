@@ -8,7 +8,7 @@ export { BrowserHost } from './BrowserHost'
 export { HostProvider, useHost } from './HostContext'
 
 // Data source interface and adapters
-export type { DataSource, DataEvent, DataListener, LibraryRoot, AudioMetadata } from './DataSource'
+export type { DataSource, DataEvent, DataListener, LibraryRoot, AudioMetadata, Subscription } from './DataSource'
 
 export { IpcDataSource } from './IpcDataSource'
 
@@ -18,10 +18,3 @@ export { DataProvider, useData } from './DataContext'
 
 // IndexedDB helpers
 export { openDB, idbGet, idbSet, idbDelete, idbGetAll } from './idb'
-
-// Keep old names for backward compatibility during migration
-export { ElectronHost as ElectronBridge } from './ElectronHost'
-
-export { BrowserHost as BrowserBridge } from './BrowserHost'
-
-export { HostProvider as BridgeProvider, useHost as useBridge } from './HostContext'

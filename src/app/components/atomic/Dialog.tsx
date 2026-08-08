@@ -14,7 +14,7 @@ interface DialogProps {
 
 export function Dialog ({ open, onClose, title, children }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const titleId = useId()
+  const titleId   = useId()
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -29,19 +29,18 @@ export function Dialog ({ open, onClose, title, children }: DialogProps) {
 
   return createPortal(
     <dialog
-      ref={dialogRef}
+      ref={ dialogRef }
       className='dialog-panel'
-      aria-labelledby={titleId}
+      aria-labelledby={ titleId }
       closedby='any'
-      onClose={() => {
+      onClose={ () => {
         if (open)
           onClose()
-      }}
-    >
+      } }>
       <header className='dialog-header'>
-        <h2 id={titleId}>{title}</h2>
+        <h2 id={ titleId }>{title}</h2>
 
-        <IconButton type='button' label='Close dialog' onClick={onClose}>
+        <IconButton type='button' label='Close dialog' onClick={ onClose }>
           <Icon name='close' />
         </IconButton>
       </header>

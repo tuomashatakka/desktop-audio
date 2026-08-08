@@ -9,7 +9,7 @@
  * {@link LibraryContext}, {@link AudioContext}, {@link SettingsContext}.
  */
 import type { ReactNode } from 'react'
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 
 
 /** Top-level routes the shell can render. */
@@ -67,7 +67,9 @@ function loadGrouping (): Grouping {
  * Wraps the app and provides {@link UIContextValue}. Pass `value` to inject
  * pre-built state for tests; otherwise local state is used.
  */
-export function UIProvider ({ children, value }: { readonly children: ReactNode; value?: UIContextValue }) {
+type UIProviderProps = { readonly children: ReactNode; value?: UIContextValue }
+
+export function UIProvider ({ children, value }: UIProviderProps) {
   const [ state, setState ] = useState<UIState>(() =>
     ({
       currentView:        'library',
@@ -128,29 +130,39 @@ export function UIProvider ({ children, value }: { readonly children: ReactNode;
     localStorage.setItem(GROUPING_KEY, state.grouping)
   }, [ state.grouping ])
 
-  return (
-    <UIContext.Provider
-      value={value || {
-        ...state,
-        setView,
-        toggleSidebar,
-        selectFolder,
-        selectPlaylist,
-        setEditingTrack,
-        setDensity,
-        setGrouping,
-      }}
-    >
-      {children}
-    </UIContext.Provider>
-  )
+  // `value` is the test-injection escape hatch; otherwise memoise, so
+  // consumers don't re-render on every provider render.
+  const contextValue = useMemo(() =>
+    value ?? {
+      ...state,
+      setView,
+      toggleSidebar,
+      selectFolder,
+      selectPlaylist,
+      setEditingTrack,
+      setDensity,
+      setGrouping,
+    }, [
+    value,
+    state,
+    setView,
+    toggleSidebar,
+    selectFolder,
+    selectPlaylist,
+    setEditingTrack,
+    setDensity,
+    setGrouping,
+  ])
+
+  return <UIContext.Provider value={ contextValue }>
+    {children}
+  </UIContext.Provider>
 }
 
 /** Access {@link UIContextValue}. Throws if used outside {@link UIProvider}. */
 export function useUI () {
   const context = useContext(UIContext)
-  if (!context) {
+  if (!context)
     throw new Error('useUI must be used within UIProvider')
-  }
   return context
 }

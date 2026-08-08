@@ -2,6 +2,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { defineConfig } from 'vite'
 
+/** This file lives in config/vite/, so repo-relative paths climb two levels. */
+const projectRoot = path.resolve(__dirname, '..', '..')
+
 
 /**
  * main.ts resolves the window icon as `<__dirname>/../assets/icon.png`, and
@@ -13,8 +16,8 @@ function emitWindowIcon () {
     name: 'desktop-audio:emit-window-icon',
 
     closeBundle () {
-      const source = path.resolve(__dirname, 'assets/icon.png')
-      const target = path.resolve(__dirname, '.vite/assets/icon.png')
+      const source = path.resolve(projectRoot, 'assets/icon.png')
+      const target = path.resolve(projectRoot, '.vite/assets/icon.png')
 
       fs.mkdirSync(path.dirname(target), { recursive: true })
       fs.copyFileSync(source, target)

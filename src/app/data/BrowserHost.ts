@@ -17,6 +17,10 @@ import { noop } from '../utils/noop'
 
 
 export class BrowserHost implements HostBridge {
+  // `padded-blocks: never` forbids the blank line that
+  // `lines-around-comment` wants before the first member's doc comment, so the
+  // two rules cannot both be satisfied at the start of a class body.
+
   /** No-op: the browser tab has no window chrome to minimize. */
   // skipcq: JS-0105
   minimizeWindow (): void {
@@ -108,9 +112,8 @@ export class BrowserHost implements HostBridge {
     }
     catch (error) {
       // User cancelled or API not available
-      if (error instanceof DOMException && error.name === 'AbortError') {
+      if (error instanceof DOMException && error.name === 'AbortError')
         return null
-      }
       console.log('BrowserHost: selectDirectory cancelled or failed', error)
       return null
     }

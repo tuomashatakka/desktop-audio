@@ -1,7 +1,9 @@
 // IpcDataSource.ts - DataSource adapter that wraps window.electronAPI calls
 // Preserves current Electron behaviour exactly
 
-import type { DataSource, DataEvent, DataListener, LibraryRoot, AudioMetadata, TrackDTO } from './DataSource'
+import type { DisposableCollection } from 'disposable-events'
+import type { DataSource, DataEvent, DataListener, AudioMetadata, TrackDTO } from './DataSource'
+import { collectUnsubscribes } from '../utils/events'
 import { noop } from '../utils/noop'
 
 
@@ -16,16 +18,6 @@ export class IpcDataSource implements DataSource {
     return path
   }
 
-  async removeRoot (rootId: string): Promise<void> {
-    // IPC doesn't have a removeRoot method yet - this would need to be added
-    console.log('IpcDataSource: removeRoot called with', rootId)
-  }
-
-  async listRoots (): Promise<readonly LibraryRoot[]> {
-    // For now, return empty - this would need IPC method to list roots
-    return []
-  }
-
   scan (rootIds: readonly string[]): void {
     // Fire and forget - results come via subscribe()
     this._ipc?.scanLibrary([ ...rootIds ])
@@ -38,49 +30,55 @@ export class IpcDataSource implements DataSource {
    * skip this, leaving playback broken until the user triggered a rescan.
    */
   private indexPaths (tracks: readonly TrackDTO[]): void {
-    for (const t of tracks) {
+    for (const t of tracks)
       this.trackIdToPath.set(t.id, t.path)
-    }
   }
 
-  /** Reads the cached library from the main-process SQLite store. */
-  async load (): Promise<readonly TrackDTO[]> {
-    const tracks = await ((this._ipc?.loadLibrary() as Promise<readonly TrackDTO[]>) ?? Promise.resolve([]))
-    this.indexPaths(tracks)
-    return tracks
+  /**
+   * Asks the main process to stream the cached library out of SQLite. Rows
+   * arrive on the hydrate channels wired up in {@link IpcDataSource.subscribe},
+   * so this returns nothing.
+   */
+  load (): void {
+    this._ipc?.loadLibrary()
   }
 
-  /** Relays scan batch/done events; returns a combined unsubscribe. */
-  subscribe (l: DataListener): () => void {
-    const unsubBatch = this._ipc?.onLibraryBatch((batch: unknown[]) => {
-      const tracks = batch as TrackDTO[]
-      this.indexPaths(tracks)
-      l({ type: 'batch', tracks })
-    }) ?? noop
+  /**
+   * Relays scan and hydrate events. The four channel unsubscribes are gathered
+   * into one {@link DisposableCollection}, so the caller drops all of them
+   * with a single `dispose()` and cannot leak one by forgetting it.
+   */
+  subscribe (l: DataListener): DisposableCollection {
+    const relayTracks = (type: 'batch' | 'hydrate-batch') =>
+      (batch: unknown[]) => {
+        const tracks = batch as TrackDTO[]
+        this.indexPaths(tracks)
+        l({ type, tracks })
+      }
 
-    const unsubDone = this._ipc?.onLibraryDone(() => {
-      l({ type: 'done', totalCount: this.trackIdToPath.size })
-    }) ?? noop
+    const unsubscribes = [
+      this._ipc?.onLibraryBatch(relayTracks('batch')) ?? noop,
+      this._ipc?.onLibraryDone(() =>
+        l({ type: 'done', totalCount: this.trackIdToPath.size })) ?? noop,
+      this._ipc?.onLibraryHydrateBatch(relayTracks('hydrate-batch')) ?? noop,
+      this._ipc?.onLibraryHydrateDone(() =>
+        l({ type: 'hydrate-done', totalCount: this.trackIdToPath.size })) ?? noop,
+    ]
 
-    return () => {
-      unsubBatch()
-      unsubDone()
-    }
+    return collectUnsubscribes(...unsubscribes)
   }
 
   async readBytes (trackId: string): Promise<ArrayBuffer> {
     const path = this.trackIdToPath.get(trackId)
-    if (!path) {
+    if (!path)
       throw new Error(`No path found for trackId: ${trackId}`)
-    }
     return (this._ipc?.readFile(path) as Promise<ArrayBuffer>) ?? Promise.resolve(new ArrayBuffer(0))
   }
 
   async readMetadata (trackId: string): Promise<AudioMetadata> {
     const path = this.trackIdToPath.get(trackId)
-    if (!path) {
+    if (!path)
       throw new Error(`No path found for trackId: ${trackId}`)
-    }
     return (this._ipc?.getAudioMetadata(path) as Promise<AudioMetadata>) ??
       Promise.resolve({ duration: 0 })
   }

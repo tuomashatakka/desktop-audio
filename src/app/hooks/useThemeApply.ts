@@ -6,12 +6,9 @@ export function useThemeApply (theme: string, customTheme: CustomTheme | null) {
   useEffect(() => {
     const root = document.documentElement
 
-    if (theme === 'custom' && customTheme) {
-      // Apply all custom theme colors
-      for (const [ key, value ] of Object.entries(customTheme.colors)) {
+    if (theme === 'custom' && customTheme)
+      for (const [ key, value ] of Object.entries(customTheme.colors))
         root.style.setProperty(key, value)
-      }
-    }
     else {
       // Remove custom properties to let CSS variables from main.css take over
       const defaultVars = [

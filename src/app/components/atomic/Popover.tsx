@@ -1,6 +1,10 @@
+/* eslint-disable react-strict/no-style-prop -- The panel is positioned at a
+   pointer coordinate supplied at call time; there is no class for "here". */
+
 import { useEffect, useId, useLayoutEffect, useRef } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { listen } from '../../utils/events'
 
 
 export interface PopoverPoint {
@@ -19,10 +23,10 @@ interface PopoverProps {
 }
 
 export function Popover ({ open, anchor = null, point = null, onClose, children, id, placement = 'bottom' }: PopoverProps) {
-  const panelRef = useRef<HTMLDivElement>(null)
+  const panelRef    = useRef<HTMLDivElement>(null)
   const generatedId = useId()
-  const popoverId = id || generatedId
-  const anchorName = `--popover-${generatedId.replace(/[^a-z0-9_-]/gi, '')}`
+  const popoverId   = id || generatedId
+  const anchorName  = `--popover-${generatedId.replace(/[^a-z0-9_-]/gi, '')}`
 
   useLayoutEffect(() => {
     const panel = panelRef.current
@@ -58,19 +62,18 @@ export function Popover ({ open, anchor = null, point = null, onClose, children,
       if ((event as ToggleEvent).newState === 'closed')
         onClose()
     }
-    panel.addEventListener('toggle', handleToggle)
+    const toggle = listen(panel, 'toggle', handleToggle)
     return () =>
-      panel.removeEventListener('toggle', handleToggle)
+      toggle.dispose()
   }, [ onClose ])
 
   return createPortal(
     <div
-      ref={panelRef}
-      id={popoverId}
-      className={`popover-panel placement-${placement} ${point ? 'at-point' : ''}`.trim()}
-      popover='auto'
-      style={point ? { left: point.x, top: point.y } as CSSProperties : undefined}
-    >
+      ref={ panelRef }
+      className={ `popover-panel placement-${placement} ${point ? 'at-point' : ''}`.trim() }
+      style={ point ? { left: point.x, top: point.y } as CSSProperties : undefined }
+      id={ popoverId }
+      popover='auto'>
       {children}
     </div>,
     document.body

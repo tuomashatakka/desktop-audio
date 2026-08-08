@@ -22,7 +22,7 @@ export function shortcutFromEvent (event: KeyEventLike): string | null {
   if (MODIFIER_KEYS.has(rawKey))
     return null
 
-  const key = rawKey === ' ' ? 'space' : rawKey
+  const key             = rawKey === ' ' ? 'space' : rawKey
   const parts: string[] = []
   if (event.metaKey || event.ctrlKey)
     parts.push('mod')

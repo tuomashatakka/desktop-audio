@@ -8,10 +8,23 @@ Electron desktop music player. **Electron + React 18 + TypeScript + Vite + bun.*
 bun run start        # dev (electron-forge start)
 bun run typecheck    # tsc --noEmit
 bun run lint         # eslint ./src
-bun test             # vitest run
+bun run test         # vitest run   (`bun test` runs bun's own runner — not this)
 bun run test:watch   # vitest --watch
 bun run make         # production build
 ```
+
+Every tool config lives in `config/` (`config/vite/*`, `config/playwright/*`,
+`config/eslint.config.mjs`, `config/vitest.config.ts`, `config/forge.config.ts`)
+and each one pins its own `projectRoot`, because a config that has moved no
+longer sits where its relative paths assume. Only `package.json` and
+`tsconfig.json` stay at the root, where their tooling requires them.
+`package.json`'s `config.forge` field is what points electron-forge at its
+relocated config.
+
+Linting is `@tuomashatakka/eslint-config` applied whole. The 35 remaining
+`react-strict/prefer-no-use-effect` warnings are known and deliberate —
+rewriting those effects is a separate refactor, not part of adopting the
+config.
 
 ## Architecture
 
@@ -37,23 +50,50 @@ Bridge methods `onLibraryBatch` / `onLibraryDone` return unsubscribe functions �
 
 ## Library loading
 
-`useLibraryScanner` is the only thing that fills the library, and it is
-cache-first:
+`useLibraryScanner` is the only thing that fills the library. It is cache-first
+and everything reaches it as a **stream of events** — nothing returns a library.
 
+- **Both** `data.scan()` and `data.load()` are fire-and-forget. A scan streams
+  `batch` → `done`; a hydrate streams `hydrate-batch` → `hydrate-done`. The two
+  pairs are deliberately distinct: a scan's `done` prunes ids it did not
+  rediscover, so a hydrate must never feed `seenThisScan`.
+- Hydration reads SQLite on the `db-reader` worker thread and posts rows back in
+  batches of `READ_BATCH_SIZE`. It used to be a synchronous `SELECT *` inside an
+  `ipcMain.handle`, which blocked the main process and painted nothing until the
+  whole table was read.
 - A module-level `Map` holds the tracks, so remounting a view replays the cache
-  instead of refetching. Hydration (`data.load()`) and the auto-rescan are each
-  guarded by a module-level flag/key — **never trigger `scanLibrary()` from a
-  view's mount effect**, that's what caused the "reloads on every tab switch"
-  bug.
+  instead of refetching. Hydration and the auto-rescan are each guarded by a
+  module-level flag/key — **never trigger `scanLibrary()` from a view's mount
+  effect**, that's what caused the "reloads on every tab switch" bug.
 - A scan never clears the cache up front. Batches merge in place; ids the scan
   didn't rediscover are pruned only on `done`, and only if it found something.
 - `isLoading` therefore means "a scan is running", not "there's nothing to
-  show". Skeletons are for an empty list only.
+  show". Skeletons are for an empty list only, and the first hydrate batch is
+  enough to retire the initial spinner.
+
+## Workers
+
+Three of them, all spawned by `main.ts` through one `getWorker(name)`
+supervisor and all built from `config/vite/worker.config.ts`:
+`scanner-worker`, `db-reader`, `db-writer`. **A worker that is not listed in
+`config/forge.config.ts` is never built**, and `new Worker()` then points at a
+file that does not exist — that is exactly how every renderer-side tag save was
+failing silently before `db-writer` was added to the build.
+
+## Subscriptions
+
+Anything that binds a listener returns a disposable from `disposable-events`,
+not a bare unsubscribe function: `src/app/utils/events.ts` wraps it as `listen`
+(one DOM listener), `listenAll` (several on one target) and
+`collectUnsubscribes` (the plain callbacks the preload bridge hands back, since
+`contextBridge` cannot carry class instances). `useEffect` cleanup is then
+always one `dispose()` call, and a bind can no longer drift away from its
+matching unbind.
 
 ## Track metadata & the tag editor
 
 `src/track-schema.ts` is the single description of the `tracks` table. The
-scanner worker, the db writer and `library:load` in `main.ts` all derive their
+scanner worker, the db writer and the db reader all derive their
 DDL, their upsert statements and the snake_case ↔ camelCase mapping from it —
 **adding a tag field is one line there plus one in `TrackFields`**
 (`app/services/types.ts`). `migrate()` back-fills columns on an existing DB via

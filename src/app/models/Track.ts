@@ -74,7 +74,7 @@ export class Track extends Model {
   }
 
   toDTO (): TrackDTO {
-    const source = this as unknown as Record<Field, unknown>
+    const source                       = this as unknown as Record<Field, unknown>
     const dto: Record<string, unknown> = { id: this.id }
     for (const field of FIELDS)
       dto[field] = source[field]

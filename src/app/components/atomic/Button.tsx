@@ -28,13 +28,10 @@ export function Button ({
     className,
   ].filter(Boolean).join(' ')
 
-  return (
-    <button
-      className={classes}
-      disabled={disabled || loading}
-      {...props}
-    >
-      {children}
-    </button>
-  )
+  return <button
+    className={ classes }
+    disabled={ disabled || loading }
+    { ...props }>
+    {children}
+  </button>
 }

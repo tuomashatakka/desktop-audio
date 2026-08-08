@@ -33,20 +33,17 @@ interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'children'> {
 
 /** One lightweight inline SVG vocabulary for every decorative app icon. */
 export function Icon ({ name, className = '', ...props }: IconProps) {
-  return (
-    <svg
-      className={`icon ${className}`.trim()}
-      viewBox='0 0 24 24'
-      fill='none'
-      stroke='currentColor'
-      strokeWidth='1.8'
-      strokeLinecap='round'
-      strokeLinejoin='round'
-      aria-hidden='true'
-      focusable='false'
-      {...props}
-    >
-      {DRAWING[name]}
-    </svg>
-  )
+  return <svg
+    className={ `icon ${className}`.trim() }
+    aria-hidden='true'
+    viewBox='0 0 24 24'
+    fill='none'
+    stroke='currentColor'
+    strokeWidth='1.8'
+    strokeLinecap='round'
+    strokeLinejoin='round'
+    focusable='false'
+    { ...props }>
+    {DRAWING[name]}
+  </svg>
 }

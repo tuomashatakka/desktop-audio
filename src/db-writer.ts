@@ -23,7 +23,6 @@ interface SqliteDatabase {
   prepare (sql: string): { run (params?: unknown): unknown; all (): unknown[] }
 }
 
-// eslint-disable-next-line functional/no-let
 let db: SqliteDatabase | null = null
 
 /**

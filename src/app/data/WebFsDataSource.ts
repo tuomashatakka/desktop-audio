@@ -1,8 +1,12 @@
+import { Disposable } from 'disposable-events'
 import type { DataSource, DataEvent, DataListener, LibraryRoot, AudioMetadata, TrackDTO } from './DataSource'
 import { idbGet, idbSet, idbDelete, idbGetAll } from './idb'
 
 
 const AUDIO_EXTENSIONS = new Set([ '.mp3', '.flac', '.ogg', '.wav', '.m4a', '.opus' ])
+
+/** Rows per hydrate event; matches `READ_BATCH_SIZE` in `db-reader.ts`. */
+const HYDRATE_BATCH_SIZE = 200
 
 type TrackSource =
   | { readonly kind: 'handle'; readonly handle: FileSystemFileHandle } |
@@ -25,10 +29,10 @@ type RootEntry = HandleRootEntry | FilesRootEntry
 
 // Simple hash function for browser environment (Web Crypto API)
 async function hashString (text: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(text)
+  const encoder    = new TextEncoder()
+  const data       = encoder.encode(text)
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  const hashArray  = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b =>
     b.toString(16).padStart(2, '0')).join('')
 }
@@ -49,24 +53,22 @@ function generateUUID (): string {
 async function* walkDir (handle: FileSystemDirectoryHandle, path = ''): AsyncGenerator<[string, FileSystemFileHandle]> {
   for await (const [ name, child ] of handle.entries()) {
     const childPath = path ? `${path}/${name}` : name
-    if (child.kind === 'file') {
+    if (child.kind === 'file')
       yield [ childPath, child as FileSystemFileHandle ]
-    }
-    else if (child.kind === 'directory') {
+    else if (child.kind === 'directory')
       yield* walkDir(child as FileSystemDirectoryHandle, childPath)
-    }
   }
 }
 
 // Firefox / Safari fallback: <input type="file" webkitdirectory>
 function pickDirectoryFallback (): Promise<{ label: string; files: File[] } | null> {
   return new Promise(resolve => {
-    const input = document.createElement('input')
-    input.type = 'file'
+    const input    = document.createElement('input')
+    input.type     = 'file'
     input.multiple = true;
     // webkitdirectory is non-standard but supported in Firefox, Safari, Chromium
     (input as HTMLInputElement & { webkitdirectory: boolean }).webkitdirectory = true
-    input.style.display = 'none'
+    input.style.display                                                        = 'none'
 
     // Promise resolution is idempotent by spec, so a second settle() (e.g. a
     // stray 'change' after 'cancel') is a harmless no-op — no latch needed.
@@ -85,7 +87,7 @@ function pickDirectoryFallback (): Promise<{ label: string; files: File[] } | nu
       const files = Array.from(fileList)
       // First path segment of webkitRelativePath is the picked folder name
       const firstPath = files[0]?.webkitRelativePath ?? ''
-      const label = firstPath.split('/')[0] || 'Library'
+      const label     = firstPath.split('/')[0] || 'Library'
       settle({ label, files })
     })
 
@@ -129,7 +131,7 @@ export class WebFsDataSource implements DataSource {
       if ('showDirectoryPicker' in window) {
         const handle = await (window as Window & typeof globalThis & { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker()
         const rootId = generateUUID()
-        const label = handle.name
+        const label  = handle.name
         await idbSet('roots', rootId, { id: rootId, label, handle } satisfies HandleRootEntry)
         return rootId
       }
@@ -139,19 +141,17 @@ export class WebFsDataSource implements DataSource {
       if (!picked)
         return null
 
-      const rootId = generateUUID()
+      const rootId                = generateUUID()
       const entry: FilesRootEntry = { id: rootId, label: picked.label, kind: 'files' }
       await idbSet('roots', rootId, entry)
       this.rootFiles.set(rootId, picked.files)
       return rootId
     }
     catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
+      if (error instanceof DOMException && error.name === 'AbortError')
         return null
-      }
-      if (error instanceof DOMException && error.name === 'PermissionDeniedError') {
+      if (error instanceof DOMException && error.name === 'PermissionDeniedError')
         throw new Error('Permission denied to access directory')
-      }
       throw error
     }
   }
@@ -201,7 +201,7 @@ export class WebFsDataSource implements DataSource {
         continue
 
       // webkitRelativePath: "<rootLabel>/sub/dir/file.mp3" — strip leading root
-      const fullPath = file.webkitRelativePath || file.name
+      const fullPath     = file.webkitRelativePath || file.name
       const relativePath = fullPath.startsWith(rootPrefix)
         ? fullPath.slice(rootPrefix.length)
         : fullPath
@@ -254,7 +254,7 @@ export class WebFsDataSource implements DataSource {
 
   private async performScan (rootIds: readonly string[]): Promise<void> {
     const batchSize = 20
-    const state = { batch: [] as TrackDTO[], totalCount: 0 }
+    const state     = { batch: [] as TrackDTO[], totalCount: 0 }
 
     const pushTrack = async (track: TrackDTO): Promise<void> => {
       state.batch.push(track)
@@ -286,25 +286,38 @@ export class WebFsDataSource implements DataSource {
     this.emit({ type: 'done', totalCount: state.totalCount })
   }
 
-  async load (): Promise<readonly TrackDTO[]> {
-    const entries = await idbGetAll('tracks')
-    return entries.map(
-      (entry: unknown) =>
-        (entry as { value: TrackDTO }).value
-    )
+  /**
+   * Streams the IndexedDB cache back as hydrate events, mirroring the Electron
+   * host so `useLibraryScanner` has one code path for both. IndexedDB hands
+   * over everything at once, so the chunking here is purely so the renderer
+   * can paint before the whole set is merged.
+   */
+  load (): void {
+    void idbGetAll('tracks')
+      .then(entries => {
+        const tracks = entries.map((entry: unknown) =>
+          (entry as { value: TrackDTO }).value)
+
+        for (let i = 0; i < tracks.length; i += HYDRATE_BATCH_SIZE)
+          this.emit({ type: 'hydrate-batch', tracks: tracks.slice(i, i + HYDRATE_BATCH_SIZE) })
+
+        this.emit({ type: 'hydrate-done', totalCount: tracks.length })
+      })
+      .catch((err: unknown) => {
+        this.emit({ type: 'error', message: String(err) })
+      })
   }
 
-  subscribe (l: DataListener): () => void {
+  subscribe (l: DataListener): Disposable {
     this.listeners.add(l)
-    return () => {
+    return new Disposable(() => {
       this.listeners.delete(l)
-    }
+    })
   }
 
   private emit (event: DataEvent): void {
-    for (const listener of this.listeners) {
+    for (const listener of this.listeners)
       listener(event)
-    }
   }
 
   private async sourceToFile (source: TrackSource): Promise<File> {
@@ -315,9 +328,8 @@ export class WebFsDataSource implements DataSource {
 
   async readBytes (trackId: string): Promise<ArrayBuffer> {
     const source = this.getTrackSource(trackId)
-    if (!source) {
+    if (!source)
       throw new Error(`No file source found for trackId: ${trackId}`)
-    }
 
     const file = await this.sourceToFile(source)
     return await file.arrayBuffer()
@@ -325,13 +337,12 @@ export class WebFsDataSource implements DataSource {
 
   async readMetadata (trackId: string): Promise<AudioMetadata> {
     const source = this.getTrackSource(trackId)
-    if (!source) {
+    if (!source)
       throw new Error(`No file source found for trackId: ${trackId}`)
-    }
 
     const file = await this.sourceToFile(source)
 
-    const mm = await import('music-metadata')
+    const mm       = await import('music-metadata')
     const metadata = await mm.parseBlob(file)
 
     return {
@@ -363,9 +374,9 @@ export class WebFsDataSource implements DataSource {
    * (file-list) roots that cannot survive a reload. Called on first user gesture.
    */
   async init (): Promise<readonly string[]> {
-    const rootEntries = await idbGetAll('roots')
+    const rootEntries               = await idbGetAll('roots')
     const verifiedRootIds: string[] = []
-    const firefoxRootsPruned = rootEntries.filter(entry =>
+    const firefoxRootsPruned        = rootEntries.filter(entry =>
       (entry as { value: RootEntry }).value.kind === 'files').length
 
     for (const entry of rootEntries) {
@@ -392,14 +403,13 @@ export class WebFsDataSource implements DataSource {
           : undefined
         const initialPermission: PermissionState = queriedPermission ?? 'prompt'
 
-        const fr = handle as FileSystemDirectoryHandle & { requestPermission?: (options: { mode: string }) => Promise<PermissionState> }
+        const fr         = handle as FileSystemDirectoryHandle & { requestPermission?: (options: { mode: string }) => Promise<PermissionState> }
         const permission = initialPermission !== 'granted' && fr.requestPermission
           ? await fr.requestPermission({ mode: 'read' })
           : initialPermission
 
-        if (permission === 'granted') {
+        if (permission === 'granted')
           verifiedRootIds.push(id)
-        }
         else {
           console.log(`WebFsDataSource: root "${label}" permission denied, removing`)
           await this.removeRoot(id)
@@ -411,13 +421,11 @@ export class WebFsDataSource implements DataSource {
       }
     }
 
-    if (firefoxRootsPruned > 0) {
+    if (firefoxRootsPruned > 0)
       console.info(`WebFsDataSource: pruned ${firefoxRootsPruned} folder(s) that need to be re-added (browser does not persist directory access).`)
-    }
 
-    if (verifiedRootIds.length > 0) {
+    if (verifiedRootIds.length > 0)
       this.scan(verifiedRootIds)
-    }
 
     return verifiedRootIds
   }

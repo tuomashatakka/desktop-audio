@@ -9,6 +9,13 @@ function createMockElectronAPI() {
   const listeners: Map<string, Function[]> = new Map()
   const storedTracks: TrackDTO[] = [] // Simulate storage for testing
   
+  const subscribeTo = (event: string) => (callback: Function) => {
+    listeners.set(event, [...(listeners.get(event) || []), callback])
+    return () => {
+      listeners.set(event, (listeners.get(event) || []).filter(cb => cb !== callback))
+    }
+  }
+
   const api = {
     selectDirectory: vi.fn().mockResolvedValue('/test/path'),
     scanLibrary: vi.fn(),
@@ -33,28 +40,19 @@ function createMockElectronAPI() {
         }
       }
     }),
-    onLibraryBatch: vi.fn((callback: Function) => {
-      const event = 'library:batch'
-      if (!listeners.has(event)) listeners.set(event, [])
-      listeners.set(event, [...(listeners.get(event) || []), callback])
-      return () => { 
-        listeners.set(event, (listeners.get(event) || []).filter(cb => cb !== callback))
-      }
-    }),
-    onLibraryDone: vi.fn((callback: Function) => {
-      const event = 'library:done'
-      if (!listeners.has(event)) listeners.set(event, [])
-      listeners.set(event, [...(listeners.get(event) || []), callback])
-      return () => { 
-        listeners.set(event, (listeners.get(event) || []).filter(cb => cb !== callback))
-      }
-    }),
+    onLibraryBatch: vi.fn(subscribeTo('library:batch')),
+    onLibraryDone: vi.fn(subscribeTo('library:done')),
+    onLibraryHydrateBatch: vi.fn(subscribeTo('library:hydrate-batch')),
+    onLibraryHydrateDone: vi.fn(subscribeTo('library:hydrate-done')),
     // Helper to trigger events for testing
     _triggerBatch: (tracks: unknown[]) => {
       listeners.get('library:batch')?.forEach((cb: Function) => cb(tracks))
     },
     _triggerDone: () => {
       listeners.get('library:done')?.forEach((cb: Function) => cb())
+    },
+    _triggerHydrateDone: () => {
+      listeners.get('library:hydrate-done')?.forEach((cb: Function) => cb())
     },
     _reset: () => {
       storedTracks.length = 0
@@ -102,34 +100,21 @@ function runContractTests(
       expect(() => ds.scan(['test-id'])).not.toThrow()
     })
     
-    it('load returns an array', async () => {
-      const tracks = await ds.load()
-      expect(Array.isArray(tracks)).toBe(true)
+    it('load does not throw and returns nothing — rows arrive as events', () => {
+      expect(typeof ds.load).toBe('function')
+      expect(() => ds.load()).not.toThrow()
     })
     
-    it('subscribe returns unsubscribe function', () => {
+    it('subscribe returns a disposable subscription', () => {
       const listener = vi.fn()
-      const unsub = ds.subscribe(listener)
-      
-      expect(typeof unsub).toBe('function')
-      
-      // Call unsubscribe
-      unsub()
-      
-      // After unsubscribe, listener should not be called
-      // (We can't easily test this without triggering an event, but we verify it doesn't throw)
-      expect(() => unsub()).not.toThrow() // Double unsubscribe should be safe
-    })
+      const subscription = ds.subscribe(listener)
 
-    it('removeRoot does not throw', async () => {
-      // Just call it - if it throws, the test will fail
-      await ds.removeRoot('test-root-id')
-      expect(true).toBe(true) // Reached here = didn't throw
-    })
+      expect(typeof subscription.dispose).toBe('function')
 
-    it('listRoots returns an array', async () => {
-      const roots = await ds.listRoots()
-      expect(Array.isArray(roots)).toBe(true)
+      subscription.dispose()
+
+      // Disposal is idempotent by contract, so a second call is safe
+      expect(() => subscription.dispose()).not.toThrow()
     })
 
     it('readBytes throws or returns ArrayBuffer for invalid track', async () => {

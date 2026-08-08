@@ -10,11 +10,11 @@ export class Album {
   tracks:               Track[] = []
 
   constructor (title: string, artist: string, year?: number, coverColor?: string, albumArt?: string) {
-    this.title = title
-    this.artist = artist
-    this.year = year
+    this.title      = title
+    this.artist     = artist
+    this.year       = year
     this.coverColor = coverColor
-    this.albumArt = albumArt
+    this.albumArt   = albumArt
   }
 
   get duration (): number {
@@ -31,7 +31,7 @@ export class AlbumIndex {
   readonly #albums = new Map<string, Album>()
 
   addTrack (track: Track): void {
-    const key = `${track.album}\x00${track.artist}`
+    const key   = `${track.album}\x00${track.artist}`
     const album = this.#albums.get(key) ??
       new Album(track.album, track.artist, track.year, track.coverColor, track.albumArt)
     this.#albums.set(key, album)
@@ -40,7 +40,7 @@ export class AlbumIndex {
   }
 
   removeTrack (track: Track): void {
-    const key = `${track.album}\x00${track.artist}`
+    const key   = `${track.album}\x00${track.artist}`
     const album = this.#albums.get(key)
     if (album) {
       album.tracks = album.tracks.filter(t =>

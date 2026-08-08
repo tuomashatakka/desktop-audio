@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { MenuList } from '../components/composite/ContextMenu'
 import type { SerializableMenuItem, ContextMenuPayload } from '../services/types'
+import { listen } from '../utils/events'
 
 
 interface ContextMenuAPI {
@@ -29,7 +30,7 @@ export function ContextMenuApp () {
       // Theme is pushed onto this window's own root, since it shares no DOM
       // with the app. Doing it here rather than in render keeps the paint in
       // step with the items — the window is shown as soon as they arrive.
-      const root = document.documentElement
+      const root         = document.documentElement
       root.dataset.theme = payload.theme
       if (payload.accent)
         root.style.setProperty('--accent', payload.accent)
@@ -51,23 +52,20 @@ export function ContextMenuApp () {
       if (e.key === 'Escape')
         handleClose()
     }
-    document.addEventListener('keydown', onKeyDown)
+    const keydown = listen(document, 'keydown', onKeyDown as EventListener)
     return () =>
-      document.removeEventListener('keydown', onKeyDown)
+      keydown.dispose()
   }, [])
 
-  return (
-    <div className='context-menu-window'>
-      <MenuList items={items} onSelect={handleAction} />
+  return <div className='context-menu-window'>
+    <MenuList items={ items } onSelect={ handleAction } />
 
-      {/* Dismiss surface, painted behind the list. Last in the DOM so the menu
+    {/* Dismiss surface, painted behind the list. Last in the DOM so the menu
           items come first in tab order; CSS stacks it underneath. */}
-      <button
-        type='button'
-        className='context-menu-dismiss'
-        aria-label='Close menu'
-        onClick={handleClose}
-      />
-    </div>
-  )
+    <button
+      className='context-menu-dismiss'
+      aria-label='Close menu'
+      type='button'
+      onClick={ handleClose } />
+  </div>
 }

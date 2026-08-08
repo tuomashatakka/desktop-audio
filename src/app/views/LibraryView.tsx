@@ -28,10 +28,10 @@ const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(item =>
 /** Scrollable track collection; its heading and controls live in the shell titlebar. */
 export function LibraryView () {
   const { setView, setEditingTrack, selectedFolderPath, selectedPlaylistId, selectFolder } = useUI()
-  const { filteredTracks, playlists, addPlaylist, selectTrack, isLoading } = useLibrary()
-  const { play, currentTrack, isPlaying } = useAudio()
-  const { libraryPaths, theme } = useSettings()
-  const host = useHost()
+  const { filteredTracks, playlists, addPlaylist, selectTrack, isLoading }                 = useLibrary()
+  const { play, currentTrack, isPlaying }                                                  = useAudio()
+  const { libraryPaths, theme }                                                            = useSettings()
+  const host                                                                               = useHost()
 
   const { isInitialLoading } = useLibraryScanner()
 
@@ -41,7 +41,7 @@ export function LibraryView () {
   }, [ setView ])
 
   const [ promptOpen, setPromptOpen ] = useState(false)
-  const contextTrackRef = useRef<Track | null>(null)
+  const contextTrackRef               = useRef<Track | null>(null)
 
   const activePlaylist = selectedPlaylistId
     ? playlists.find(playlist =>
@@ -97,53 +97,49 @@ export function LibraryView () {
     return filteredTracks
   }, [ activePlaylist, selectedFolderPath, filteredTracks ])
 
-  return (
-    <section className='library' aria-label='Library tracks'>
-      {libraryPaths.length === 0
+  return <section className='library' aria-label='Library tracks'>
+    {libraryPaths.length === 0
+      ? <div className='library-empty'>
+        <article className='library-empty-card'>
+          <h3>No library folder yet</h3>
+          <p>Add a folder in Settings to start scanning for music.</p>
+
+          <Button type='button' variant='secondary' onClick={ goToLibrarySettings }>
+            Open Settings
+          </Button>
+        </article>
+      </div>
+      : isInitialLoading && displayTracks.length === 0
         ? <div className='library-empty'>
-          <div className='library-empty-card'>
-            <h3>No library folder yet</h3>
-            <p>Add a folder in Settings to start scanning for music.</p>
-
-            <Button type='button' variant='secondary' onClick={goToLibrarySettings}>
-              Open Settings
-            </Button>
-          </div>
+          <output className='spinner' aria-label='Loading library' />
         </div>
-        : isInitialLoading && displayTracks.length === 0
-          ? <div className='library-empty'>
-            <output className='spinner' aria-label='Loading library' />
-          </div>
-          : displayTracks.length === 0 && !isLoading
-            ? <p className='status-message'>
-              No tracks found
-              <small>
-                {activePlaylist
-                  ? 'This playlist is empty'
-                  : 'Select a folder or add library paths in Settings'}
-              </small>
-            </p>
-            : <TrackTable
-              tracks={displayTracks}
-              isLoading={isLoading}
-              currentTrack={currentTrack}
-              isPlaying={isPlaying}
-              onPlay={handleTrackPlay}
-              onContextMenu={handleContextMenu}
-              onNavigate={selectFolder}
-              roots={libraryPaths}
-            />
-      }
+        : displayTracks.length === 0 && !isLoading
+          ? <p className='status-message'>
+            No tracks found
+            <small>
+              {activePlaylist
+                ? 'This playlist is empty'
+                : 'Select a folder or add library paths in Settings'}
+            </small>
+          </p>
+          : <TrackTable
+            tracks={ displayTracks }
+            isLoading={ isLoading }
+            currentTrack={ currentTrack }
+            isPlaying={ isPlaying }
+            roots={ libraryPaths }
+            onPlay={ handleTrackPlay }
+            onContextMenu={ handleContextMenu }
+            onNavigate={ selectFolder } />
+    }
 
-      <PromptDialog
-        open={promptOpen}
-        title='New Playlist'
-        placeholder='Playlist name...'
-        onConfirm={name =>
-          addPlaylist(name)}
-        onClose={() =>
-          setPromptOpen(false)}
-      />
-    </section>
-  )
+    <PromptDialog
+      open={ promptOpen }
+      title='New Playlist'
+      placeholder='Playlist name...'
+      onConfirm={ name =>
+        addPlaylist(name) }
+      onClose={ () =>
+        setPromptOpen(false) } />
+  </section>
 }
