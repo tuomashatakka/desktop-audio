@@ -1,10 +1,11 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useSettings, UI_FONT_LABELS, MIN_FONT_SCALE, MAX_FONT_SCALE } from '../contexts'
 import type { RepeatMode, Theme, CustomTheme, UiFont } from '../contexts'
 import { useData } from '../data'
-import { useThemeApply } from '../hooks'
-import { Button } from '../components/atomic'
+import { useKeybindings, useThemeApply } from '../hooks'
+import { formatShortcut, shortcutFromEvent } from '../../keybindings'
+import { Button, Icon } from '../components/atomic'
 
 
 const THEME_COLORS = [
@@ -32,6 +33,7 @@ const SETTINGS_SECTIONS = [
   { id: 'settings-library', label: 'Library' },
   { id: 'settings-appearance', label: 'Appearance' },
   { id: 'settings-playback', label: 'Playback' },
+  { id: 'settings-hotkeys', label: 'Hotkeys' },
   { id: 'settings-about', label: 'About' },
 ] as const
 
@@ -47,6 +49,9 @@ export function SettingsView () {
   } = useSettings()
   const data = useData()
   const themeFileRef = useRef<HTMLInputElement>(null)
+  const { bindings, updateBinding, resetKeybindings } = useKeybindings()
+  const [ shortcutStatus, setShortcutStatus ] = useState('Select a shortcut field, then press the new keys.')
+  const isMac = typeof navigator !== 'undefined' && (/mac/i).test(navigator.userAgent)
 
   useThemeApply(theme, theme === 'custom' ? customTheme : null)
 
@@ -103,6 +108,30 @@ export function SettingsView () {
     localStorage.setItem('desktop-audio-custom-theme', JSON.stringify(themeData))
   }
 
+  const handleShortcutKey = (id: string, event: React.KeyboardEvent<HTMLInputElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    if (event.key === 'Escape') {
+      event.currentTarget.blur()
+      return
+    }
+
+    const clear = (event.key === 'Backspace' || event.key === 'Delete') &&
+      !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
+    const shortcut = clear ? '' : shortcutFromEvent(event)
+    if (shortcut === null)
+      return
+
+    if (updateBinding(id, shortcut)) {
+      setShortcutStatus(clear ? 'Shortcut cleared.' : `Shortcut changed to ${formatShortcut(shortcut, isMac)}.`)
+      event.currentTarget.blur()
+    }
+    else {
+      setShortcutStatus('That shortcut is already assigned.')
+    }
+  }
+
   const currentColors = theme === 'custom' && customTheme ? customTheme.colors : {}
 
   return (
@@ -137,7 +166,7 @@ export function SettingsView () {
                     onClick={() =>
                       removeLibraryPath(path)}
                   >
-                    <span aria-hidden='true'>×</span>
+                    <Icon name='close' />
                   </Button>
                 </li>
               )}
@@ -350,6 +379,43 @@ export function SettingsView () {
 
             <span>Shuffle</span>
           </label>
+        </section>
+
+        <section id='settings-hotkeys' aria-labelledby='settings-hotkeys-heading'>
+          <h2 id='settings-hotkeys-heading'>Hotkeys</h2>
+
+          <p className='section-description'>
+            Focus a shortcut and press its replacement. Backspace or Delete clears it.
+          </p>
+
+          <fieldset className='hotkey-list'>
+            <legend className='sr-only'>Keyboard shortcuts</legend>
+
+            {bindings.map(binding =>
+              <label className='hotkey-field' key={binding.id}>
+                <span>{binding.label}</span>
+
+                <input
+                  type='text'
+                  readOnly
+                  value={formatShortcut(binding.shortcut, isMac)}
+                  aria-describedby='shortcut-status'
+                  onFocus={event =>
+                    event.currentTarget.select()}
+                  onKeyDown={event =>
+                    handleShortcutKey(binding.id, event)}
+                />
+              </label>
+            )}
+          </fieldset>
+
+          <output id='shortcut-status' className='hotkey-status' aria-live='polite'>
+            {shortcutStatus}
+          </output>
+
+          <Button type='button' variant='secondary' size='sm' onClick={resetKeybindings}>
+            Reset shortcuts
+          </Button>
         </section>
 
         <section id='settings-about' aria-labelledby='settings-about-heading'>

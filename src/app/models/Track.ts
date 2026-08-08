@@ -10,7 +10,7 @@ import type { TrackDTO, TrackFields } from '../services/types'
  */
 const FIELDS = [
   'path', 'title', 'artist', 'album', 'duration', 'format', 'size',
-  'coverColor', 'albumArt', 'year', 'genre', 'trackNumber',
+  'coverColor', 'albumArt', 'year', 'genre', 'trackNumber', 'rating',
   'albumArtist', 'composer', 'trackTotal', 'discNumber', 'discTotal', 'bpm',
   'comment', 'lyrics', 'publisher', 'copyright', 'isrc', 'encodedBy',
   'language', 'mood', 'grouping', 'bitrate', 'sampleRate', 'channels',

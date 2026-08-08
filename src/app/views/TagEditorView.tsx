@@ -20,7 +20,7 @@ import type { Track } from '../models'
 import type { TagField, TrackDTO } from '../services/types'
 import { PRIMARY_TAG_FIELDS, EXTENDED_TAG_FIELDS } from '../services/types'
 import { useData } from '../data'
-import { Button, Input } from '../components/atomic'
+import { Button, Icon, Input } from '../components/atomic'
 import { formatTime, isoDuration } from '../utils/time'
 
 
@@ -149,7 +149,7 @@ function ArtworkField ({ art, color, album, onPick, onClear }: {
       <figure className='art-preview' style={{ backgroundColor: color }}>
         {art
           ? <img src={art} alt={`Album artwork for ${album}`} />
-          : <span aria-hidden='true'>♫</span>
+          : <Icon name='music' />
         }
       </figure>
 
@@ -244,7 +244,10 @@ function TagEditorForm ({ track, onClose, onSaved }: TagEditorFormProps) {
             <TagInputs fields={PRIMARY_TAG_FIELDS} form={form} onChange={setField} />
 
             <details className='tag-extended'>
-              <summary>More tags</summary>
+              <summary>
+                <Icon name='chevron-right' />
+                More tags
+              </summary>
 
               <div className='form-stack'>
                 <TagInputs fields={EXTENDED_TAG_FIELDS} form={form} onChange={setField} />

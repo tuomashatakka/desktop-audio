@@ -22,22 +22,35 @@ plays your music.
 
 ## Library
 
-Breadcrumbs across the top navigate the folder tree; the header collapses as
+Breadcrumbs across the top navigate the folder tree, and every nested folder is
+a native disclosure that can be toggled at any depth. The header collapses as
 you scroll so the column header can pin to the top of the view.
 
 ![Library scrolled down with the column header pinned to the top](public/screenshots/library-sticky-header.png)
 
-Tracks group by album, artist or path, in three row densities.
+Tracks group by album, artist or path, in three row densities. Alt-clicking one
+group applies its next state to every group. Right-clicking the table header
+opens the column picker exactly at the pointer; every field, including year and
+rating, can be shown or hidden.
 
 ![Library grouped by album with cover art beside each group](public/screenshots/library-album-groups.png)
 
+## Keyboard control
+
+Playback, views, settings, and the side menu have global shortcuts. Bindings can
+be reassigned instantly under **Settings → Hotkeys**. See
+[key bindings](docs/keybindings.md) for the defaults and package API.
+
 ## Native, instant UI
 
-The app keeps one stable, virtualized library and player tree. Dialogs, popovers,
-disclosures, forms, and action menus use native HTML behavior. The waveform is
-an SVG backed by a native range input, so pointer, touch, and keyboard seeking
-work without per-frame DOM animation. Interaction transitions are intentionally
-zero-duration; loading and ambient artwork feedback remain non-blocking.
+The app keeps one stable, shallow, virtualized library and player tree. Natural
+block and grid flow handle layout; flex is kept for the few controls that are
+genuinely one-dimensional. Dialogs, popovers, disclosures, forms, and action
+menus use native HTML behavior. The waveform is an SVG backed by a native range
+input, so pointer, touch, and keyboard seeking work without per-frame DOM
+animation. It begins as a line and expands once real samples arrive. Interaction
+transitions are intentionally zero-duration; loading and ambient artwork
+feedback remain non-blocking.
 
 ## Development
 

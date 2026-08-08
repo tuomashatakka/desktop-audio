@@ -1,12 +1,19 @@
 @layer components {
+  svg.icon {
+    display: block;
+    width: 1em;
+    height: 1em;
+    flex: 0 0 auto;
+  }
+
   .button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display: inline-grid;
+    grid-auto-flow: column;
+    place-items: center;
     gap: var(--sp-2);
     padding: var(--sp-2) var(--sp-4);
     border: 1px solid transparent;
-    border-radius: var(--radius);
+    border-radius: var(--control-radius);
     color: inherit;
     font-size: var(--text-base);
     font-weight: var(--font-medium);
@@ -35,7 +42,7 @@
     width: 100%;
     padding: var(--sp-2) var(--sp-3);
     border: 1px solid var(--border);
-    border-radius: 999px;
+    border-radius: var(--control-radius);
     color: var(--text);
     background: var(--bg-input);
     font-size: var(--text-base);
@@ -54,8 +61,8 @@
     box-shadow: var(--focus-ring);
   }
 
-  .field { display: flex; flex-direction: column; gap: var(--sp-1); }
-  .field > span:first-child { color: var(--text-dim); font-size: var(--text-sm); font-weight: var(--font-medium); }
+  .field { display: block; }
+  .field > span:first-child { display: block; margin-bottom: var(--sp-1); color: var(--text-dim); font-size: var(--text-sm); font-weight: var(--font-medium); }
   .field.error :is(input, select) { border-color: var(--danger); }
   .field.error small { color: var(--danger); }
 
@@ -105,10 +112,10 @@
   }
 
   .dialog-panel::backdrop { background: var(--overlay); animation: fade-in var(--duration-fast) var(--ease); }
-  .dialog-header { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); }
+  .dialog-header { display: grid; grid-template-columns: 1fr auto; align-items: center; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); }
   .dialog-header h2 { font-size: var(--text-base); font-weight: var(--font-semibold); }
   .dialog-body { padding: var(--sp-4); }
-  .prompt-form { display: flex; flex-direction: column; gap: var(--sp-4); }
+  .prompt-form { display: grid; gap: var(--sp-4); }
 
   .popover-panel {
     position: fixed;
@@ -138,6 +145,14 @@
     transform: rotate(45deg);
   }
 
+  .popover-panel.at-point {
+    right: auto;
+    bottom: auto;
+    margin: 0;
+    position-try-fallbacks: none;
+  }
+
+  .popover-panel.at-point::before { display: none; }
   .popover-panel.placement-top { top: auto; bottom: anchor(top); margin-block: 0 var(--sp-1); }
   .popover-panel.placement-top::before {
     top: auto;
@@ -172,7 +187,8 @@
   .context-menu-dismiss { position: fixed; inset: 0; z-index: 0; }
   .context-menu-list { padding-block: var(--sp-1); }
   .context-menu-item {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: var(--sp-2);
     width: 100%;
@@ -186,7 +202,7 @@
   .context-menu-item:hover { color: var(--text); background: var(--bg-hover); }
   .context-menu-item.danger { color: var(--danger); }
   .context-menu-item.danger:hover { background: var(--danger-muted); }
-  .context-menu-icon { font-size: var(--text-base); line-height: 1; opacity: 0.7; }
+  .context-menu-icon { font-size: var(--text-base); opacity: 0.7; }
   .context-menu-separator { height: 1px; margin-block: var(--sp-1); background: var(--border); }
 
   @keyframes shimmer {

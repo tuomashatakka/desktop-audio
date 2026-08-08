@@ -5,14 +5,14 @@ import { useLibraryScanner } from '../hooks'
 import { Button, PromptDialog } from '../components/atomic'
 import { TrackTable } from '../components/composite/TrackTable'
 import { useHost } from '../data'
-import type { SerializableMenuItem } from '../services/types'
+import type { ContextMenuPoint, SerializableMenuItem } from '../services/types'
 
 
 const CONTEXT_MENU_ITEMS: SerializableMenuItem[] = [
-  { label: 'Play', icon: '▶' },
-  { label: 'Add to Playlist', icon: '♩' },
+  { label: 'Play', icon: 'play' },
+  { label: 'Add to Playlist', icon: 'music' },
   { separator: true },
-  { label: 'Edit Tags', icon: '✎' },
+  { label: 'Edit Tags', icon: 'edit' },
 ]
 
 const ITEM_HEIGHT      = 32
@@ -53,7 +53,7 @@ export function LibraryView () {
     play(track)
   }, [ selectTrack, play ])
 
-  const handleContextMenu = useCallback((track: Track, rect: DOMRect) => {
+  const handleContextMenu = useCallback((track: Track, point: ContextMenuPoint) => {
     contextTrackRef.current = track
 
     // The menu renders in its own window with its own document, so the theme
@@ -65,8 +65,8 @@ export function LibraryView () {
 
     host.showContextMenu(
       CONTEXT_MENU_ITEMS,
-      window.screenX + rect.left,
-      window.screenY + rect.bottom + 4,
+      point.x,
+      point.y,
       MENU_WIDTH,
       MENU_HEIGHT,
       theme,

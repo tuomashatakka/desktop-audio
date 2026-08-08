@@ -2,6 +2,7 @@ import { useEffect, useId, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { IconButton } from './IconButton'
+import { Icon } from './Icon'
 
 
 interface DialogProps {
@@ -41,7 +42,7 @@ export function Dialog ({ open, onClose, title, children }: DialogProps) {
         <h2 id={titleId}>{title}</h2>
 
         <IconButton type='button' label='Close dialog' onClick={onClose}>
-          <span aria-hidden='true'>✕</span>
+          <Icon name='close' />
         </IconButton>
       </header>
 

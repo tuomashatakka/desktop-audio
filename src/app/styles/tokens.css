@@ -135,6 +135,7 @@
     --radius: 0;
     --radius-lg: 2px;
     --radius-full: 9999px;
+    --control-radius: 999px;
     --titlebar-h: 40px;
 
     --shadow-lg: 0 1px 0 rgb(255 255 255 / 5%) inset, 0 12px 32px rgb(0 0 0 / 50%);

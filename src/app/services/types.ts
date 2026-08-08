@@ -15,6 +15,30 @@
  *
  * Most consumers want the frozen view: see {@link Track}.
  */
+export type IconName =
+  | 'add' |
+  'chevron-right' |
+  'close' |
+  'density-compact' |
+  'density-normal' |
+  'density-relaxed' |
+  'edit' |
+  'library' |
+  'lyrics' |
+  'maximize' |
+  'menu' |
+  'minimize' |
+  'music' |
+  'next' |
+  'pause' |
+  'play' |
+  'previous' |
+  'repeat' |
+  'search' |
+  'settings' |
+  'shuffle' |
+  'waveform'
+
 export interface TrackFields {
   id:           string
   path:         string
@@ -29,6 +53,7 @@ export interface TrackFields {
   year?:        number
   genre?:       string
   trackNumber?: number
+  rating?:      number
 
   /* Extended tags — everything below is optional and often absent. */
   albumArtist?: string
@@ -104,10 +129,15 @@ export interface AudioMetadata {
   readonly genre?:    string
 }
 
+export interface ContextMenuPoint {
+  readonly x: number
+  readonly y: number
+}
+
 /** Plain-object form of a context-menu item that can ride IPC to the menu window. */
 export interface SerializableMenuItem {
   readonly label?:     string
-  readonly icon?:      string
+  readonly icon?:      IconName
   readonly danger?:    boolean
   readonly separator?: boolean
 }

@@ -161,7 +161,8 @@
 .hero-logo {
   position: relative;
   z-index: 2;
-  font-size: clamp(4rem, 12vw, 8rem);
+  width: clamp(4rem, 12vw, 8rem);
+  height: clamp(4rem, 12vw, 8rem);
   color: var(--clr-accent);
   filter: drop-shadow(0 0 40px var(--clr-glow));
   animation: logoPulse 4s ease-in-out infinite;
@@ -576,9 +577,9 @@
 }
 
 .cta-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-grid;
+  grid-auto-flow: column;
+  place-items: center;
   gap: 0.5rem;
   padding: 1rem 2.5rem;
   border-radius: 999px;
@@ -594,6 +595,8 @@
   min-height: 44px;
   position: relative;
 }
+
+.inline-icon { width: 1em; height: 1em; }
 
 .cta-btn:hover {
   transform: translateY(-2px) scale(1.02);
@@ -999,6 +1002,8 @@
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
+.lightbox-btn > svg,
+.lightbox-close > svg { width: 1em; height: 1em; }
 .lightbox-btn:hover { background: rgba(255,255,255,0.14); transform: translateY(-50%) scale(1.06); }
 .lightbox-btn:active {
   background: rgba(255,255,255,0.25) !important;

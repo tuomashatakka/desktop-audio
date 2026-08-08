@@ -2,12 +2,14 @@ import type { ReactNode } from 'react'
 import { useUI } from '../contexts'
 import type { ViewType } from '../contexts'
 import { useBridge } from '../data'
+import { Icon } from '../components/atomic'
+import type { IconName } from '../services/types'
 
 
-const NAV_ITEMS: readonly { view: ViewType; icon: string }[] = [
-  { view: 'library', icon: '♫' },
-  { view: 'player', icon: '▶' },
-  { view: 'settings', icon: '⚙' },
+const NAV_ITEMS: readonly { view: ViewType; icon: IconName }[] = [
+  { view: 'library', icon: 'library' },
+  { view: 'player', icon: 'play' },
+  { view: 'settings', icon: 'settings' },
 ]
 
 const NAV_LABELS: Record<ViewType, string> = {
@@ -40,18 +42,10 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
         aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
         aria-expanded={sidebarOpen}
       >
-        <span aria-hidden='true' />
-        <span aria-hidden='true' />
-        <span aria-hidden='true' />
+        <Icon name='menu' />
       </button>
 
-      <div className='titlebar-logo'>
-        <span className='logo-icon' aria-hidden='true'>
-          <svg viewBox='0 0 1024 1024' width='18' height='18' fill='none' stroke='currentColor' strokeWidth='56' strokeLinecap='round' strokeLinejoin='round'>
-            <polyline points='120,512 320,512 432,232 624,792 736,512 904,512' />
-          </svg>
-        </span>
-      </div>
+      <Icon className='logo-icon' name='waveform' />
 
       {/* Icon-only: the label is carried by `aria-label` and the `title`
           tooltip, so the tab strip costs the titlebar three glyphs of width
@@ -69,7 +63,7 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
                 onClick={() =>
                   setView(view)}
               >
-                <span className='nav-icon' aria-hidden='true'>{icon}</span>
+                <Icon className='nav-icon' name={icon} />
               </button>
             </li>
           )}
@@ -87,7 +81,7 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
               bridge.minimizeWindow()}
             aria-label='Minimize'
           >
-            <span aria-hidden='true'>─</span>
+            <Icon name='minimize' />
           </button>
         </li>
 
@@ -99,7 +93,7 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
               bridge.maximizeWindow()}
             aria-label='Maximize'
           >
-            <span aria-hidden='true'>□</span>
+            <Icon name='maximize' />
           </button>
         </li>
 
@@ -111,7 +105,7 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
               bridge.closeWindow()}
             aria-label='Close'
           >
-            <span aria-hidden='true'>✕</span>
+            <Icon name='close' />
           </button>
         </li>
       </menu>

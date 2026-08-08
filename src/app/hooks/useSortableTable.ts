@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import type { Track } from '../contexts'
 
 
-export type SortKey = keyof Pick<Track, 'title' | 'artist' | 'album' | 'duration' | 'format' | 'year' | 'genre' | 'size' | 'trackNumber' | 'path'>
+export type SortKey = keyof Pick<Track, 'title' | 'artist' | 'album' | 'duration' | 'format' | 'year' | 'genre' | 'size' | 'trackNumber' | 'rating' | 'path'>
 
 export type SortDir = 'asc' | 'desc'
 
@@ -13,7 +13,7 @@ interface SortableTableResult {
   readonly toggleSort: (key: SortKey) => void
 }
 
-const NUMERIC_KEYS = new Set<SortKey>([ 'duration', 'year', 'size', 'trackNumber' ])
+const NUMERIC_KEYS = new Set<SortKey>([ 'duration', 'year', 'size', 'trackNumber', 'rating' ])
 
 export function useSortableTable (tracks: readonly Track[]): SortableTableResult {
   const [ sortKey, setSortKey ] = useState<SortKey>('title')

@@ -65,7 +65,8 @@ jobs:
           "$deepsource_cli_dir/deepsource" report \
             --analyzer test-coverage \
             --key javascript \
-            --value-file "$coverage_report"
+            --value-file "$coverage_report" \
+            --commit "${{ github.event.pull_request.head.sha || github.sha }}"
         env:
           DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
 

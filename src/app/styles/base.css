@@ -17,10 +17,13 @@
 
   button {
     border: 0;
+    border-radius: var(--control-radius);
     background: none;
     color: inherit;
     cursor: pointer;
   }
+
+  textarea { border-radius: var(--control-radius); }
 }
 
 @layer base {
@@ -35,7 +38,6 @@
   }
 
   #app {
-    display: flex;
     overflow: hidden;
     background: var(--bg);
   }

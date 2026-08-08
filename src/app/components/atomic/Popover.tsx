@@ -1,18 +1,24 @@
 import { useEffect, useId, useLayoutEffect, useRef } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 
+export interface PopoverPoint {
+  readonly x: number
+  readonly y: number
+}
+
 interface PopoverProps {
   readonly open:       boolean
-  readonly anchor:     HTMLElement | null
   readonly onClose:    () => void
   readonly children:   ReactNode
+  readonly anchor?:    HTMLElement | null
+  readonly point?:     PopoverPoint | null
   readonly id?:        string
   readonly placement?: 'top' | 'bottom'
 }
 
-export function Popover ({ open, anchor, onClose, children, id, placement = 'bottom' }: PopoverProps) {
+export function Popover ({ open, anchor = null, point = null, onClose, children, id, placement = 'bottom' }: PopoverProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const generatedId = useId()
   const popoverId = id || generatedId
@@ -37,11 +43,11 @@ export function Popover ({ open, anchor, onClose, children, id, placement = 'bot
       return
 
     const visible = panel.matches(':popover-open')
-    if (open && anchor && !visible)
+    if (open && (anchor || point) && !visible)
       panel.showPopover()
-    else if ((!open || !anchor) && visible)
+    else if ((!open || !(anchor || point)) && visible)
       panel.hidePopover()
-  }, [ open, anchor ])
+  }, [ open, anchor, point ])
 
   useEffect(() => {
     const panel = panelRef.current
@@ -61,8 +67,9 @@ export function Popover ({ open, anchor, onClose, children, id, placement = 'bot
     <div
       ref={panelRef}
       id={popoverId}
-      className={`popover-panel placement-${placement}`}
+      className={`popover-panel placement-${placement} ${point ? 'at-point' : ''}`.trim()}
       popover='auto'
+      style={point ? { left: point.x, top: point.y } as CSSProperties : undefined}
     >
       {children}
     </div>,

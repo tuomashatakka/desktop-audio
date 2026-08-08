@@ -166,6 +166,7 @@ const processAudioFile = async (
       year:         common.year ?? year,
       genre:        common.genre?.[0],
       track_number: common.track?.no ?? trackNumber,
+      rating:       mm.ratingToStars(common.rating?.[0]?.rating),
 
       album_artist: common.albumartist,
       composer:     common.composer?.[0],

@@ -1,104 +1,142 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useMemo } from 'react'
+import { actionForEvent } from '../../keybindings'
+import type { KeybindingAction } from '../../keybindings'
 import { useAudio, useLibrary, useUI } from '../contexts'
 import { useHost } from '../data'
+import { useKeybindings } from './useKeybindings'
 
 
-const INTERACTIVE_TARGETS = [
-  'button',
+const EDITABLE_TARGETS = [
   'input',
   'textarea',
   'select',
-  'a[href]',
-  'summary',
   '[contenteditable]:not([contenteditable="false"])',
-  '[role="button"]',
-  '[role="menuitem"]',
-  '[role="option"]',
-  '[role="slider"]',
-  '[role="tab"]',
 ].join(', ')
 
-function ownsKeyboardInput (event: KeyboardEvent): boolean {
+const GLOBAL_EDITABLE_ACTIONS = new Set<KeybindingAction>([
+  'open-settings',
+  'open-library',
+  'open-player',
+  'toggle-sidebar',
+])
+
+function isEditableTarget (target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(EDITABLE_TARGETS) !== null
+}
+
+function isNativeActivationTarget (target: EventTarget | null): boolean {
+  return target instanceof Element &&
+    target.closest('button, a[href], summary') !== null
+}
+
+function shouldIgnoreEvent (
+  event: KeyboardEvent,
+  action: KeybindingAction | null
+): boolean {
   return event.defaultPrevented ||
-    event.target instanceof Element && event.target.closest(INTERACTIVE_TARGETS) !== null
+    event.isComposing ||
+    event.repeat ||
+    isEditableTarget(event.target) &&
+      (!action || !GLOBAL_EDITABLE_ACTIONS.has(action))
 }
 
 export function useKeyboardShortcuts () {
   const { isPlaying, currentTrack, volume, pause, resume, setVolume, playNext, playPrevious } = useAudio()
   const { filteredTracks } = useLibrary()
-  const { currentView, previousView, setView } = useUI()
+  const { currentView, previousView, sidebarOpen, setView, toggleSidebar } = useUI()
+  const { bindings } = useKeybindings()
   const host = useHost()
 
-  // eslint-disable-next-line complexity
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (ownsKeyboardInput(e)) {
+  const actions = useMemo<Record<KeybindingAction, () => void>>(() =>
+    ({
+      'next-track': () =>
+        playNext(filteredTracks),
+      'previous-track': () =>
+        playPrevious(filteredTracks),
+      'play-pause': () => {
+        if (currentTrack)
+          void (isPlaying ? pause() : resume())
+      },
+      'volume-up': () =>
+        setVolume(Math.min(1, volume + 0.1)),
+      'volume-down': () =>
+        setVolume(Math.max(0, volume - 0.1)),
+      'open-settings': () =>
+        setView('settings'),
+      'open-library': () =>
+        setView('library'),
+      'open-player': () =>
+        setView('player'),
+      'toggle-sidebar': () => {
+        if (currentView === 'player') {
+          setView('library')
+          if (!sidebarOpen)
+            toggleSidebar()
+        }
+        else {
+          toggleSidebar()
+        }
+      },
+    }), [
+    currentTrack,
+    currentView,
+    filteredTracks,
+    isPlaying,
+    pause,
+    playNext,
+    playPrevious,
+    resume,
+    setView,
+    setVolume,
+    sidebarOpen,
+    toggleSidebar,
+    volume,
+  ])
+
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    const action = actionForEvent(bindings, event)
+    if (shouldIgnoreEvent(event, action))
+      return
+
+    if (event.key === 'Escape') {
+      if (currentView === 'player') {
+        event.preventDefault()
+        setView(previousView ?? 'library')
+      }
       return
     }
 
-    switch (e.code) {
-      case 'Space':
-        e.preventDefault()
-        if (currentTrack) {
-          void (isPlaying ? pause() : resume())
-        }
-        break
-      case 'ArrowRight':
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault()
-          playNext(filteredTracks)
-        }
-        break
-      case 'ArrowLeft':
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault()
-          playPrevious(filteredTracks)
-        }
-        break
-      case 'ArrowUp':
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault()
-          setVolume(Math.min(1, volume + 0.1))
-        }
-        break
-      case 'ArrowDown':
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault()
-          setVolume(Math.max(0, volume - 0.1))
-        }
-        break
-      case 'Escape':
-        if (currentView === 'player')
-          setView(previousView ?? 'library')
-        e.preventDefault()
-        break
-      case 'AltLeft':
-      case 'AltRight':
-        // Focus first title-bar button — do NOT preventDefault (breaks OS Alt combos)
-        document.querySelector<HTMLElement>('.titlebar-controls button')?.focus()
-        break
+    if (event.key === 'Alt') {
+      document.querySelector<HTMLElement>('.titlebar-controls button')?.focus()
+      return
     }
-  }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, filteredTracks, setVolume, volume, currentView, previousView, setView ])
+
+    if (!action || action === 'play-pause' && isNativeActivationTarget(event.target))
+      return
+
+    event.preventDefault()
+    actions[action]()
+  }, [ actions, bindings, currentView, previousView, setView ])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
-    return () => {
+    return () =>
       window.removeEventListener('keydown', handleKeyDown)
-    }
   }, [ handleKeyDown ])
 
-  // ─── Media key IPC subscriptions ──────────────────────────────────────────
-
   useEffect(() => {
-    const unsub1 = host.onMediaPlayPause(() => {
+    const unsubscribePlay = host.onMediaPlayPause(() => {
       if (currentTrack)
         void (isPlaying ? pause() : resume())
     })
-    const unsub2 = host.onMediaNext(() =>
+    const unsubscribeNext = host.onMediaNext(() =>
       playNext(filteredTracks))
-    const unsub3 = host.onMediaPrev(() =>
+    const unsubscribePrevious = host.onMediaPrev(() =>
       playPrevious(filteredTracks))
     return () => {
-      unsub1(); unsub2(); unsub3()
+      unsubscribePlay()
+      unsubscribeNext()
+      unsubscribePrevious()
     }
   }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, filteredTracks, host ])
 }

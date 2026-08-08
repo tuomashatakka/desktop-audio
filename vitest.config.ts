@@ -13,8 +13,15 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html', ['lcov', { file: 'lcov.info' }], ['clover', { file: 'clover.xml' }]],
       reportsDirectory: './coverage',
+      reportOnFailure: true,
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/**/*.d.ts', 'tests/**', 'node_modules/**'],
+      thresholds: {
+        statements: 35,
+        branches:   30,
+        functions:  35,
+        lines:      35,
+      },
     },
   },
 })

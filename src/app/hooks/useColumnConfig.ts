@@ -13,6 +13,7 @@ export type ColumnKey =
   'format' |
   'size' |
   'trackNumber' |
+  'rating' |
   'path'
 
 export interface ColumnConfig {
@@ -35,6 +36,7 @@ const DEFAULT_COLUMNS: readonly ColumnConfig[] = [
   { key: 'format', label: 'Format', width: '6ch', visible: true },
   { key: 'size', label: 'Size', width: '8ch', visible: false },
   { key: 'trackNumber', label: 'Track #', width: '5ch', visible: false },
+  { key: 'rating', label: 'Rating', width: '6ch', visible: false },
   { key: 'path', label: 'Path', width: '2fr', visible: false },
 ]
 

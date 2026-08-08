@@ -85,10 +85,9 @@
 }
 
 .titlebar > .menu-toggle { margin-left: var(--sp-2); -webkit-app-region: no-drag; }
-.titlebar-logo { display: flex; align-items: center; gap: var(--sp-2); padding-inline: var(--sp-2); -webkit-app-region: no-drag; }
 .titlebar-context { display: flex; flex: 1; align-items: center; gap: var(--sp-3); min-width: 0; height: 100%; -webkit-app-region: no-drag; }
 .app-shell:not([data-view='library']) .titlebar-context { display: none; }
-.logo-icon { display: flex; color: var(--accent); }
+.logo-icon { width: 18px; height: 18px; margin-inline: var(--sp-2); color: var(--accent); -webkit-app-region: no-drag; }
 
 .titlebar-nav { display: flex; gap: var(--sp-1); -webkit-app-region: no-drag; }
 .nav-item {
@@ -96,7 +95,7 @@
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--radius);
+  border-radius: var(--control-radius);
   color: var(--text-dim);
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
@@ -129,7 +128,7 @@
 }
 
 @media (max-width: 500px) {
-  .titlebar-logo { display: none; }
+  .logo-icon { display: none; }
   .titlebar-btn { width: var(--titlebar-h); }
 }
 
@@ -156,7 +155,8 @@
 .library-sidebar > .resize-handle:hover { background: var(--accent); }
 .library-sidebar details + details { margin-top: var(--sp-1); border-top: 1px solid var(--border); }
 .library-sidebar summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
@@ -170,19 +170,14 @@
 }
 
 .library-sidebar summary::-webkit-details-marker { display: none; }
-.library-sidebar summary::before {
-  content: '›';
-  display: inline-block;
-  font-size: var(--text-base);
-  transition: transform var(--duration-fast) var(--ease);
-}
-
+.library-sidebar summary > .icon { transition: transform var(--duration-fast) var(--ease); }
 .library-sidebar summary:hover { color: var(--text-dim); }
-.library-sidebar details[open] > summary::before { transform: rotate(90deg); }
+.library-sidebar details[open] > summary > .icon { transform: rotate(90deg); }
 
 .playlist-list { padding-bottom: var(--sp-2); }
 .playlist-list button {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sp-2);
   width: 100%;
@@ -199,7 +194,8 @@
 .playlist-list .add-playlist { color: var(--text-muted); }
 
 .folder-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--sp-4) minmax(0, 1fr);
   align-items: center;
   gap: var(--sp-1);
   padding-left: calc(var(--sp-2) + var(--level, 0) * var(--sp-3));
@@ -220,7 +216,7 @@
 
 .folder-row .disclosure.open { transform: rotate(90deg); }
 .folder-row .folder-name {
-  flex: 1;
+  grid-column: 2;
   padding: var(--sp-2) var(--sp-1);
   color: var(--text-dim);
   font-size: var(--text-sm);
@@ -312,6 +308,7 @@ body::before {
 .player-promote { display: none; }
 .player-art { display: flex; flex: 0 0 auto; }
 .album-art-card {
+  display: grid;
   flex: 0 0 auto;
   width: var(--art-size);
   aspect-ratio: 1;
@@ -320,6 +317,7 @@ body::before {
   border-radius: var(--radius-lg);
   background: var(--bg-raised);
   box-shadow: var(--shadow-card);
+  place-items: center;
   appearance: none;
 }
 
@@ -327,12 +325,8 @@ body::before {
 .album-art-card:focus-visible { outline: 0; box-shadow: var(--shadow-card), var(--focus-ring); }
 .album-art-card img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
 .art-fallback {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  place-items: center;
-  background: var(--bg-hover);
-  font-size: clamp(var(--text-xl), 20cqi, 64px);
+  width: clamp(var(--text-xl), 20cqi, 64px);
+  height: clamp(var(--text-xl), 20cqi, 64px);
   opacity: 0.35;
 }
 
@@ -442,9 +436,27 @@ body::before {
   width: 100%;
   height: calc(100% - 2 * (var(--sp-1) + var(--sp-0-5)));
 }
-.waveform-unplayed { fill: var(--wf-unplayed); }
-.waveform-played { fill: var(--wf-played); }
-.waveform-line { display: none; }
+.waveform-unplayed { fill: var(--wf-unplayed); stroke: var(--wf-unplayed); }
+.waveform-played { fill: var(--wf-played); stroke: var(--wf-played); }
+.waveform-shape {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.waveform-progress:not([data-loaded]) .waveform-shape { visibility: hidden; }
+.waveform-progress[data-loaded] .waveform-shape {
+  animation: waveform-rise var(--duration-slow) var(--ease) both;
+}
+.waveform-line {
+  display: block;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1px;
+}
+.waveform-progress[data-loaded] .waveform-line { display: none; }
+
+@keyframes waveform-rise {
+  from { transform: scaleY(0.02); }
+  to { transform: scaleY(1); }
+}
 .waveform-input {
   position: absolute;
   inset: 0;
@@ -662,7 +674,7 @@ body::before {
   :is(.player-art, .progress-section, .playback-controls) { pointer-events: auto; }
 .app-shell[data-height-tier='normal']:not([data-view='player']) .player-art { grid-area: art; }
 .app-shell[data-height-tier='normal']:not([data-view='player']) .album-art-card { box-shadow: none; }
-.app-shell[data-height-tier='normal']:not([data-view='player']) .art-fallback { font-size: var(--text-xl); }
+.app-shell[data-height-tier='normal']:not([data-view='player']) .art-fallback { width: var(--text-xl); height: var(--text-xl); }
 .app-shell[data-height-tier='normal']:not([data-view='player']) .player-info { grid-area: info; width: auto; text-align: start; }
 .app-shell[data-height-tier='normal']:not([data-view='player']) .track-title { margin: 0; font-weight: var(--font-medium); }
 .app-shell[data-height-tier='normal']:not([data-view='player']) .track-artist { margin: 0; font-size: var(--text-xs); }
@@ -724,6 +736,7 @@ body::before {
 
 @media (prefers-reduced-motion: reduce) {
   :root { transition: none; }
-  .player-info .track-title > span { animation: none; }
+  .player-info .track-title > span,
+  .waveform-progress[data-loaded] .waveform-shape { animation: none; }
   .app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .track-title { text-overflow: ellipsis; }
 }

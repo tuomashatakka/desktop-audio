@@ -24,7 +24,9 @@ import { useUI } from '../../contexts'
 import type { Density, Grouping, Track } from '../../contexts'
 import { Skeleton } from '../atomic/Skeleton'
 import { Popover } from '../atomic/Popover'
+import type { PopoverPoint } from '../atomic/Popover'
 import { Button } from '../atomic/Button'
+import { Icon } from '../atomic/Icon'
 import { Breadcrumbs } from './Breadcrumbs'
 import type { SortKey } from '../../hooks/useSortableTable'
 import { formatTime, isoDuration } from '../../utils/time'
@@ -48,7 +50,7 @@ interface TrackTableProps {
   readonly currentTrack:   Track | null
   readonly isPlaying:      boolean
   readonly onPlay:         (track: Track, index: number) => void
-  readonly onContextMenu?: (track: Track, rect: DOMRect) => void
+  readonly onContextMenu?: (track: Track, point: PopoverPoint) => void
   readonly onNavigate?:    (path: string | null) => void
   readonly roots?:         readonly string[]
 }
@@ -115,6 +117,8 @@ const CELL_RENDERERS: Record<ColumnKey, CellRenderer> = {
     formatSize(track.size),
   trackNumber: track =>
     track.trackNumber ?? '',
+  rating: track =>
+    track.rating ? `${track.rating}/5` : '',
   path: track =>
     track.path,
 }
@@ -131,7 +135,7 @@ interface HeaderCellProps {
   readonly onResize:       (key: ColumnKey, width: string) => void
   readonly onReorder:      (from: ColumnKey, to: ColumnKey) => void
   readonly tableSemantics: boolean
-  readonly onContextMenu?: (anchor: HTMLElement) => void
+  readonly onContextMenu?: (point: PopoverPoint) => void
 }
 
 /** One column header: click to sort, drag to reorder, drag the edge to resize. */
@@ -186,8 +190,8 @@ function HeaderCell ({ col, sortKey, sortDir, toggleSort, onResize, onReorder, t
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
-    if (onContextMenu && ref.current)
-      onContextMenu(ref.current)
+    if (onContextMenu)
+      onContextMenu({ x: e.clientX, y: e.clientY })
   }
 
   return (
@@ -213,7 +217,7 @@ function HeaderCell ({ col, sortKey, sortDir, toggleSort, onResize, onReorder, t
       <span className='label'>{col.label}</span>
 
       {isSorted &&
-        <span aria-hidden='true'>{sortDir === 'asc' ? '▲' : '▼'}</span>
+        <Icon className={sortDir === 'asc' ? 'sort-ascending' : 'sort-descending'} name='chevron-right' />
       }
 
       <span className='resize-handle' onMouseDown={handleResizeStart} aria-hidden='true' />
@@ -221,12 +225,22 @@ function HeaderCell ({ col, sortKey, sortDir, toggleSort, onResize, onReorder, t
   )
 }
 
-/** Popover listing every column with a checkbox, plus a reset button. */
-function ColumnMenu ({ anchor, onClose }: { readonly anchor: HTMLElement | null; readonly onClose: () => void }) {
-  const { columns, toggleColumn, resetColumns } = useColumnConfig()
-
+/** Pointer-positioned popover listing every column, plus a reset button. */
+function ColumnMenu ({
+  point,
+  columns,
+  toggleColumn,
+  resetColumns,
+  onClose,
+}: {
+  readonly point:        PopoverPoint | null
+  readonly columns:      readonly ColumnConfig[]
+  readonly toggleColumn: (key: ColumnKey) => void
+  readonly resetColumns: () => void
+  readonly onClose:      () => void
+}) {
   return (
-    <Popover open={anchor !== null} anchor={anchor} onClose={onClose}>
+    <Popover open={point !== null} point={point} onClose={onClose}>
       <fieldset className='config-menu'>
         <legend>Columns</legend>
 
@@ -280,7 +294,7 @@ function GroupToggle ({ open, controls, label, onToggle }: {
   readonly open:     boolean
   readonly controls: string
   readonly label:    string
-  readonly onToggle: () => void
+  readonly onToggle: (toggleAll: boolean) => void
 }) {
   return (
     <button
@@ -289,9 +303,10 @@ function GroupToggle ({ open, controls, label, onToggle }: {
       aria-expanded={open}
       aria-controls={controls}
       aria-label={`${open ? 'Collapse' : 'Expand'} ${label}`}
-      onClick={onToggle}
+      onClick={event =>
+        onToggle(event.altKey)}
     >
-      <span aria-hidden='true'>▸</span>
+      <Icon name='chevron-right' />
     </button>
   )
 }
@@ -345,10 +360,18 @@ export function TrackTable ({
 }: TrackTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const { density, grouping } = useUI()
-  const { visible, gridTemplate, resizeColumn, reorderColumn } = useColumnConfig()
+  const {
+    columns,
+    visible,
+    gridTemplate,
+    toggleColumn,
+    resizeColumn,
+    reorderColumn,
+    resetColumns,
+  } = useColumnConfig()
   const { sorted, sortKey, sortDir, toggleSort } = useSortableTable(tracks)
 
-  const [ menuAnchor, setMenuAnchor ] = useState<HTMLElement | null>(null)
+  const [ menuPoint, setMenuPoint ] = useState<PopoverPoint | null>(null)
   const [ focusedIndex, setFocusedIndex ] = useState(0)
 
   // Collapsed rather than expanded state: groups default to open, and a set
@@ -356,17 +379,26 @@ export function TrackTable ({
   // rebuilt every time the group list changes.
   const [ collapsedGroups, setCollapsedGroups ] = useState<ReadonlySet<string>>(new Set())
 
-  const toggleGroup = useCallback((key: string) => {
-    setCollapsedGroups(current => {
-      const next = new Set(current)
-      if (!next.delete(key))
-        next.add(key)
-      return next
-    })
-  }, [])
-
   const groups = useMemo(() =>
     buildGroups(sorted, grouping), [ sorted, grouping ])
+
+  const toggleGroup = useCallback((key: string, toggleAll: boolean) => {
+    setCollapsedGroups(current => {
+      const willCollapse = !current.has(key)
+      if (toggleAll)
+        return willCollapse
+          ? new Set(groups.map(group =>
+            group.key))
+          : new Set()
+
+      const next = new Set(current)
+      if (willCollapse)
+        next.add(key)
+      else
+        next.delete(key)
+      return next
+    })
+  }, [ groups ])
 
   const rowHeight = ROW_HEIGHT_BY_DENSITY[density]
 
@@ -419,7 +451,7 @@ export function TrackTable ({
     }
     const openContextMenu = (event: React.MouseEvent<HTMLElement>) => {
       event.preventDefault()
-      onContextMenu?.(track, event.currentTarget.getBoundingClientRect())
+      onContextMenu?.(track, { x: event.screenX, y: event.screenY })
     }
     const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
       if (event.key === 'Enter' || event.key === ' ') {
@@ -451,7 +483,9 @@ export function TrackTable ({
         role={tableSemantics ? 'cell' : undefined}
         className={`col-${col.key}`}
       >
-        {col.key === 'index' && active && isPlaying ? '▶' : cellValue(track, col.key, index, density)}
+        {col.key === 'index' && active && isPlaying
+          ? <Icon name='play' />
+          : cellValue(track, col.key, index, density)}
       </span>
     )
 
@@ -543,7 +577,7 @@ export function TrackTable ({
                 onResize={resizeColumn}
                 onReorder={reorderColumn}
                 tableSemantics={tableSemantics}
-                onContextMenu={setMenuAnchor}
+                onContextMenu={setMenuPoint}
               />
             )}
           </div>
@@ -605,8 +639,8 @@ export function TrackTable ({
                   open={!collapsed}
                   controls={rowsId}
                   label={g.label}
-                  onToggle={() =>
-                    toggleGroup(g.key)}
+                  onToggle={toggleAll =>
+                    toggleGroup(g.key, toggleAll)}
                 />
 
               if (grouping === 'album')
@@ -678,9 +712,14 @@ export function TrackTable ({
         }
       </div>
 
-      <ColumnMenu anchor={menuAnchor}
+      <ColumnMenu
+        point={menuPoint}
+        columns={columns}
+        toggleColumn={toggleColumn}
+        resetColumns={resetColumns}
         onClose={() =>
-          setMenuAnchor(null)} />
+          setMenuPoint(null)}
+      />
     </section>
   )
 }

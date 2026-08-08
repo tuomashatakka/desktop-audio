@@ -62,26 +62,19 @@
 }
 
 .search-input > input { padding-left: var(--sp-8); }
-.search-input::after {
-  content: '⌕';
+.search-input > .icon {
   position: absolute;
-  top: 0;
-  left: 0;
-  display: grid;
-  width: var(--sp-8);
-  height: 100%;
-  place-items: center;
+  top: 50%;
+  left: var(--sp-2);
+  z-index: 1;
   color: var(--text-muted);
   font-size: var(--text-lg);
   pointer-events: none;
+  transform: translateY(-50%);
 }
 
 .search-input:not(:focus-within):has(> input:placeholder-shown) { width: var(--sp-8); }
-.search-input:not(:focus-within):has(> input:placeholder-shown):hover::after { color: var(--text); }
-
-/* Three centred bars morph into a left caret from aria-expanded alone. */
 .menu-toggle {
-  position: relative;
   display: grid;
   flex: 0 0 auto;
   width: var(--sp-6);
@@ -91,23 +84,6 @@
 }
 
 .menu-toggle:hover { color: var(--text); }
-.menu-toggle span {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--sp-4);
-  height: var(--sp-0-5);
-  margin: -1px 0 0 calc(-1 * var(--sp-2));
-  border-radius: 1px;
-  background: currentColor;
-  transition: transform var(--duration) var(--ease), opacity var(--duration) var(--ease);
-}
-
-.menu-toggle span:first-child { transform: translateY(-5px); }
-.menu-toggle span:last-child { transform: translateY(5px); }
-.menu-toggle[aria-expanded='true'] span:first-child { transform: translate(-3px, -3.5px) rotate(-45deg) scaleX(0.65); }
-.menu-toggle[aria-expanded='true'] span:nth-child(2) { opacity: 0; transform: scaleX(0.2); }
-.menu-toggle[aria-expanded='true'] span:last-child { transform: translate(-3px, 3.5px) rotate(45deg) scaleX(0.65); }
 
 .breadcrumbs { min-width: 0; overflow: hidden; }
 .breadcrumbs ol,
@@ -130,7 +106,7 @@
   gap: var(--sp-0-5);
   padding: var(--sp-0-5);
   border: 0;
-  border-radius: var(--radius);
+  border-radius: var(--control-radius);
   background: var(--bg-raised);
 }
 
@@ -150,6 +126,7 @@
 .density-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
 .config-toggle { padding: var(--sp-1) var(--sp-2); color: var(--text-muted); font-size: var(--text-base); }
+.config-toggle > .icon { transform: rotate(90deg); }
 .config-toggle:hover { color: var(--text); background: var(--bg-hover); }
 .config-menu { min-width: 200px; padding: var(--sp-3); border: 0; }
 .config-menu legend { padding-bottom: var(--sp-2); color: var(--text-muted); font-size: var(--text-xs); text-transform: uppercase; }
@@ -186,7 +163,8 @@
 .track-header-row { height: var(--head-h); }
 .track-column-header {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sp-1);
   padding: var(--sp-2) var(--sp-3);
@@ -201,7 +179,9 @@
 .track-column-header.sorted { color: var(--accent); }
 .track-column-header:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
 .track-column-header[tabindex] { cursor: pointer; }
-.track-header .label { flex: 1 1 auto; }
+.track-header .label { overflow: hidden; text-overflow: ellipsis; }
+.track-header .sort-ascending { transform: rotate(-90deg); }
+.track-header .sort-descending { transform: rotate(90deg); }
 .track-header .resize-handle { position: absolute; inset: 0 0 0 auto; width: 5px; cursor: col-resize; }
 .track-header .resize-handle:hover { background: var(--accent); }
 .track-header .col-duration { justify-content: flex-end; }
@@ -217,26 +197,28 @@
 .track-row .col-index { color: var(--text-muted); font-size: var(--text-xs); text-align: center; }
 .track-row :is(.col-artist, .col-album, .col-genre, .col-path) { color: var(--text-dim); }
 .track-row .col-format,
-.track-row :is(.col-duration, .col-size, .col-trackNumber, .col-year) {
+.track-row :is(.col-duration, .col-size, .col-trackNumber, .col-year, .col-rating) {
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
 
 .track-row .col-format { text-transform: uppercase; }
-.track-row :is(.col-duration, .col-size, .col-trackNumber, .col-year) { text-align: end; }
+.track-row :is(.col-duration, .col-size, .col-trackNumber, .col-year, .col-rating) { text-align: end; }
 button.track-row { width: 100%; color: inherit; text-align: start; }
 
 /* Relaxed rows stack title over artist; the header uses the same col class. */
 .track-table[data-density='relaxed'] .track-row .col-title { display: grid; line-height: 1.2; }
 .track-table[data-density='relaxed'] .track-row .col-title small { font-size: var(--text-xs); }
 
-.track-body.grouped { display: flex; flex-direction: column; gap: var(--sp-3); padding-top: var(--sp-2); }
+.track-body.grouped { padding-top: var(--sp-2); }
+.track-group + .track-group { margin-top: var(--sp-3); }
 .track-group > header {
   position: sticky;
   top: var(--head-h);
   z-index: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto max-content minmax(0, 1fr);
   align-items: baseline;
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
@@ -268,7 +250,7 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
   background: var(--bg-raised);
 }
 
-.track-group.album > .album-art { grid-row: 1 / span 2; width: 96px; border-radius: var(--radius-lg); }
+.track-group.album > .album-art { grid-row: 1; width: 96px; border-radius: var(--radius-lg); }
 .track-group.album > header {
   position: static;
   display: grid;
@@ -287,7 +269,10 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
 .track-group.album[data-collapsed] > .album-art { grid-row: auto; width: 40px; }
 
 .group-rows { min-width: 0; }
-.track-group.album > .group-rows { grid-column: 2; }
+.track-group.album > .group-rows {
+  grid-column: 1 / -1;
+  margin: 0 calc(-1 * var(--sp-3)) calc(-1 * var(--sp-3));
+}
 
 @media (max-width: 720px) {
   .library-heading { display: none; }
@@ -302,7 +287,7 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
   .view-controls > li:has(.search-input) { display: none; }
 }
 
-/* settings: native hash targets choose among four permanently mounted panels */
+/* settings: native hash targets choose among five permanently mounted panels */
 .settings-view {
   display: grid;
   grid-template-columns: 200px minmax(0, 1fr);
@@ -335,6 +320,7 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
 .settings-view:has(#settings-library:target) .settings-nav a[href='#settings-library'],
 .settings-view:has(#settings-appearance:target) .settings-nav a[href='#settings-appearance'],
 .settings-view:has(#settings-playback:target) .settings-nav a[href='#settings-playback'],
+.settings-view:has(#settings-hotkeys:target) .settings-nav a[href='#settings-hotkeys'],
 .settings-view:has(#settings-about:target) .settings-nav a[href='#settings-about'] {
   color: var(--text);
   background: var(--bg-raised);
@@ -381,12 +367,23 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
   cursor: pointer;
 }
 
-.checkbox-field { flex-direction: row; align-items: center; gap: var(--sp-2); }
+.checkbox-field { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--sp-2); }
 .checkbox-field input { width: auto; }
 
 .volume-setting { display: flex; align-items: center; gap: var(--sp-2); }
 .volume-setting .slider { flex: 1; }
 .volume-value { min-width: 4ch; color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); text-align: end; }
+
+.hotkey-list { display: grid; gap: var(--sp-2); margin-block: var(--sp-4); border: 0; }
+.hotkey-field {
+  display: grid;
+  grid-template-columns: minmax(12ch, 1fr) minmax(12ch, 180px);
+  align-items: center;
+  gap: var(--sp-3);
+}
+.hotkey-field > span { color: var(--text-dim); font-size: var(--text-sm); }
+.hotkey-field > input { text-align: center; cursor: pointer; }
+.hotkey-status { display: block; min-height: 1.5em; margin-bottom: var(--sp-3); color: var(--text-muted); font-size: var(--text-sm); }
 
 @container (max-width: 640px) {
   .settings-view { grid-template-columns: 1fr; padding: var(--sp-4); }
@@ -408,7 +405,8 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
 /* Everything past the seven common tags sits behind this. */
 .tag-extended { border-top: 1px solid var(--border); padding-top: var(--sp-3); }
 .tag-extended > summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: var(--sp-2);
   color: var(--text-muted);
@@ -421,13 +419,8 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
 }
 
 .tag-extended > summary::-webkit-details-marker { display: none; }
-.tag-extended > summary::before {
-  content: '›';
-  font-size: var(--text-base);
-  transition: transform var(--duration-fast) var(--ease);
-}
-
-.tag-extended[open] > summary::before { transform: rotate(90deg); }
+.tag-extended > summary > .icon { transition: transform var(--duration-fast) var(--ease); }
+.tag-extended[open] > summary > .icon { transform: rotate(90deg); }
 .tag-extended[open] > summary { color: var(--text-dim); }
 .tag-extended > .form-stack { margin-top: var(--sp-3); }
 
@@ -435,7 +428,7 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
   width: 100%;
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--control-radius);
   color: var(--text);
   background: var(--bg-input);
   font-family: inherit;

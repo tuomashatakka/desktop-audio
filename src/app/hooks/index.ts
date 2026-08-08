@@ -2,6 +2,8 @@ export * from './useLibraryScanner'
 
 export * from './useKeyboardShortcuts'
 
+export * from './useKeybindings'
+
 export * from './useSortableTable'
 
 export * from './useHeightTier'

@@ -7,6 +7,7 @@
  */
 import { useLibrary, useUI } from '../contexts'
 import { FolderTree } from '../components/composite/FolderTree'
+import { Icon } from '../components/atomic'
 import { useState, useCallback } from 'react'
 
 
@@ -72,7 +73,10 @@ export function LibrarySidebar () {
       />
 
       <details open>
-        <summary>Folders</summary>
+        <summary>
+          <Icon name='chevron-right' />
+          Folders
+        </summary>
 
         <FolderTree
           folders={folders}
@@ -89,7 +93,10 @@ export function LibrarySidebar () {
         {/* The "new playlist" control is the last list item rather than a
             button inside <summary> — nesting a button in a summary nests
             two buttons in the a11y tree. */}
-        <summary>Playlists</summary>
+        <summary>
+          <Icon name='chevron-right' />
+          Playlists
+        </summary>
 
         <ul className='playlist-list'>
           {playlists.map(playlist =>
@@ -103,7 +110,7 @@ export function LibrarySidebar () {
                   setView('library')
                 }}
               >
-                <span aria-hidden='true'>♩</span>
+                <Icon name='music' />
                 <span className='name'>{playlist.name}</span>
                 <small>{playlist.tracks.length}</small>
               </button>
@@ -115,7 +122,7 @@ export function LibrarySidebar () {
               className='add-playlist'
               onClick={() =>
                 addPlaylist('New Playlist')}>
-              <span aria-hidden='true'>+</span>
+              <Icon name='add' />
               <span className='name'>New playlist</span>
             </button>
           </li>

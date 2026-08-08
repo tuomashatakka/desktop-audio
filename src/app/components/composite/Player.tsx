@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useUI, useAudio, useLibrary, useSettings } from '../../contexts'
 import type { Track, RepeatMode } from '../../contexts'
-import { IconButton, Button } from '../atomic'
+import { Icon, IconButton, Button } from '../atomic'
 import { WaveformProgress } from '../atomic/WaveformProgress'
 import { useWindowScale } from '../../hooks'
 import { formatTime, isoDuration } from '../../utils/time'
@@ -13,9 +13,6 @@ const REPEAT_CYCLE: Record<RepeatMode, RepeatMode> = {
   all:  'one',
   one:  'none',
 }
-
-/** One glyph for all three modes; colour and the `1` badge carry the state. */
-const REPEAT_GLYPH = '↻'
 
 const REPEAT_LABEL: Record<RepeatMode, string> = {
   none: 'Repeat off',
@@ -41,7 +38,7 @@ function PlayerArtwork ({ track, onToggle }: {
       >
         {track?.albumArt
           ? <img src={track.albumArt} alt='' />
-          : <span className='art-fallback' aria-hidden='true'>♫</span>
+          : <Icon className='art-fallback' name='music' />
         }
       </button>
     </figure>
@@ -76,13 +73,13 @@ function PlayerTransport ({
           data-active={shuffle || undefined}
           onClick={onShuffle}
         >
-          <span aria-hidden='true'>⤨</span>
+          <Icon name='shuffle' />
         </IconButton>
       </li>
 
       <li className='prev'>
         <IconButton label='Previous' type='button' disabled={!hasTrack} onClick={onPrevious}>
-          <span aria-hidden='true'>⏮</span>
+          <Icon name='previous' />
         </IconButton>
       </li>
 
@@ -97,13 +94,13 @@ function PlayerTransport ({
           disabled={!hasTrack}
           onClick={onToggle}
         >
-          <span aria-hidden='true'>{isPlaying ? '⏸' : '▶'}</span>
+          <Icon name={isPlaying ? 'pause' : 'play'} />
         </Button>
       </li>
 
       <li className='next'>
         <IconButton label='Next' type='button' disabled={!hasTrack} onClick={onNext}>
-          <span aria-hidden='true'>⏭</span>
+          <Icon name='next' />
         </IconButton>
       </li>
 
@@ -115,7 +112,7 @@ function PlayerTransport ({
           data-active={repeatMode === 'none' ? undefined : true}
           onClick={onRepeat}
         >
-          <span aria-hidden='true'>{REPEAT_GLYPH}</span>
+          <Icon name='repeat' />
           {repeatMode === 'one' && <span className='mode-badge' aria-hidden='true'>1</span>}
         </IconButton>
       </li>
@@ -222,7 +219,7 @@ export function Player () {
               setShowLyrics(current =>
                 !current)}
           >
-            <span aria-hidden='true'>☰</span>
+            <Icon name='lyrics' />
           </IconButton>
 
           <IconButton
@@ -232,7 +229,7 @@ export function Player () {
             onClick={() =>
               setView('library')}
           >
-            <span aria-hidden='true'>✕</span>
+            <Icon name='close' />
           </IconButton>
         </div>
 

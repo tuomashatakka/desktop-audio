@@ -1,3 +1,7 @@
+import { Icon } from '../atomic/Icon'
+import type { IconName } from '../../services/types'
+
+
 /**
  * The presentational half of a context menu: label, icon, danger tint or a
  * separator. Deliberately carries no action — {@link MenuList} reports the
@@ -7,7 +11,7 @@
  */
 export interface MenuEntry {
   readonly label?:     string
-  readonly icon?:      string
+  readonly icon?:      IconName
   readonly danger?:    boolean
   readonly separator?: boolean
 }
@@ -34,7 +38,7 @@ export function MenuList ({ items, onSelect }: MenuListProps) {
               onClick={() =>
                 onSelect(index)}
             >
-              {item.icon && <span className='context-menu-icon' aria-hidden='true'>{item.icon}</span>}
+              {item.icon && <Icon className='context-menu-icon' name={item.icon} />}
               {item.label}
             </button>
           </li>

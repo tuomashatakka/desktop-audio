@@ -1,4 +1,5 @@
 import type { FolderNode } from '../../contexts'
+import { Icon } from '../atomic'
 
 
 /**
@@ -39,9 +40,9 @@ export function FolderTree ({ folders, selectedPath, onSelect, onToggle, level =
                   aria-expanded={folder.expanded}
                   aria-label={`${folder.expanded ? 'Collapse' : 'Expand'} ${folder.name}`}
                 >
-                  ›
+                  <Icon name='chevron-right' />
                 </button>
-                : <span className='disclosure' aria-hidden='true' />
+                : null
               }
 
               <button

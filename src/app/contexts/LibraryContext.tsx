@@ -48,6 +48,32 @@ interface LibraryContextValue extends LibraryState {
 
 const LibraryContext = createContext<LibraryContextValue | null>(null)
 
+function toggleFolderBranch (folder: FolderEntry, path: string): FolderEntry {
+  if (folder.path === path) {
+    return FolderEntry.fromFolderNode({
+      id:       folder.id,
+      name:     folder.name,
+      path:     folder.path,
+      children: folder.children,
+      expanded: !folder.expanded,
+    })
+  }
+
+  const children = folder.children.map(child =>
+    toggleFolderBranch(child, path))
+  if (children.every((child, index) =>
+    child === folder.children[index]))
+    return folder
+
+  return FolderEntry.fromFolderNode({
+    id:       folder.id,
+    name:     folder.name,
+    path:     folder.path,
+    children,
+    expanded: folder.expanded,
+  })
+}
+
 /** Provides {@link LibraryContextValue}; pair with {@link useLibraryScanner} to populate. */
 export function LibraryProvider ({ children }: { readonly children: ReactNode }) {
   const [ state, setState ] = useState<LibraryState>({
@@ -98,19 +124,8 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
       const newRegistry = new ModelRegistry()
       for (const track of s.registry.getAllTracks())
         newRegistry.addTrack(track)
-      for (const [ id, folder ] of s.registry.folders) {
-        if (folder.path === path) {
-          const updated = new FolderEntry(folder.id)
-          updated.name = folder.name
-          updated.path = folder.path
-          updated.children = [ ...folder.children ]
-          updated.expanded = !folder.expanded
-          newRegistry.addFolder(updated)
-        }
-        else {
-          newRegistry.addFolder(folder)
-        }
-      }
+      for (const folder of s.registry.folders.values())
+        newRegistry.addFolder(toggleFolderBranch(folder, path))
       return { ...s, registry: newRegistry }
     })
   }, [])
@@ -134,15 +149,6 @@ export function LibraryProvider ({ children }: { readonly children: ReactNode })
           p.id !== id) }))
   }, [])
 
-  const selectFolder = useCallback((path: string | null) => {
-    setState(s =>
-      ({ ...s }))
-  }, [])
-
-  const selectPlaylist = useCallback((id: string | null) => {
-    setState(s =>
-      ({ ...s }))
-  }, [])
 
   const addTracksToPlaylist = useCallback((playlistId: string, tracks: Track[]) => {
     setState(s =>

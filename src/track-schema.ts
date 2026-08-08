@@ -28,6 +28,7 @@ export const TRACK_COLUMNS = {
   year:         'INTEGER',
   genre:        'TEXT',
   track_number: 'INTEGER',
+  rating:       'INTEGER',
   album_artist: 'TEXT',
   composer:     'TEXT',
   track_total:  'INTEGER',

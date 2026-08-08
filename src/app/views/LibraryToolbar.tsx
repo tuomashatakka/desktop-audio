@@ -1,11 +1,16 @@
 import { useLibrary, useSettings, useUI } from '../contexts'
 import type { Density, Grouping } from '../contexts'
-import { Input } from '../components/atomic'
+import { Icon, Input } from '../components/atomic'
+import type { IconName } from '../services/types'
 import { Breadcrumbs } from '../components/composite/Breadcrumbs'
 
 
 const DENSITIES: readonly Density[] = [ 'compact', 'normal', 'relaxed' ]
-const DENSITY_GLYPH: Record<Density, string> = { compact: '≡', normal: '≢', relaxed: '=' }
+const DENSITY_ICON: Record<Density, IconName> = {
+  compact: 'density-compact',
+  normal:  'density-normal',
+  relaxed: 'density-relaxed',
+}
 
 const GROUPINGS: readonly Grouping[] = [ 'none', 'album', 'artist', 'path' ]
 const GROUPING_LABEL: Record<Grouping, string> = {
@@ -52,6 +57,7 @@ export function LibraryToolbar () {
             placeholder='Search tracks...'
             aria-label='Search tracks'
             value={searchQuery}
+            startAdornment={<Icon name='search' />}
             onChange={event =>
               setSearchQuery(event.target.value)}
           />
@@ -73,7 +79,7 @@ export function LibraryToolbar () {
                     setDensity(densityOption)}
                 />
 
-                <span aria-hidden='true'>{DENSITY_GLYPH[densityOption]}</span>
+                <Icon name={DENSITY_ICON[densityOption]} />
               </label>
             )}
           </fieldset>
@@ -86,7 +92,7 @@ export function LibraryToolbar () {
             popoverTarget='library-view-options'
             aria-label='View options'
           >
-            <span aria-hidden='true'>⌄</span>
+            <Icon name='chevron-right' />
           </button>
         </li>
       </menu>
