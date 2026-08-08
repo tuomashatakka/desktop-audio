@@ -137,7 +137,7 @@ runs *after* it on any commit that changes both. Don't move it deeper.
 that stays put is `position: sticky` inside it:
 
 - `.track-header` pins at `top: 0`; its row height is fixed to `--head-h`
-  (34px) so group headers can pin at `top: var(--head-h)`.
+  (`--track-head-h`) so group headers can pin at `top: var(--head-h)`.
 - The flat list is virtualized (absolutely positioned rows inside a spacer);
   grouped views render in full.
 - Ancestors (`.app-main`, `.view-content`) are `overflow: hidden` for views
@@ -147,7 +147,39 @@ that stays put is `position: sticky` inside it:
   button next to the heading, keyed by group in a `collapsedGroups` set — not
   `<details>`. Album groups put artwork outside the heading and path groups put
   an interactive breadcrumb trail inside it, and neither survives a
-  `<summary>`. A collapsed group renders no rows at all.
+  `<summary>`. A collapsed group renders no rows at all, which is also why its
+  collapse cannot animate (see Motion) and why it drops out of the keyboard
+  navigation order.
+- `data-group-key` on each group section is what ArrowLeft uses to find the
+  heading to move focus to.
+
+## Keyboard browsing
+
+Arrow keys act on whatever pane holds focus — there is no global arrow router,
+and there shouldn't be one. Each pane handles its own keys, so "sidebar or
+list?" answers itself.
+
+**Sidebar** (`FolderTree` + `useTreeNavigation`) is the WAI-ARIA tree pattern:
+`role="tree"` / `role="treeitem"`, one tab stop, exactly one row at
+`tabIndex={0}`. Up/Down walk the *visible* nodes (a collapsed branch
+contributes none), Right opens a closed node and descends into an open one,
+Left closes an open node and climbs to the parent from a closed one or a leaf,
+Home/End jump. It renders **flat**, not recursively: the hook already flattens
+the visible nodes to do index arithmetic, and reusing that list is what
+guarantees DOM order matches traversal order. Depth is `--level`, not nesting.
+The chevron is a decorative `<span>` — `aria-expanded` lives on the treeitem,
+so a nested button would be a second interactive node for the same job.
+
+**Track list** navigates `visibleRows`, the ids in *render* order, not the
+global sorted index. A row's index is its position in the sorted list so its
+row number stays stable, but grouped views render group by group — stepping
+through global indices jumped to whatever row held the adjacent number rather
+than the row below. Left/Right mirror the tree: Right opens the row's group,
+Left closes it and moves focus to its heading toggle. Both are no-ops in a
+flat list, which has no parent to close.
+
+Bare arrows are safe to claim: `src/keybindings/defaults.ts` only ever binds
+`mod+arrow*`.
 
 ## Ambient wash
 

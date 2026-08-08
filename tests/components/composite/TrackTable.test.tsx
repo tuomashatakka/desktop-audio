@@ -156,3 +156,122 @@ describe('TrackTable', () => {
     expect(onTrackContext).toHaveBeenCalledWith(tracks[0], { x: 540, y: 320 })
   })
 })
+
+/*
+ * Interleaved artists: sorted by title the order is A, B, C, but grouped by
+ * artist it renders A, C (Xylo) then B (Yarrow). Global index order and render
+ * order therefore disagree — which is exactly the case arrow keys used to get
+ * wrong, stepping to whatever row held the adjacent index rather than the row
+ * below.
+ */
+const interleaved = [
+  Track.fromDTO({
+    id: 'a', title: 'Alpha', artist: 'Xylo', album: 'X', duration: 100,
+    format: 'mp3', size: 1, coverColor: '#000', path: '/a.mp3',
+  }),
+  Track.fromDTO({
+    id: 'b', title: 'Bravo', artist: 'Yarrow', album: 'Y', duration: 100,
+    format: 'mp3', size: 1, coverColor: '#000', path: '/b.mp3',
+  }),
+  Track.fromDTO({
+    id: 'c', title: 'Charlie', artist: 'Xylo', album: 'X', duration: 100,
+    format: 'mp3', size: 1, coverColor: '#000', path: '/c.mp3',
+  }),
+]
+
+function renderInterleaved (onPlay = vi.fn()) {
+  render(
+    <UIProvider value={uiValue}>
+      <TrackTable
+        tracks={interleaved}
+        isLoading={false}
+        currentTrack={null}
+        isPlaying={false}
+        onPlay={onPlay}
+      />
+    </UIProvider>
+  )
+  return onPlay
+}
+
+const row = (name: RegExp) =>
+  screen.getByRole('button', { name })
+
+describe('TrackTable grouped keyboard navigation', () => {
+  it('renders group order, not global sort order', () => {
+    renderInterleaved()
+
+    const titles = screen.getAllByRole('button', { name: /alpha|bravo|charlie/i })
+      .map(el => el.textContent)
+
+    expect(titles.map(t => t?.match(/Alpha|Bravo|Charlie/)?.[0])).toEqual([ 'Alpha', 'Charlie', 'Bravo' ])
+  })
+
+  it('ArrowDown follows the rendered order across a group boundary', async () => {
+    renderInterleaved()
+
+    row(/alpha/i).focus()
+    fireEvent.keyDown(row(/alpha/i), { key: 'ArrowDown' })
+
+    // Charlie is the next *rendered* row; Bravo holds the next global index.
+    await waitFor(() =>
+      expect(row(/charlie/i)).toHaveFocus())
+
+    fireEvent.keyDown(row(/charlie/i), { key: 'ArrowDown' })
+    await waitFor(() =>
+      expect(row(/bravo/i)).toHaveFocus())
+  })
+
+  it('ArrowUp walks back through the rendered order', async () => {
+    renderInterleaved()
+
+    row(/bravo/i).focus()
+    fireEvent.keyDown(row(/bravo/i), { key: 'ArrowUp' })
+
+    await waitFor(() =>
+      expect(row(/charlie/i)).toHaveFocus())
+  })
+
+  it('End lands on the last rendered row, not the last sorted track', async () => {
+    renderInterleaved()
+
+    row(/alpha/i).focus()
+    fireEvent.keyDown(row(/alpha/i), { key: 'End' })
+
+    await waitFor(() =>
+      expect(row(/bravo/i)).toHaveFocus())
+  })
+
+  it('ArrowLeft collapses the row\'s group', () => {
+    renderInterleaved()
+
+    fireEvent.keyDown(row(/alpha/i), { key: 'ArrowLeft' })
+
+    expect(screen.queryByRole('button', { name: /alpha/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /charlie/i })).not.toBeInTheDocument()
+    // The other group is untouched.
+    expect(screen.getByRole('button', { name: /bravo/i })).toBeInTheDocument()
+  })
+
+  it('a collapsed group drops out of the navigation order', async () => {
+    renderInterleaved()
+
+    fireEvent.keyDown(row(/alpha/i), { key: 'ArrowLeft' })
+
+    row(/bravo/i).focus()
+    fireEvent.keyDown(row(/bravo/i), { key: 'ArrowUp' })
+
+    // Nothing above it any more, so focus stays put.
+    await waitFor(() =>
+      expect(row(/bravo/i)).toHaveFocus())
+  })
+
+  it('ArrowRight is a no-op on a row whose group is already open', () => {
+    renderInterleaved()
+
+    fireEvent.keyDown(row(/alpha/i), { key: 'ArrowRight' })
+
+    expect(screen.getByRole('button', { name: /alpha/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /charlie/i })).toBeInTheDocument()
+  })
+})

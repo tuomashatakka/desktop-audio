@@ -45,13 +45,16 @@ describe('LibraryContext folder tree', () => {
       </LibraryProvider>
     )
 
-    const expandChild = await screen.findByRole('button', { name: 'Expand Child' })
-    expect(screen.queryByRole('button', { name: 'Grandchild' })).not.toBeInTheDocument()
+    const tree = await screen.findByRole('tree')
+    expect(screen.queryByRole('treeitem', { name: /Grandchild/ })).not.toBeInTheDocument()
 
-    fireEvent.click(expandChild)
+    // Focus starts on the first node; walk down to Child, then open it.
+    fireEvent.keyDown(tree, { key: 'ArrowDown' })
+    fireEvent.keyDown(tree, { key: 'ArrowRight' })
 
-    expect(screen.getByRole('button', { name: 'Grandchild' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Collapse Child' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Collapse Music' })).toBeInTheDocument()
+    expect(screen.getByRole('treeitem', { name: /Grandchild/ })).toBeInTheDocument()
+    expect(screen.getByRole('treeitem', { name: /Child/ })).toHaveAttribute('aria-expanded', 'true')
+    // The root branch survives a nested toggle rather than being replaced.
+    expect(screen.getByRole('treeitem', { name: /Music/ })).toHaveAttribute('aria-expanded', 'true')
   })
 })

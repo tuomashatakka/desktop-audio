@@ -337,18 +337,28 @@
 }
 
 /*
- * Tree rows. `--level` is the node's depth, written inline by `FolderTree`,
- * because no fixed set of classes can express an arbitrarily deep tree.
+ * The folder tree is the WAI-ARIA tree pattern: one tab stop, arrow-key
+ * roaming, and a single focusable row at a time. It renders flat — depth is
+ * `--level`, written inline by `FolderTree`, because no fixed set of classes
+ * can express an arbitrarily deep tree — so the DOM order matches the
+ * traversal order the arrow keys walk.
  */
+.folder-tree { display: grid; }
+
+/* The row itself is the treeitem, so it is what focuses and what hovers. */
 .folder-row {
   display: grid;
   grid-template-columns: var(--sp-4) minmax(0, 1fr);
   align-items: center;
   gap: var(--sp-1);
   padding-left: calc(var(--sp-2) + var(--level, 0) * var(--sp-3));
+  cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease);
 
   &:hover { background: var(--bg-hover); }
+  &:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+
+  &:hover .folder-name { color: var(--text); }
 
   &.active {
     background: var(--accent-muted);
@@ -356,10 +366,16 @@
     .folder-name { color: var(--accent); }
   }
 
+  /*
+   * Decorative: `aria-expanded` lives on the row, so a nested button here
+   * would duplicate the same affordance in the accessibility tree.
+   */
   .disclosure {
+    display: grid;
     flex: 0 0 auto;
     width: var(--sp-4);
     padding: 0;
+    place-items: center;
     color: var(--text-muted);
     font-size: var(--text-xs);
     line-height: 1;
@@ -375,8 +391,6 @@
     font-size: var(--text-sm);
     text-align: start;
     transition: color var(--duration-fast) var(--ease);
-
-    &:hover { color: var(--text); }
   }
 }
 
