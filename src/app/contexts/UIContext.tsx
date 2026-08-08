@@ -10,7 +10,6 @@
  */
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { flushSync } from 'react-dom'
 
 
 /** Top-level routes the shell can render. */
@@ -81,38 +80,12 @@ export function UIProvider ({ children, value }: { readonly children: ReactNode;
       grouping:           loadGrouping(),
     }))
 
-  /**
-   * Switching views is wrapped in a view transition where the browser has
-   * one, which is what animates the player growing out of its footer bar and
-   * back. The `view-transition-name`s that make it a *morph* rather than a
-   * cross-fade are declared in `layout.css`.
-   *
-   * Nothing waits on the transition: the state update inside the callback is
-   * the same one that would run without it, so an environment with no
-   * `startViewTransition` (jsdom, older engines) just switches instantly.
-   */
+  /** Switches the stable view tree immediately; CSS owns the resulting layout. */
   const setView = useCallback((view: ViewType) => {
-    const apply = () =>
-      setState(s =>
-        s.currentView === view
-          ? s
-          : { ...s, currentView: view, previousView: s.currentView })
-
-    const doc = document as Document & {
-      startViewTransition?: (cb: () => void) => unknown
-    }
-
-    if (typeof doc.startViewTransition !== 'function' ||
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      apply()
-      return
-    }
-
-    doc.startViewTransition(() => {
-      // React batches this into the transition's DOM-update callback, which
-      // is exactly where the snapshot boundary needs it.
-      flushSync(apply)
-    })
+    setState(state =>
+      state.currentView === view
+        ? state
+        : { ...state, currentView: view, previousView: state.currentView })
   }, [])
 
   const toggleSidebar = useCallback(() => {

@@ -112,7 +112,7 @@ export function LibraryView () {
         </div>
         : isInitialLoading && displayTracks.length === 0
           ? <div className='library-empty'>
-            <span className='spinner' role='status' aria-label='Loading library' />
+            <output className='spinner' aria-label='Loading library' />
           </div>
           : displayTracks.length === 0 && !isLoading
             ? <p className='status-message'>

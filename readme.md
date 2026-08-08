@@ -31,6 +31,14 @@ Tracks group by album, artist or path, in three row densities.
 
 ![Library grouped by album with cover art beside each group](public/screenshots/library-album-groups.png)
 
+## Native, instant UI
+
+The app keeps one stable, virtualized library and player tree. Dialogs, popovers,
+disclosures, forms, and action menus use native HTML behavior. The waveform is
+an SVG backed by a native range input, so pointer, touch, and keyboard seeking
+work without per-frame DOM animation. Interaction transitions are intentionally
+zero-duration; loading and ambient artwork feedback remain non-blocking.
+
 ## Development
 
 ```bash

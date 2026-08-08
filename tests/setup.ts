@@ -44,6 +44,35 @@ Object.defineProperty(window, 'localStorage', {
   value: localStorageMock,
 })
 
+// jsdom does not implement the native dialog methods used by Chromium.
+if (typeof HTMLDialogElement !== 'undefined') {
+  HTMLDialogElement.prototype.showModal ??= function () {
+    this.setAttribute('open', '')
+  }
+  HTMLDialogElement.prototype.close ??= function () {
+    this.removeAttribute('open')
+    this.dispatchEvent(new Event('close'))
+  }
+}
+
+// jsdom also lacks the native popover methods and :popover-open state.
+const openPopovers = new WeakSet<HTMLElement>()
+const nativeMatches = HTMLElement.prototype.matches
+HTMLElement.prototype.matches = function (selector: string) {
+  return selector === ':popover-open'
+    ? openPopovers.has(this)
+    : nativeMatches.call(this, selector)
+}
+HTMLElement.prototype.showPopover ??= function () {
+  openPopovers.add(this)
+}
+HTMLElement.prototype.hidePopover ??= function () {
+  openPopovers.delete(this)
+  const event = new Event('toggle')
+  Object.assign(event, { newState: 'closed' })
+  this.dispatchEvent(event)
+}
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()

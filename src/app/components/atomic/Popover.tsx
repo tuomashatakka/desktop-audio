@@ -9,11 +9,10 @@ interface PopoverProps {
   readonly onClose:    () => void
   readonly children:   ReactNode
   readonly id?:        string
-  readonly label?:     string
   readonly placement?: 'top' | 'bottom'
 }
 
-export function Popover ({ open, anchor, onClose, children, id, label, placement = 'bottom' }: PopoverProps) {
+export function Popover ({ open, anchor, onClose, children, id, placement = 'bottom' }: PopoverProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const generatedId = useId()
   const popoverId = id || generatedId
@@ -34,18 +33,14 @@ export function Popover ({ open, anchor, onClose, children, id, label, placement
 
   useEffect(() => {
     const panel = panelRef.current
-    if (!panel || typeof panel.showPopover !== 'function')
+    if (!panel)
       return
 
-    try {
-      if (open && anchor)
-        panel.showPopover()
-      else
-        panel.hidePopover()
-    }
-    catch {
-      // The declarative hidden state remains a safe fallback.
-    }
+    const visible = panel.matches(':popover-open')
+    if (open && anchor && !visible)
+      panel.showPopover()
+    else if ((!open || !anchor) && visible)
+      panel.hidePopover()
   }, [ open, anchor ])
 
   useEffect(() => {
@@ -54,7 +49,7 @@ export function Popover ({ open, anchor, onClose, children, id, label, placement
       return
 
     const handleToggle = (event: Event) => {
-      if ((event as Event & { newState?: string }).newState === 'closed')
+      if ((event as ToggleEvent).newState === 'closed')
         onClose()
     }
     panel.addEventListener('toggle', handleToggle)
@@ -68,9 +63,6 @@ export function Popover ({ open, anchor, onClose, children, id, label, placement
       id={popoverId}
       className={`popover-panel placement-${placement}`}
       popover='auto'
-      role='dialog'
-      aria-label={label}
-      hidden={!open || !anchor}
     >
       {children}
     </div>,

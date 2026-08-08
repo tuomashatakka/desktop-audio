@@ -18,28 +18,27 @@ interface MenuListProps {
 }
 
 /**
- * The `menu` role list itself, without any positioning opinion. Shared by the
- * anchored {@link ContextMenu} and by the standalone context-menu window.
+ * A native action menu. Keeping ordinary buttons preserves the browser's
+ * keyboard model instead of claiming the stricter ARIA menu pattern.
  */
 export function MenuList ({ items, onSelect }: MenuListProps) {
   return (
-    <ul className='context-menu-list' role='menu'>
-      {items.map((item, i) =>
+    <menu className='context-menu-list'>
+      {items.map((item, index) =>
         item.separator
-          ? <li key={i} className='context-menu-separator' role='separator' />
-          : <li key={i} role='none'>
+          ? <li key={index} className='context-menu-separator' aria-hidden='true' />
+          : <li key={index}>
             <button
               type='button'
-              role='menuitem'
               className={`context-menu-item ${item.danger ? 'danger' : ''}`}
               onClick={() =>
-                onSelect(i)}
+                onSelect(index)}
             >
               {item.icon && <span className='context-menu-icon' aria-hidden='true'>{item.icon}</span>}
               {item.label}
             </button>
           </li>
       )}
-    </ul>
+    </menu>
   )
 }

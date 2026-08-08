@@ -61,6 +61,7 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
           {NAV_ITEMS.map(({ view, icon }) =>
             <li key={view}>
               <button
+                type='button'
                 className='nav-item'
                 aria-label={NAV_LABELS[view]}
                 title={NAV_LABELS[view]}
@@ -80,6 +81,7 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
       <menu className='titlebar-controls' aria-label='Window controls'>
         <li>
           <button
+            type='button'
             className='titlebar-btn'
             onClick={() =>
               bridge.minimizeWindow()}
@@ -91,6 +93,7 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
 
         <li>
           <button
+            type='button'
             className='titlebar-btn'
             onClick={() =>
               bridge.maximizeWindow()}
@@ -102,6 +105,7 @@ export function Titlebar ({ children }: { readonly children?: ReactNode }) {
 
         <li>
           <button
+            type='button'
             className='titlebar-btn titlebar-btn-close'
             onClick={() =>
               bridge.closeWindow()}

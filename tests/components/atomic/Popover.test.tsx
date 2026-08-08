@@ -11,7 +11,7 @@ function Harness () {
   return (
     <>
       <button ref={setAnchor} type='button' onClick={() => setOpen(value => !value)}>Options</button>
-      <Popover open={open} anchor={anchor} label='Track options' onClose={() => setOpen(false)}>
+      <Popover open={open} anchor={anchor} onClose={() => setOpen(false)}>
         <button type='button'>One action</button>
       </Popover>
     </>
@@ -24,11 +24,11 @@ describe('Popover', () => {
 
     const anchor = screen.getByRole('button', { name: 'Options' })
     const panel = screen.getByText('One action').closest('[popover]')
-    expect(panel).toHaveAttribute('hidden')
+    expect(panel).toHaveAttribute('popover', 'auto')
 
     fireEvent.click(anchor)
 
-    expect(panel).not.toHaveAttribute('hidden')
+    expect(screen.getByText('One action').closest('[popover]')).toBe(panel)
     expect(anchor.style.getPropertyValue('anchor-name')).toMatch(/^--popover-/)
     expect((panel as HTMLElement).style.getPropertyValue('position-anchor')).toBe(
       anchor.style.getPropertyValue('anchor-name')

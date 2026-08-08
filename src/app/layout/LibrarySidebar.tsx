@@ -12,6 +12,7 @@ import { useState, useCallback } from 'react'
 
 const MIN_WIDTH = 180
 const MAX_WIDTH = 400
+const RESIZE_STEP = 10
 
 /** See module docstring. */
 export function LibrarySidebar () {
@@ -41,13 +42,33 @@ export function LibrarySidebar () {
     document.addEventListener('mouseup', onUp)
   }, [])
 
+  const handleResizeKeyDown = useCallback((event: React.KeyboardEvent) => {
+    const delta = event.key === 'ArrowLeft'
+      ? -RESIZE_STEP
+      : event.key === 'ArrowRight'
+        ? RESIZE_STEP
+        : null
+    if (delta === null)
+      return
+
+    event.preventDefault()
+    setWidth(current =>
+      Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, current + delta)))
+  }, [])
+
   return (
     <nav className='library-sidebar' style={{ width }} aria-label='Library'>
       <span
         className='resize-handle'
         onMouseDown={handleResizeStart}
         role='separator'
+        tabIndex={0}
+        aria-label='Resize library sidebar'
         aria-orientation='vertical'
+        aria-valuemin={MIN_WIDTH}
+        aria-valuemax={MAX_WIDTH}
+        aria-valuenow={width}
+        onKeyDown={handleResizeKeyDown}
       />
 
       <details open>

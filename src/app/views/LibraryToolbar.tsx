@@ -1,7 +1,6 @@
-import { useState } from 'react'
 import { useLibrary, useSettings, useUI } from '../contexts'
 import type { Density, Grouping } from '../contexts'
-import { Input, Popover } from '../components/atomic'
+import { Input } from '../components/atomic'
 import { Breadcrumbs } from '../components/composite/Breadcrumbs'
 
 
@@ -19,20 +18,15 @@ const GROUPING_LABEL: Record<Grouping, string> = {
 /** Library-specific heading and controls hosted by the shell titlebar. */
 export function LibraryToolbar () {
   const {
-    currentView, selectedFolderPath, selectedPlaylistId, selectFolder,
+    selectedFolderPath, selectedPlaylistId, selectFolder,
     density, setDensity, grouping, setGrouping,
   } = useUI()
   const { filteredTracks, playlists, searchQuery, setSearchQuery, isLoading } = useLibrary()
   const { libraryPaths } = useSettings()
-  const [ configOpen, setConfigOpen ] = useState(false)
-  const [ configAnchor, setConfigAnchor ] = useState<HTMLButtonElement | null>(null)
-
   const activePlaylist = selectedPlaylistId
     ? playlists.find(playlist =>
       playlist.id === selectedPlaylistId)
     : undefined
-  const optionsOpen = configOpen && currentView === 'library'
-
   return (
     <>
       <div className='library-heading'>
@@ -88,29 +82,16 @@ export function LibraryToolbar () {
         <li>
           <button
             type='button'
-            ref={setConfigAnchor}
             className='config-toggle'
-            onClick={() =>
-              setConfigOpen(current =>
-                !current)}
+            popoverTarget='library-view-options'
             aria-label='View options'
-            aria-expanded={optionsOpen}
-            aria-controls='library-view-options'
-            aria-haspopup='dialog'
           >
             <span aria-hidden='true'>⌄</span>
           </button>
         </li>
       </menu>
 
-      <Popover
-        id='library-view-options'
-        label='View options'
-        open={optionsOpen}
-        anchor={configAnchor}
-        onClose={() =>
-          setConfigOpen(false)}
-      >
+      <div id='library-view-options' className='popover-panel' popover='auto'>
         <fieldset className='config-menu'>
           <legend>Grouping</legend>
 
@@ -129,7 +110,7 @@ export function LibraryToolbar () {
             </label>
           )}
         </fieldset>
-      </Popover>
+      </div>
     </>
   )
 }

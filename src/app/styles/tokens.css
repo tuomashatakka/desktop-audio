@@ -60,6 +60,9 @@
 
 @layer tokens {
   :root {
+    color-scheme: dark;
+    accent-color: var(--accent);
+
     /* palette primitives */
     --mono-ink: #0b0b10;
     --mono-onyx: #111118;
@@ -140,8 +143,8 @@
     --focus-ring: 0 0 0 2px var(--border-focus);
 
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
-    --duration-fast: 100ms;
-    --duration: 200ms;
+    --duration-fast: 0ms;
+    --duration: 0ms;
     --duration-slow: 300ms;
 
     --wf-unplayed: rgb(255 255 255 / 15%);
@@ -149,6 +152,7 @@
   }
 
   [data-theme='light'] {
+    color-scheme: light;
     --bg: #f0f0f0;
     --bg-raised: #fff;
     --bg-input: #e8e8e8;

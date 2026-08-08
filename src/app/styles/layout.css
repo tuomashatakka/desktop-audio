@@ -1,28 +1,5 @@
 /* shell, persistent view slots, window chrome, sidebar, and player */
 
-/* Lets `width: auto` be a transition endpoint — see `.app-sidebar`. */
-:root { interpolate-size: allow-keywords; }
-
-/*
- * Promoting the player to the full window is a view transition, driven from
- * `UIContext.setView`. Naming the player and its artwork is what turns the
- * default cross-fade into a morph: the same two boxes are matched across the
- * two states and tweened, so the bar grows into the now-playing screen
- * instead of one fading into the other.
- */
-.player-view { view-transition-name: player; }
-.album-art-card { view-transition-name: player-art; }
-
-::view-transition-old(player),
-::view-transition-new(player),
-::view-transition-old(player-art),
-::view-transition-new(player-art) {
-  animation-duration: var(--duration);
-  animation-timing-function: var(--ease);
-}
-
-::view-transition-group(player-art) { animation-duration: var(--duration); }
-
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -37,15 +14,6 @@
 .app-main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .app-player { min-width: 0; overflow: hidden; }
 
-/*
- * The sidebar slides rather than blinking out. It can't be `display: none`
- * for that, and its open width isn't a constant either — the user drags it,
- * so it lives as an inline width on `.library-sidebar` inside.
- *
- * `interpolate-size: allow-keywords` (set on :root below) is what makes the
- * intrinsic `width: auto` animatable, so the slot can shrink to nothing
- * without the width ever being restated here.
- */
 .app-sidebar {
   display: flex;
   flex-shrink: 0;
@@ -53,9 +21,6 @@
   width: auto;
   height: 100%;
   overflow: hidden;
-  transition:
-    width var(--duration) var(--ease),
-    opacity var(--duration) var(--ease);
 }
 
 .app-shell:not([data-sidebar-open]) .app-sidebar { width: 0; opacity: 0; }
@@ -461,31 +426,39 @@ body::before {
 }
 
 .waveform-progress {
-  display: flex;
-  align-items: center;
+  position: relative;
   width: 100%;
   min-width: 60px;
   height: 52px;
-  padding-block: calc(var(--sp-1) + var(--sp-0-5));
   overflow: hidden;
   cursor: pointer;
 }
 
-.waveform-progress:focus-visible { outline: 0; border-radius: var(--radius); box-shadow: var(--focus-ring); }
-.waveform-progress.compact { height: 28px; padding-block: var(--sp-1); }
-.wf-bar {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: var(--sp-1);
-  height: 100%;
-  border-radius: 1px;
-  background: var(--wf-unplayed);
-  transform: scaleY(var(--amp));
-  transform-origin: center;
-  transition: background-color var(--duration-fast) var(--ease);
+.waveform-progress:focus-within { border-radius: var(--radius); box-shadow: var(--focus-ring); }
+.waveform-progress.compact { height: 28px; }
+.waveform-svg {
+  position: absolute;
+  inset: calc(var(--sp-1) + var(--sp-0-5)) 0;
+  width: 100%;
+  height: calc(100% - 2 * (var(--sp-1) + var(--sp-0-5)));
 }
-
-.wf-bar.played { background: var(--wf-played); }
+.waveform-unplayed { fill: var(--wf-unplayed); }
+.waveform-played { fill: var(--wf-played); }
+.waveform-line { display: none; }
+.waveform-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.waveform-input:disabled { cursor: default; }
+.waveform-progress.compact .waveform-svg {
+  inset-block: var(--sp-1);
+  height: calc(100% - 2 * var(--sp-1));
+}
 
 /* Full-player width and height compression only changes inherited sizing. */
 @container player (max-width: 480px) {
@@ -604,8 +577,10 @@ body::before {
   width: 100%;
 }
 .app-shell[data-height-tier='mini'] .time-row { display: none; }
-.app-shell[data-height-tier='mini'] .waveform-progress { height: var(--sp-1); min-width: 0; padding: 0; }
-.app-shell[data-height-tier='mini'] .wf-bar { max-width: none; border-radius: 0; transform: none; }
+.app-shell[data-height-tier='mini'] .waveform-progress { height: var(--sp-1); min-width: 0; }
+.app-shell[data-height-tier='mini'] .waveform-svg { inset: 0; height: 100%; }
+.app-shell[data-height-tier='mini'] .waveform-shape { display: none; }
+.app-shell[data-height-tier='mini'] .waveform-line { display: block; }
 
 @container player (max-width: 260px) {
   .app-shell[data-height-tier='mini'] .player-art { display: none; }
@@ -706,7 +681,10 @@ body::before {
   grid-column: 2;
   grid-row: 1;
   height: 28px;
-  padding-block: var(--sp-1);
+}
+.app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section .waveform-svg {
+  inset-block: var(--sp-1);
+  height: calc(100% - 2 * var(--sp-1));
 }
 
 .app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section .time-row { display: contents; }
@@ -737,7 +715,10 @@ body::before {
   .app-shell[data-height-tier='normal']:not([data-view='player']) .track-artist { display: none; }
   .app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section .waveform-progress {
     height: var(--text-xl);
-    padding-block: var(--sp-0-5);
+  }
+  .app-shell[data-height-tier='normal']:not([data-view='player']) .progress-section .waveform-svg {
+    inset-block: var(--sp-0-5);
+    height: calc(100% - 2 * var(--sp-0-5));
   }
 }
 

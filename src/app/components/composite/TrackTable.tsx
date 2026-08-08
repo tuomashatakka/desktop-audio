@@ -226,7 +226,7 @@ function ColumnMenu ({ anchor, onClose }: { readonly anchor: HTMLElement | null;
   const { columns, toggleColumn, resetColumns } = useColumnConfig()
 
   return (
-    <Popover open={anchor !== null} anchor={anchor} label='Column options' onClose={onClose}>
+    <Popover open={anchor !== null} anchor={anchor} onClose={onClose}>
       <fieldset className='config-menu'>
         <legend>Columns</legend>
 

@@ -16,13 +16,14 @@ interface PromptDialogProps {
 export function PromptDialog ({ open, title, placeholder, onConfirm, onClose }: PromptDialogProps) {
   const [ value, setValue ] = useState('')
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault()
-    if (!value.trim())
+  const handleSubmit = (event: FormEvent) => {
+    if (!value.trim()) {
+      event.preventDefault()
       return
+    }
+
     onConfirm(value.trim())
     setValue('')
-    onClose()
   }
 
   const handleClose = () => {
@@ -32,9 +33,10 @@ export function PromptDialog ({ open, title, placeholder, onConfirm, onClose }: 
 
   return (
     <Dialog open={open} onClose={handleClose} title={title}>
-      <form onSubmit={handleSubmit} className='prompt-form'>
+      <form method='dialog' onSubmit={handleSubmit} className='prompt-form'>
         <Input
           placeholder={placeholder}
+          required
           value={value}
           onChange={e =>
             setValue(e.target.value)}

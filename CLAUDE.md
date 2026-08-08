@@ -177,18 +177,19 @@ The footer bar has **no volume slider** — the system volume and the full playe
 both already own that, and the width is better spent on the progress bar. The
 `.player-volume` element still renders; the bar-mode rules hide it.
 
-## Animation
+## Instant interaction and waveform rendering
 
-Two motions, two mechanisms, both in `layout.css`:
+Interactive state changes do not wait for transitions: `--duration-fast` and
+`--duration` are zero, view changes are ordinary React state updates, and the
+sidebar changes width immediately. The slow token remains reserved for
+non-blocking feedback such as the loading spinner and ambient album-art wash.
 
-- **Sidebar toggle** — `:root { interpolate-size: allow-keywords }` makes the
-  slot's intrinsic `width: auto` a transition endpoint, so it slides to `0`
-  without the open width ever being restated in CSS (the user drags it; it's an
-  inline width on `.library-sidebar`). It can no longer be `display: none`.
-- **Now-playing promote** — `UIContext.setView` wraps the state update in
-  `document.startViewTransition` + `flushSync`. `view-transition-name: player`
-  and `player-art` are what make it a morph rather than a cross-fade. Falls
-  back to an instant switch with no transition API or under reduced motion.
+`WaveformProgress` renders amplitudes as one memoized SVG path. The path is
+painted once as unplayed and once through an SVG clip as played; a transparent
+native `<input type="range">` above it provides pointer, touch, and keyboard
+seeking. Playback ticks update the clip edge and range value only. The mini tier
+switches the same SVG to two rectangles so its progress indicator stays the
+existing solid hairline.
 
 ## Context menu window
 
