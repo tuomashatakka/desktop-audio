@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useMemo } from 'react'
 import { actionForEvent } from '../../keybindings'
 import type { KeybindingAction } from '../../keybindings'
-import { useAudio, useLibrary, useUI } from '../contexts'
+import { useAudio, useUI } from '../contexts'
 import { useHost } from '../data'
 import { useKeybindings } from './useKeybindings'
 import { listen, collectUnsubscribes } from '../utils/events'
@@ -43,18 +43,15 @@ function shouldIgnoreEvent (
 
 export function useKeyboardShortcuts () {
   const { isPlaying, currentTrack, volume, pause, resume, setVolume, playNext, playPrevious } = useAudio()
-  const { filteredTracks }                                                                    = useLibrary()
-  const { currentView, previousView, sidebarOpen, setView, toggleSidebar }                    = useUI()
+  const { openOverlay, closeOverlay, toggleSidebar }                                          = useUI()
   const { bindings }                                                                          = useKeybindings()
   const host                                                                                  = useHost()
 
   const actions = useMemo<Record<KeybindingAction, () => void>>(() =>
     ({
-      'next-track': () =>
-        playNext(filteredTracks),
-      'previous-track': () =>
-        playPrevious(filteredTracks),
-      'play-pause': () => {
+      'next-track':     playNext,
+      'previous-track': playPrevious,
+      'play-pause':     () => {
         if (currentTrack)
           void (isPlaying ? pause() : resume())
       },
@@ -63,32 +60,23 @@ export function useKeyboardShortcuts () {
       'volume-down': () =>
         setVolume(Math.max(0, volume - 0.1)),
       'open-settings': () =>
-        setView('settings'),
-      'open-library': () =>
-        setView('library'),
-      'open-player': () =>
-        setView('player'),
-      'toggle-sidebar': () => {
-        if (currentView === 'player') {
-          setView('library')
-          if (!sidebarOpen)
-            toggleSidebar()
-        }
-        else
-          toggleSidebar()
-      },
+        openOverlay('settings'),
+      // The library is always there; "go to it" means dismissing whatever is
+      // covering it. Escape does the same thing via the dialog itself.
+      'open-library': closeOverlay,
+      'open-player':  () =>
+        openOverlay('player'),
+      'toggle-sidebar': toggleSidebar,
     }), [
     currentTrack,
-    currentView,
-    filteredTracks,
     isPlaying,
     pause,
     playNext,
     playPrevious,
     resume,
-    setView,
+    openOverlay,
+    closeOverlay,
     setVolume,
-    sidebarOpen,
     toggleSidebar,
     volume,
   ])
@@ -97,14 +85,6 @@ export function useKeyboardShortcuts () {
     const action = actionForEvent(bindings, event)
     if (shouldIgnoreEvent(event, action))
       return
-
-    if (event.key === 'Escape') {
-      if (currentView === 'player') {
-        event.preventDefault()
-        setView(previousView ?? 'library')
-      }
-      return
-    }
 
     if (event.key === 'Alt') {
       document.querySelector<HTMLElement>('.titlebar-controls button')?.focus()
@@ -116,7 +96,7 @@ export function useKeyboardShortcuts () {
 
     event.preventDefault()
     actions[action]()
-  }, [ actions, bindings, currentView, previousView, setView ])
+  }, [ actions, bindings ])
 
   useEffect(() => {
     const keydown = listen(window, 'keydown', handleKeyDown as EventListener)
@@ -130,13 +110,11 @@ export function useKeyboardShortcuts () {
         if (currentTrack)
           void (isPlaying ? pause() : resume())
       }),
-      host.onMediaNext(() =>
-        playNext(filteredTracks)),
-      host.onMediaPrev(() =>
-        playPrevious(filteredTracks)),
+      host.onMediaNext(playNext),
+      host.onMediaPrev(playPrevious),
     )
 
     return () =>
       mediaKeys.dispose()
-  }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, filteredTracks, host ])
+  }, [ currentTrack, isPlaying, pause, resume, playNext, playPrevious, host ])
 }

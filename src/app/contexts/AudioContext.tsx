@@ -3,8 +3,14 @@
  *
  * Drives a single `<audio>` element through an {@link AudioContext} graph
  * (gain → analyzer → destination), exposes transport controls, and decodes
- * waveform-bar amplitudes for visualizers. Queue navigation (next/previous)
- * is delegated by callers passing the current track list.
+ * waveform-bar amplitudes for visualizers.
+ *
+ * Playback runs off a real queue held here. Callers hand a list *once*, when
+ * they start playback (`playQueue(tracks, index)`), and next/previous walk it
+ * by index from then on. They used to pass a list on every step, which meant
+ * the queue was whatever list the caller happened to be holding — the library
+ * handed over its whole filtered set, so starting a track inside one album and
+ * pressing next left the album entirely.
  */
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react'
@@ -26,20 +32,31 @@ interface AudioState {
   readonly volume:       number
   readonly isLoading:    boolean
   readonly waveformBars: Float32Array | null
+
+  /** The list playback is walking, and where in it we are (`-1` = nowhere). */
+  readonly queue:      readonly Track[]
+  readonly queueIndex: number
 }
 
 /** Playback state plus the transport actions exposed to the UI. */
 interface AudioContextValue extends AudioState {
-  readonly play:            (track: Track) => void
-  readonly pause:           () => void
-  readonly resume:          () => void
-  readonly stop:            () => void
-  readonly seek:            (time: number) => void
-  readonly setVolume:       (volume: number) => void
-  readonly playNext:        (tracks: readonly Track[]) => void
-  readonly playPrevious:    (tracks: readonly Track[]) => void
-  readonly analyzer:        AnalyserNode | null
-  readonly setCurrentQueue: (tracks: Track[]) => void
+
+  /** Play one track on its own — replaces the queue with just that track. */
+  readonly play: (track: Track) => void
+
+  /** Replace the queue and start at `startIndex`. */
+  readonly playQueue: (tracks: readonly Track[], startIndex?: number) => void
+
+  /** Append to the queue without disturbing what is playing. */
+  readonly enqueue:      (tracks: readonly Track[]) => void
+  readonly pause:        () => void
+  readonly resume:       () => void
+  readonly stop:         () => void
+  readonly seek:         (time: number) => void
+  readonly setVolume:    (volume: number) => void
+  readonly playNext:     () => void
+  readonly playPrevious: () => void
+  readonly analyzer:     AnalyserNode | null
 
   /** Ensure audio context is ready (resumes if suspended). Call after user gesture. */
   readonly ensureReady: () => Promise<void>
@@ -49,7 +66,7 @@ interface AudioContextValue extends AudioState {
 type Step = 1 | -1
 
 /**
- * The track a step lands on, given shuffle and repeat.
+ * The queue position a step lands on, given shuffle and repeat.
  *
  * Shuffle ignores direction — "previous" in a shuffled queue is another
  * arbitrary track, not a history stack, and pretending otherwise would need
@@ -57,33 +74,32 @@ type Step = 1 | -1
  * repeat `none` stops there by returning `null`. Repeat `one` is handled by
  * the caller, since it re-seeks rather than picking anything.
  */
-function pickTrack (
-  tracks: readonly Track[],
-  current: Track | null,
+function pickIndex (
+  length: number,
+  current: number,
   step: Step,
   shuffle: boolean,
   repeat: RepeatMode
-): Track | null {
-  if (tracks.length === 0)
+): number | null {
+  if (length === 0)
     return null
 
-  const index = current
-    ? tracks.findIndex(t =>
-      t.id === current.id)
-    : -1
-
   if (shuffle) {
-    const pool = tracks.filter((_, i) =>
-      i !== index)
-    return pool[Math.floor(Math.random() * pool.length)] ?? tracks[0] ?? null
+    if (length === 1)
+      return 0
+
+    // Draw from the other positions so a shuffle never repeats the track
+    // that just played.
+    const draw = Math.floor(Math.random() * (length - 1))
+    return draw >= current ? draw + 1 : draw
   }
 
-  const next = index + step
-  if (next >= 0 && next < tracks.length)
-    return tracks[next]
+  const next = current + step
+  if (next >= 0 && next < length)
+    return next
 
   if (repeat === 'all')
-    return step > 0 ? tracks[0] : tracks[tracks.length - 1]
+    return step > 0 ? 0 : length - 1
 
   return null
 }
@@ -143,8 +159,8 @@ function useMediaSessionRefs (currentTrack: Track | null) {
   const pauseRef        = useRef<() => void>(noop)
   const resumeRef       = useRef<() => void>(noop)
   const seekRef         = useRef<(time: number) => void>(noop)
-  const playNextRef     = useRef<(tracks: readonly Track[]) => void>(noop)
-  const playPreviousRef = useRef<(tracks: readonly Track[]) => void>(noop)
+  const playNextRef     = useRef<() => void>(noop)
+  const playPreviousRef = useRef<() => void>(noop)
 
   /** What to do when a track runs out. Reassigned every render, see below. */
   const advanceRef = useRef<() => void>(noop)
@@ -152,12 +168,6 @@ function useMediaSessionRefs (currentTrack: Track | null) {
   // Tracks no longer carry their art; the OS media session needs a real image,
   // so it is fetched for the current track like every other full-size use.
   const currentArt = useArtwork(currentTrack?.id, 'full')
-
-  // Track the current playlist being played
-  const currentQueueRef = useRef<Track[]>([])
-  const setCurrentQueue = useCallback((tracks: Track[]) => {
-    currentQueueRef.current = tracks
-  }, [])
 
   // MediaSession: set up metadata & handlers when track changes
   useEffect(() => {
@@ -182,10 +192,10 @@ function useMediaSessionRefs (currentTrack: Track | null) {
       pauseRef.current()
     })
     navigator.mediaSession.setActionHandler('previoustrack', () => {
-      playPreviousRef.current(currentQueueRef.current)
+      playPreviousRef.current()
     })
     navigator.mediaSession.setActionHandler('nexttrack', () => {
-      playNextRef.current(currentQueueRef.current)
+      playNextRef.current()
     })
     navigator.mediaSession.setActionHandler('seekto', details => {
       if (details.seekTime !== undefined)
@@ -200,8 +210,6 @@ function useMediaSessionRefs (currentTrack: Track | null) {
     playNextRef,
     playPreviousRef,
     advanceRef,
-    currentQueueRef,
-    setCurrentQueue,
   }
 }
 
@@ -220,6 +228,8 @@ export function AudioProvider ({ children }: AudioProviderProps) {
     volume:       0.8,
     isLoading:    false,
     waveformBars: null,
+    queue:        [],
+    queueIndex:   -1,
   })
 
   // Playback preferences are read, never written, from here — the toggles in
@@ -237,9 +247,14 @@ export function AudioProvider ({ children }: AudioProviderProps) {
   const data                      = useData()
 
   const {
-    pauseRef, resumeRef, seekRef, playNextRef, playPreviousRef,
-    advanceRef, currentQueueRef, setCurrentQueue,
+    pauseRef, resumeRef, seekRef, playNextRef, playPreviousRef, advanceRef,
   } = useMediaSessionRefs(state.currentTrack)
+
+  // The queue is held in refs as well as state: the `ended` listener is
+  // registered once and must read the *current* queue, not the one that
+  // existed when the effect first ran. State is the mirror the UI renders.
+  const queueRef      = useRef<readonly Track[]>([])
+  const queueIndexRef = useRef(-1)
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -379,7 +394,8 @@ export function AudioProvider ({ children }: AudioProviderProps) {
     return analyzerRef.current
   }, [])
 
-  const play = useCallback(async (track: Track) => {
+  /** Load and start one track. Queue bookkeeping is the callers' job. */
+  const loadTrack = useCallback(async (track: Track) => {
     const audio = audioRef.current
     if (!audio)
       return
@@ -419,6 +435,49 @@ export function AudioProvider ({ children }: AudioProviderProps) {
     }
   }, [ setupAnalyzer ])
 
+  const playQueue = useCallback((tracks: readonly Track[], startIndex = 0) => {
+    if (tracks.length === 0)
+      return
+
+    const index = Math.max(0, Math.min(startIndex, tracks.length - 1))
+
+    queueRef.current      = tracks
+    queueIndexRef.current = index
+    setState(s =>
+      ({ ...s, queue: tracks, queueIndex: index }))
+
+    void loadTrack(tracks[index])
+  }, [ loadTrack ])
+
+  /** A bare `play` is a queue of one — honest about what next/previous will do. */
+  const play = useCallback((track: Track) => {
+    playQueue([ track ], 0)
+  }, [ playQueue ])
+
+  const enqueue = useCallback((tracks: readonly Track[]) => {
+    if (tracks.length === 0)
+      return
+
+    queueRef.current = [ ...queueRef.current, ...tracks ]
+    setState(s =>
+      ({ ...s, queue: queueRef.current }))
+  }, [])
+
+  /** Step through the queue. Returns false when there is nowhere to go. */
+  const advance = useCallback((step: Step) => {
+    const queue = queueRef.current
+    const index = pickIndex(queue.length, queueIndexRef.current, step, shuffle, repeatMode)
+    if (index === null)
+      return false
+
+    queueIndexRef.current = index
+    setState(s =>
+      ({ ...s, queueIndex: index }))
+
+    void loadTrack(queue[index])
+    return true
+  }, [ loadTrack, shuffle, repeatMode ])
+
   const pause = useCallback(() => {
     const audio = audioRef.current
     if (!audio)
@@ -456,12 +515,15 @@ export function AudioProvider ({ children }: AudioProviderProps) {
     if (audio.src.startsWith('blob:'))
       URL.revokeObjectURL(audio.src)
 
+    queueIndexRef.current = -1
+
     setState(s =>
       ({
         ...s,
         isPlaying:    false,
         currentTime:  0,
         currentTrack: null,
+        queueIndex:   -1,
       }))
 
     if (navigator.mediaSession) {
@@ -485,23 +547,13 @@ export function AudioProvider ({ children }: AudioProviderProps) {
       ({ ...s, volume: Math.max(0, Math.min(1, volume)) }))
   }, [])
 
-  const playNext = useCallback(
-    (tracks: readonly Track[]) => {
-      const next = pickTrack(tracks, state.currentTrack, 1, shuffle, repeatMode)
-      if (next)
-        play(next)
-    },
-    [ state.currentTrack, play, shuffle, repeatMode ]
-  )
+  const playNext = useCallback(() => {
+    advance(1)
+  }, [ advance ])
 
-  const playPrevious = useCallback(
-    (tracks: readonly Track[]) => {
-      const previous = pickTrack(tracks, state.currentTrack, -1, shuffle, repeatMode)
-      if (previous)
-        play(previous)
-    },
-    [ state.currentTrack, play, shuffle, repeatMode ]
-  )
+  const playPrevious = useCallback(() => {
+    advance(-1)
+  }, [ advance ])
 
   /**
    * End-of-track advance. Repeat `one` restarts the same file rather than
@@ -519,14 +571,11 @@ export function AudioProvider ({ children }: AudioProviderProps) {
       return
     }
 
-    const next = pickTrack(currentQueueRef.current, state.currentTrack, 1, shuffle, repeatMode)
-    if (next) {
-      play(next)
-      return
-    }
-
-    setState(s =>
-      ({ ...s, isPlaying: false, currentTime: 0 }))
+    // Running off the end is not the same as pressing next there: playback
+    // stops rather than doing nothing.
+    if (!advance(1))
+      setState(s =>
+        ({ ...s, isPlaying: false, currentTime: 0 }))
   }
 
   // Ensure audio context is ready (resume if suspended due to autoplay policy)
@@ -555,6 +604,8 @@ export function AudioProvider ({ children }: AudioProviderProps) {
     ({
       ...state,
       play,
+      playQueue,
+      enqueue,
       pause,
       resume,
       stop,
@@ -563,11 +614,12 @@ export function AudioProvider ({ children }: AudioProviderProps) {
       playNext,
       playPrevious,
       analyzer,
-      setCurrentQueue,
       ensureReady,
     }), [
     state,
     play,
+    playQueue,
+    enqueue,
     pause,
     resume,
     stop,
@@ -576,7 +628,6 @@ export function AudioProvider ({ children }: AudioProviderProps) {
     playNext,
     playPrevious,
     analyzer,
-    setCurrentQueue,
     ensureReady,
   ])
 

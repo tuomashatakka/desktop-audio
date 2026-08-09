@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LibraryView } from '../../src/app/views/LibraryView'
 import { renderWithProviders } from '../helpers/renderWithProviders'
@@ -15,11 +15,32 @@ describe('LibraryView', () => {
     localStorage.clear()
   })
 
-  it('renders the labeled track collection', async () => {
+  it('renders the labeled collection with its toolbar above it', async () => {
     seedLibraryPath('/mock/music-a')
     renderWithProviders(<LibraryView />)
 
-    expect(screen.getByRole('region', { name: 'Library tracks' })).toBeInTheDocument()
+    const library = screen.getByRole('region', { name: 'Library' })
+    expect(library).toBeInTheDocument()
+
+    // Grouping and density act on the list, so they live with it now.
+    expect(screen.getByRole('group', { name: 'Group tracks by' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Collection layout' })).toBeInTheDocument()
+
+    // `.library-toolbar` is a <header> scoped to the section, so it is generic
+    // rather than a second banner landmark.
+    expect(library.querySelector('.library-toolbar')?.tagName).toBe('HEADER')
+
+    await screen.findByText('No tracks found')
+  })
+
+  it('offers five layouts: three row densities and two grid sizes', async () => {
+    seedLibraryPath('/mock/music-a')
+    renderWithProviders(<LibraryView />)
+
+    const layout = screen.getByRole('group', { name: 'Collection layout' })
+    for (const name of [ 'Compact rows', 'Normal rows', 'Relaxed rows', 'Small grid', 'Large grid' ])
+      expect(within(layout).getByRole('radio', { name })).toBeInTheDocument()
+
     await screen.findByText('No tracks found')
   })
 

@@ -132,7 +132,7 @@
     animation: shimmer 1.5s infinite;
   }
 
-  :where(.dialog-panel, .popover-panel) {
+  :where(.overlay-dialog, .popover-panel) {
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     color: var(--text);
@@ -141,19 +141,21 @@
   }
 
   /*
-   * Dialogs and popovers animate closed as well as open. `@starting-style`
-   * supplies the pre-open frame; `transition-behavior: allow-discrete` on
-   * `display` and `overlay` keeps the element painted in the top layer for
-   * the length of the exit instead of snapping away on the first frame.
+   * Overlays animate closed as well as open. `@starting-style` supplies the
+   * pre-open frame; `transition-behavior: allow-discrete` on `display` and
+   * `overlay` keeps the element painted in the top layer for the length of
+   * the exit instead of snapping away on the first frame.
+   *
+   * One element, three sizes. `panel` is a card, `sheet` a large scrollable
+   * surface, `full` the whole window — and `full` rises from the bottom edge
+   * because that is where its trigger, the player bar, is.
    */
-  .dialog-panel {
-    width: min(calc(100vw - var(--sp-8)), 480px);
+  .overlay-dialog {
+    max-width: none;
+    max-height: none;
     margin: auto;
     padding: 0;
-    overflow: hidden;
     opacity: 0;
-    translate: 0 calc(-1 * var(--shift-md));
-    scale: 0.97;
     transition:
       opacity var(--duration) var(--ease-exit),
       translate var(--duration) var(--ease-exit),
@@ -161,22 +163,59 @@
       overlay var(--duration) allow-discrete,
       display var(--duration) allow-discrete;
 
+    &[data-variant='panel'] {
+      width: min(calc(100vw - var(--sp-8)), 480px);
+      overflow: hidden;
+      translate: 0 calc(-1 * var(--shift-md));
+      scale: 0.97;
+    }
+
+    &[data-variant='sheet'] {
+      width: min(calc(100vw - var(--sp-8)), 880px);
+      max-height: min(calc(100dvh - var(--sp-8)), 760px);
+      overflow: auto;
+      translate: 0 calc(-1 * var(--shift-md));
+      scale: 0.97;
+      container-type: inline-size;
+    }
+
+    &[data-variant='full'] {
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+      border: 0;
+      border-radius: 0;
+      translate: 0 var(--shift-md);
+    }
+
     &[open] {
       opacity: 1;
       translate: 0 0;
       scale: 1;
       transition-timing-function: var(--ease-emphasis);
 
-      @starting-style {
-        opacity: 0;
-        translate: 0 calc(-1 * var(--shift-md));
-        scale: 0.97;
+      &[data-variant='panel'] {
+        @starting-style { opacity: 0; translate: 0 calc(-1 * var(--shift-md)); scale: 0.97; }
+      }
+
+      &[data-variant='sheet'] {
+        @starting-style { opacity: 0; translate: 0 calc(-1 * var(--shift-md)); scale: 0.97; }
+      }
+
+      &[data-variant='full'] {
+        @starting-style { opacity: 0; translate: 0 var(--shift-md); }
       }
     }
 
+    /*
+     * Lighter than a plain modal scrim, and blurred: the point of making the
+     * views overlays is that the library is still *there* behind them, so the
+     * backdrop has to let it read rather than paint it out.
+     */
     &::backdrop {
       background: var(--overlay);
       opacity: 0;
+      backdrop-filter: blur(var(--overlay-blur));
       transition:
         opacity var(--duration) var(--ease),
         overlay var(--duration) allow-discrete,
@@ -189,6 +228,22 @@
       @starting-style { opacity: 0; }
     }
   }
+
+  /* Floats over the overlay's own content, so it needs a layer of its own. */
+  .overlay-close {
+    position: absolute;
+    z-index: var(--z-sticky);
+    top: var(--sp-3);
+    right: var(--sp-3);
+    color: var(--text-muted);
+    background: transparent;
+    border-color: transparent;
+
+    &:hover { color: var(--text); background: var(--bg-hover); }
+  }
+
+  /* The now-playing overlay paints its own background, edge to edge. */
+  .player-overlay { background: var(--bg); }
 
   .dialog-header {
     display: grid;
@@ -329,6 +384,182 @@
 
   .context-menu-icon { font-size: var(--text-base); opacity: 0.7; }
   .context-menu-separator { height: 1px; margin-block: var(--sp-1); background: var(--border); }
+
+  /*
+   * A one-of-N switch, built on a real radio group. The inputs are shrunk to
+   * a pixel rather than `display: none` so they stay focusable and arrow-key
+   * navigable; `label:has(:checked)` carries the selected look.
+   */
+  .segmented {
+    display: flex;
+    gap: var(--sp-0-5);
+    padding: var(--sp-0-5);
+    border: 0;
+    border-radius: var(--control-radius);
+    background: var(--bg-raised);
+
+    label {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: var(--sp-1);
+      padding: var(--sp-1) var(--sp-3);
+      border-radius: var(--control-radius);
+      color: var(--text-muted);
+      font-size: var(--text-sm);
+      white-space: nowrap;
+      cursor: pointer;
+      transition:
+        color var(--duration-fast) var(--ease),
+        background-color var(--duration-fast) var(--ease);
+
+      &:hover { color: var(--text); background: var(--bg-hover); }
+      &:has(:checked) { color: var(--accent-contrast); background: var(--accent); }
+      &:focus-within { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+    }
+
+    &[data-icon-only] label { padding-inline: var(--sp-2); font-size: var(--text-base); }
+
+    input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  }
+
+  /*
+   * Stars render in reverse DOM order and are flipped back with
+   * `row-reverse`, which is what lets `:checked` fill every star *before* it
+   * with a plain sibling selector — no per-star state, no JS.
+   */
+  .rating {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    gap: var(--sp-0-5);
+    padding: 0;
+    border: 0;
+
+    label {
+      position: relative;
+      display: grid;
+      place-items: center;
+      padding: var(--sp-0-5);
+      color: var(--text-muted);
+      font-size: var(--text-lg);
+      cursor: pointer;
+      transition: color var(--duration-fast) var(--ease);
+
+      &:focus-within { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+    }
+
+    /* The hovered/checked star and everything to its left (later in the DOM). */
+    label:hover,
+    label:hover ~ label,
+    label:has(:checked),
+    label:has(:checked) ~ label {
+      color: var(--accent);
+
+      .icon { fill: currentcolor; }
+    }
+
+    input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+    &[data-readonly] label { cursor: default; }
+
+    .rating-clear {
+      order: -1;
+      margin-left: var(--sp-2);
+      color: var(--text-muted);
+      font-size: var(--text-sm);
+      transition: color var(--duration-fast) var(--ease);
+
+      &:hover { color: var(--danger); }
+    }
+  }
+
+  .rating-field {
+    display: grid;
+    gap: var(--sp-1);
+
+    > span { color: var(--text-dim); font-size: var(--text-sm); }
+  }
+
+  /*
+   * A grid tile. The heading keeps its heading semantics and the button lives
+   * inside it; `.card-open::after` stretches that button's hit area over the
+   * whole card. A `<button>` may only contain phrasing content, so wrapping
+   * the heading in the button instead would be invalid markup.
+   */
+  .media-card {
+    position: relative;
+    display: grid;
+    gap: var(--sp-1);
+    padding: var(--sp-2);
+    border-radius: var(--radius-lg);
+    transition: background-color var(--duration-fast) var(--ease);
+
+    &:hover { background: var(--bg-hover); }
+    &:hover .card-play { opacity: 1; translate: 0 0; }
+
+    .card-cover {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1;
+      border-radius: var(--radius);
+      background: var(--bg-input);
+      object-fit: cover;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card-title {
+      font-size: var(--text-sm);
+      font-weight: var(--font-medium);
+      line-height: 1.3;
+    }
+
+    .card-open {
+      display: block;
+      width: 100%;
+      overflow: hidden;
+      color: var(--text);
+      text-align: start;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+
+      /* The stretched hit area. Siblings above it stay clickable via z-index. */
+      &::after { position: absolute; inset: 0; content: ''; }
+      &:focus-visible { outline: 0; }
+    }
+
+    &:has(.card-open:focus-visible) { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+    .card-sub {
+      overflow: hidden;
+      color: var(--text-muted);
+      font-size: var(--text-xs);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .card-play {
+      position: absolute;
+      z-index: var(--z-raised);
+      right: var(--sp-3);
+      bottom: calc(var(--sp-8) + var(--sp-4));
+      display: grid;
+      width: var(--sp-8);
+      height: var(--sp-8);
+      place-items: center;
+      border-radius: 50%;
+      color: var(--accent-contrast);
+      background: var(--accent);
+      box-shadow: var(--shadow);
+      opacity: 0;
+      translate: 0 var(--sp-2);
+      transition:
+        opacity var(--duration-fast) var(--ease),
+        translate var(--duration-fast) var(--ease-emphasis);
+
+      &:focus-visible { opacity: 1; translate: 0 0; }
+    }
+  }
 
   @keyframes shimmer {
     from { background-position: 200% 0; }

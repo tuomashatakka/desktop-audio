@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Player } from '../../../src/app/components/composite/Player'
 
 
-const setView = vi.fn()
+const openOverlay = vi.fn()
+const closeOverlay = vi.fn()
 const setVolume = vi.fn()
 const toggleWindowScale = vi.fn()
 
@@ -40,9 +41,8 @@ const settings = {
 }
 
 vi.mock('../../../src/app/contexts', () => ({
-  useUI: () => ({ setView, currentView: 'player' }),
+  useUI: () => ({ openOverlay, closeOverlay }),
   useAudio: () => audio,
-  useLibrary: () => ({ filteredTracks: [ track ] }),
   useSettings: () => settings,
 }))
 
@@ -71,13 +71,19 @@ describe('Player', () => {
     expect(within(player).getByText('3:45')).toHaveAttribute('datetime', 'PT3M45S')
   })
 
-  it('opens now playing without remounting a second player', () => {
+  it('opens the now-playing overlay from the bar without remounting a second player', () => {
     const { container } = render(<Player />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open now playing' }))
 
-    expect(setView).toHaveBeenCalledWith('player')
+    expect(openOverlay).toHaveBeenCalledWith('player')
     expect(container.querySelectorAll('.player-view')).toHaveLength(1)
+  })
+
+  it('drops the promote button in the overlay, where it would be redundant', () => {
+    render(<Player expanded />)
+
+    expect(screen.queryByRole('button', { name: 'Open now playing' })).toBeNull()
   })
 
   it('names transport controls from their actions', () => {
@@ -93,11 +99,15 @@ describe('Player', () => {
     expect(screen.queryByRole('button', { name: 'Mute' })).not.toBeInTheDocument()
   })
 
-  it('has a close button that returns to the library', () => {
-    render(<Player />)
+  it('has a close button in the overlay, and none in the bar', () => {
+    const { unmount } = render(<Player expanded />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Close player' }))
-    expect(setView).toHaveBeenCalledWith('library')
+    expect(closeOverlay).toHaveBeenCalled()
+    unmount()
+
+    render(<Player />)
+    expect(screen.queryByRole('button', { name: 'Close player' })).toBeNull()
   })
 
   it('names the playback modes by their current state, not their icon', () => {
@@ -113,8 +123,8 @@ describe('Player', () => {
     expect(settings.setRepeatMode).toHaveBeenCalledWith('all')
   })
 
-  it('swaps the transport for lyrics on demand', () => {
-    render(<Player />)
+  it('swaps the transport for lyrics on demand, in the overlay only', () => {
+    render(<Player expanded />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Show lyrics' }))
 

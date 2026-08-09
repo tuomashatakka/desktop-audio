@@ -101,7 +101,13 @@
     --border: rgb(255 255 255 / 10%);
     --border-hover: rgb(255 255 255 / 20%);
     --border-focus: var(--accent);
-    --overlay: rgb(0 0 0 / 60%);
+    /*
+     * The scrim behind a modal. Overlays replaced the old full-page routes, so
+     * the library really is still behind them — the backdrop dims and blurs it
+     * rather than painting it out.
+     */
+    --overlay: rgb(0 0 0 / 38%);
+    --overlay-blur: 8px;
     --shell-wash: rgb(255 255 255 / 6%);
 
     /* type */

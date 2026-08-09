@@ -1,115 +1,80 @@
 import { useLibrary, useSettings, useUI } from '../contexts'
 import type { Density, Grouping } from '../contexts'
-import { Icon, Input } from '../components/atomic'
-import type { IconName } from '../services/types'
+import { SegmentedControl } from '../components/atomic'
+import type { SegmentedOption } from '../components/atomic'
 import { Breadcrumbs } from '../components/composite/Breadcrumbs'
+import type { Crumb } from '../components/composite/Breadcrumbs'
 
 
-const DENSITIES: readonly Density[]           = [ 'compact', 'normal', 'relaxed' ]
-const DENSITY_ICON: Record<Density, IconName> = {
-  compact: 'density-compact',
-  normal:  'density-normal',
-  relaxed: 'density-relaxed',
-}
+const DENSITIES: readonly SegmentedOption<Density>[] = [
+  { value: 'compact', label: 'Compact rows', icon: 'density-compact' },
+  { value: 'normal', label: 'Normal rows', icon: 'density-normal' },
+  { value: 'relaxed', label: 'Relaxed rows', icon: 'density-relaxed' },
+  { value: 'grid-sm', label: 'Small grid', icon: 'grid-sm' },
+  { value: 'grid-lg', label: 'Large grid', icon: 'grid-lg' },
+]
 
-const GROUPINGS: readonly Grouping[]           = [ 'none', 'album', 'artist', 'path' ]
-const GROUPING_LABEL: Record<Grouping, string> = {
-  none:   'None',
-  album:  'By Album',
-  artist: 'By Artist',
-  path:   'By Path',
-}
+const GROUPINGS: readonly SegmentedOption<Grouping>[] = [
+  { value: 'none', label: 'None' },
+  { value: 'album', label: 'Album' },
+  { value: 'artist', label: 'Artist' },
+  { value: 'path', label: 'Folder' },
+]
 
-/** Library-specific heading and controls hosted by the shell titlebar. */
+/**
+ * Where you are in the library, and how it is laid out.
+ *
+ * This used to live in the titlebar, two containers away from the list it
+ * acts on and hidden whenever another view was active. It sits directly above
+ * the collection now; only the search box is still titlebar chrome.
+ */
 export function LibraryToolbar () {
   const {
-    selectedFolderPath, selectedPlaylistId, selectFolder,
+    selectedFolderPath, selectedPlaylistId, selectedGroup, selectFolder,
     density, setDensity, grouping, setGrouping,
-  }                                                                           = useUI()
-  const { filteredTracks, playlists, searchQuery, setSearchQuery, isLoading } = useLibrary()
-  const { libraryPaths }                                                      = useSettings()
-  const activePlaylist                                                        = selectedPlaylistId
+  }                                              = useUI()
+  const { filteredTracks, playlists, isLoading } = useLibrary()
+  const { libraryPaths }                         = useSettings()
+
+  const activePlaylist = selectedPlaylistId
     ? playlists.find(playlist =>
       playlist.id === selectedPlaylistId)
     : undefined
-  return <>
-    <div className='library-heading'>
-      {activePlaylist
-        ? <h1>{activePlaylist.name}</h1>
-        : <Breadcrumbs
-          path={ selectedFolderPath }
-          roots={ libraryPaths }
-          onNavigate={ selectFolder } />
-      }
 
-      {isLoading && filteredTracks.length > 0 &&
-          <small className='scan-status' role='status'>Scanning…</small>
-      }
+  // A drilled-into album or artist is not a folder, so it rides along as an
+  // extra crumb rather than pretending to be part of the path.
+  const trail: readonly Crumb[] = selectedGroup
+    ? [{ label: selectedGroup.label, path: null }]
+    : []
+
+  return <header className='library-toolbar'>
+    {activePlaylist
+      ? <h1>{activePlaylist.name}</h1>
+      : <Breadcrumbs
+        path={ selectedFolderPath }
+        roots={ libraryPaths }
+        trail={ trail }
+        label='Library location'
+        onNavigate={ selectFolder } />
+    }
+
+    {isLoading && filteredTracks.length > 0 &&
+      <small className='scan-status' role='status'>Scanning…</small>
+    }
+
+    <div className='toolbar-controls'>
+      <SegmentedControl
+        legend='Group tracks by'
+        value={ grouping }
+        options={ GROUPINGS }
+        onChange={ setGrouping } />
+
+      <SegmentedControl
+        legend='Collection layout'
+        value={ density }
+        options={ DENSITIES }
+        iconOnly
+        onChange={ setDensity } />
     </div>
-
-    <menu className='view-controls' aria-label='Library view controls'>
-      <li>
-        <Input
-          aria-label='Search tracks'
-          wrapperClass='search-input'
-          type='search'
-          placeholder='Search tracks...'
-          value={ searchQuery }
-          startAdornment={ <Icon name='search' /> }
-          onChange={ event =>
-            setSearchQuery(event.target.value) } />
-      </li>
-
-      <li>
-        <fieldset className='density-toggle'>
-          <legend className='sr-only'>Row density</legend>
-
-          {DENSITIES.map(densityOption =>
-            <label key={ densityOption } title={ `${densityOption} density` }>
-              <input
-                aria-label={ `${densityOption} density` }
-                type='radio'
-                name='density'
-                value={ densityOption }
-                checked={ density === densityOption }
-                onChange={ () =>
-                  setDensity(densityOption) } />
-
-              <Icon name={ DENSITY_ICON[densityOption] } />
-            </label>
-          )}
-        </fieldset>
-      </li>
-
-      <li>
-        <button
-          className='config-toggle'
-          aria-label='View options'
-          type='button'
-          popoverTarget='library-view-options'>
-          <Icon name='chevron-right' />
-        </button>
-      </li>
-    </menu>
-
-    <div className='popover-panel' id='library-view-options' popover='auto'>
-      <fieldset className='config-menu'>
-        <legend>Grouping</legend>
-
-        {GROUPINGS.map(groupingOption =>
-          <label key={ groupingOption }>
-            <input
-              type='radio'
-              name='grouping'
-              value={ groupingOption }
-              checked={ grouping === groupingOption }
-              onChange={ () =>
-                setGrouping(groupingOption) } />
-
-            {GROUPING_LABEL[groupingOption]}
-          </label>
-        )}
-      </fieldset>
-    </div>
-  </>
+  </header>
 }

@@ -10,21 +10,25 @@ import { noop } from '../../../src/app/utils/noop'
 type UIValue = NonNullable<ComponentProps<typeof UIProvider>['value']>
 
 const uiValue: UIValue = {
-  currentView:        'library',
-  previousView:       null,
+  overlay:            null,
   sidebarOpen:        false,
   selectedFolderPath: null,
   selectedPlaylistId: null,
+  selectedGroup:      null,
   editingTrackId:     null,
   density:            'normal',
   grouping:           'artist',
-  setView:            noop,
+  sidebarWidth:       220,
+  openOverlay:        noop,
+  closeOverlay:       noop,
   toggleSidebar:      noop,
   selectFolder:       noop,
   selectPlaylist:     noop,
+  selectGroup:        noop,
   setEditingTrack:    noop,
   setDensity:         noop,
   setGrouping:        noop,
+  setSidebarWidth:    noop,
 }
 
 const tracks = [
@@ -273,5 +277,61 @@ describe('TrackTable grouped keyboard navigation', () => {
 
     expect(screen.getByRole('button', { name: /alpha/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /charlie/i })).toBeInTheDocument()
+  })
+
+  it('plays the whole album from the group heading cover', () => {
+    const onPlayGroup = vi.fn()
+    const onPlay      = vi.fn()
+
+    render(
+      <UIProvider value={{ ...uiValue, grouping: 'album' }}>
+        <TrackTable
+          tracks={ tracks }
+          isLoading={ false }
+          currentTrack={ null }
+          isPlaying={ false }
+          onPlay={ onPlay }
+          onPlayGroup={ onPlayGroup } />
+      </UIProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play One Album' }))
+
+    // The album's own tracks, not the whole table, and from the top.
+    expect(onPlayGroup).toHaveBeenCalledWith(
+      expect.arrayContaining([ expect.objectContaining({ album: 'One Album' }) ])
+    )
+    expect(onPlay).not.toHaveBeenCalled()
+  })
+
+  it('keeps the album cover button out of the rows, which are buttons themselves', () => {
+    const { container } = render(
+      <UIProvider value={{ ...uiValue, grouping: 'album' }}>
+        <TrackTable
+          tracks={ tracks }
+          isLoading={ false }
+          currentTrack={ null }
+          isPlaying={ false }
+          onPlay={ noop }
+          onPlayGroup={ noop } />
+      </UIProvider>
+    )
+
+    expect(container.querySelector('button button')).toBeNull()
+  })
+
+  it('falls back to normal rows when a grid density is selected', () => {
+    const { container } = render(
+      <UIProvider value={{ ...uiValue, density: 'grid-lg', grouping: 'none' }}>
+        <TrackTable
+          tracks={ tracks }
+          isLoading={ false }
+          currentTrack={ null }
+          isPlaying={ false }
+          onPlay={ noop } />
+      </UIProvider>
+    )
+
+    expect(container.querySelector('.track-table')).toHaveAttribute('data-density', 'normal')
   })
 })

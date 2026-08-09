@@ -16,16 +16,13 @@ const mocks = vi.hoisted(() => {
     playPrevious: vi.fn(),
   }
   const ui = {
-    currentView:  'library',
-    previousView: null,
-    sidebarOpen:  false,
-    setView:      vi.fn(),
+    openOverlay:   vi.fn(),
+    closeOverlay:  vi.fn(),
     toggleSidebar: vi.fn(),
   }
   return {
     audio,
     ui,
-    library: { filteredTracks: [{ id: 'track-1' }] },
     host: {
       onMediaPlayPause: vi.fn(() =>
         vi.fn()),
@@ -40,8 +37,6 @@ const mocks = vi.hoisted(() => {
 vi.mock('../../src/app/contexts', () => ({
   useAudio: () =>
     mocks.audio,
-  useLibrary: () =>
-    mocks.library,
   useUI: () =>
     mocks.ui,
 }))
@@ -60,8 +55,6 @@ describe('useKeyboardShortcuts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     keybindingStore.reset()
-    mocks.ui.currentView = 'library'
-    mocks.ui.sidebarOpen = false
   })
 
   it('handles both letter and platform next/previous shortcuts', () => {
@@ -76,7 +69,7 @@ describe('useKeyboardShortcuts', () => {
     expect(mocks.audio.playPrevious).toHaveBeenCalledTimes(2)
   })
 
-  it('opens app views and toggles the side menu with modifier shortcuts', () => {
+  it('opens overlays and toggles the side menu with modifier shortcuts', () => {
     render(<Harness />)
 
     fireEvent.keyDown(window, { key: ',', metaKey: true })
@@ -84,9 +77,10 @@ describe('useKeyboardShortcuts', () => {
     fireEvent.keyDown(window, { key: 'p', metaKey: true })
     fireEvent.keyDown(window, { key: 'e', ctrlKey: true })
 
-    expect(mocks.ui.setView).toHaveBeenNthCalledWith(1, 'settings')
-    expect(mocks.ui.setView).toHaveBeenNthCalledWith(2, 'library')
-    expect(mocks.ui.setView).toHaveBeenNthCalledWith(3, 'player')
+    expect(mocks.ui.openOverlay).toHaveBeenNthCalledWith(1, 'settings')
+    // "Go to library" is now "dismiss whatever is covering it".
+    expect(mocks.ui.closeOverlay).toHaveBeenCalledOnce()
+    expect(mocks.ui.openOverlay).toHaveBeenNthCalledWith(2, 'player')
     expect(mocks.ui.toggleSidebar).toHaveBeenCalledOnce()
   })
 
@@ -102,6 +96,6 @@ describe('useKeyboardShortcuts', () => {
     fireEvent.keyDown(editor, { key: 'l', metaKey: true })
 
     expect(mocks.audio.playNext).toHaveBeenCalledOnce()
-    expect(mocks.ui.setView).toHaveBeenCalledWith('library')
+    expect(mocks.ui.closeOverlay).toHaveBeenCalledOnce()
   })
 })

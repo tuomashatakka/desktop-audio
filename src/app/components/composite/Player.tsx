@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useUI, useAudio, useLibrary, useSettings } from '../../contexts'
+import { useUI, useAudio, useSettings } from '../../contexts'
 import type { Track, RepeatMode } from '../../contexts'
 import { Icon, IconButton, Button } from '../atomic'
 import { WaveformProgress } from '../atomic/WaveformProgress'
@@ -142,26 +142,36 @@ function playerAriaLabel (track: Track | null): string {
   return track ? `Now playing: ${track.title}` : 'Player'
 }
 
+type PlayerProps = {
+
+  /** True for the now-playing overlay's copy; false for the footer bar's. */
+  readonly expanded?: boolean
+}
+
 /**
- * The one and only player.
+ * The one and only player — rendered twice, from one component.
  *
- * Mounted once, permanently, in the shell's footer — never conditionally
- * rendered per view. Whether it reads as a transport bar along the bottom or
- * as a full-window now-playing screen is decided entirely in CSS, off
- * `data-view` and `data-height-tier` on `.app-shell`. See `layout.css`.
+ * The footer bar's copy lives inside `.app-shell`, so the height-tier and
+ * footer-bar rules in `layout.css` reach it. The now-playing overlay's copy is
+ * portaled to `document.body` by {@link Overlay}, *outside* the shell, so none
+ * of those descendant selectors match and it falls through to the full-window
+ * layout by default. That is the whole mechanism — there is no bar/full switch
+ * in CSS beyond where the element happens to sit.
+ *
+ * `expanded` therefore only drives the things CSS cannot decide: which chrome
+ * is in the DOM at all.
  *
  * The class hooks here (`.player-view`, `.player-content`, `.album-art-card`,
  * `.player-info`, `.progress-section`, `.playback-controls`) are a deliberate
  * contract with the tier/container-query system; renaming them means rewriting
  * that system.
  */
-export function Player () {
-  const { setView, currentView } = useUI()
+export function Player ({ expanded = false }: PlayerProps) {
+  const { openOverlay, closeOverlay } = useUI()
   const {
     currentTrack, isPlaying, currentTime, duration, waveformBars,
     pause, resume, seek, playNext, playPrevious,
   }                                                        = useAudio()
-  const { filteredTracks }                                 = useLibrary()
   const { shuffle, setShuffle, repeatMode, setRepeatMode } = useSettings()
   const toggleWindowScale                                  = useWindowScale()
 
@@ -170,7 +180,7 @@ export function Player () {
   // Lyrics only make sense in the full-window player; the footer bar and the
   // mini tiers have nowhere to put them, so the panel isn't in their DOM at
   // all rather than being hidden after the fact.
-  const lyricsOpen = showLyrics && currentView === 'player'
+  const lyricsOpen = showLyrics && expanded
 
   // Shares the cache entry `PlayerArt` above already warmed for this track.
   const currentArt = useArtwork(currentTrack?.id, 'full')
@@ -186,13 +196,17 @@ export function Player () {
         </div>
     }
 
-    <button
-      className='player-promote'
-      aria-label='Open now playing'
-      type='button'
-      disabled={ !currentTrack }
-      onClick={ () =>
-        setView('player') } />
+    {/* The bar's whole surface is the "open now playing" affordance; the
+          overlay it opens obviously doesn't need one. */}
+    {!expanded &&
+      <button
+        className='player-promote'
+        aria-label='Open now playing'
+        type='button'
+        disabled={ !currentTrack }
+        onClick={ () =>
+          openOverlay('player') } />
+    }
 
     <div className='player-content'>
       <PlayerArtwork track={ currentTrack } onToggle={ toggleWindowScale } />
@@ -210,33 +224,35 @@ export function Player () {
       </hgroup>
 
       {/* A menu of controls, like `.playback-controls` below — same shape so
-          the two read alike and neither is a bare <div>. */}
-      <menu className='player-actions' aria-label='Player'>
-        <li>
-          <IconButton
-            className='lyrics-toggle'
-            aria-pressed={ showLyrics }
-            label={ showLyrics ? 'Show playback controls' : 'Show lyrics' }
-            type='button'
-            disabled={ !currentTrack }
-            onClick={ () =>
-              setShowLyrics(current =>
-                !current) }>
-            <Icon name='lyrics' />
-          </IconButton>
-        </li>
+          the two read alike and neither is a bare <div>. Only the overlay has
+          anywhere to put it. */}
+      {expanded &&
+        <menu className='player-actions' aria-label='Player'>
+          <li>
+            <IconButton
+              className='lyrics-toggle'
+              aria-pressed={ showLyrics }
+              label={ showLyrics ? 'Show playback controls' : 'Show lyrics' }
+              type='button'
+              disabled={ !currentTrack }
+              onClick={ () =>
+                setShowLyrics(current =>
+                  !current) }>
+              <Icon name='lyrics' />
+            </IconButton>
+          </li>
 
-        <li>
-          <IconButton
-            className='player-close'
-            label='Close player'
-            type='button'
-            onClick={ () =>
-              setView('library') }>
-            <Icon name='close' />
-          </IconButton>
-        </li>
-      </menu>
+          <li>
+            <IconButton
+              className='player-close'
+              label='Close player'
+              type='button'
+              onClick={ closeOverlay }>
+              <Icon name='close' />
+            </IconButton>
+          </li>
+        </menu>
+      }
 
       {lyricsOpen && <PlayerLyrics lyrics={ currentTrack?.lyrics } />}
 
@@ -263,11 +279,9 @@ export function Player () {
         isPlaying={ isPlaying }
         shuffle={ shuffle }
         repeatMode={ repeatMode }
-        onPrevious={ () =>
-          playPrevious(filteredTracks) }
+        onPrevious={ playPrevious }
         onToggle={ isPlaying ? pause : resume }
-        onNext={ () =>
-          playNext(filteredTracks) }
+        onNext={ playNext }
         onShuffle={ () =>
           setShuffle(!shuffle) }
         onRepeat={ () =>

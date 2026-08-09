@@ -1,8 +1,8 @@
 export {
   UIProvider, useUI,
   MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, DEFAULT_SIDEBAR_WIDTH,
-  clampSidebarWidth,
-  type ViewType, type Density, type Grouping,
+  clampSidebarWidth, isGridDensity,
+  type OverlayName, type Density, type GridDensity, type Grouping, type BucketGrouping, type GroupScope,
 } from './UIContext'
 
 export {

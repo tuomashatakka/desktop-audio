@@ -1,12 +1,14 @@
 /*
  * Shell, persistent view slots, window chrome, sidebar, and player.
  *
- * Two attributes on `.app-shell` decide the whole layout: `data-view` (which
- * route is active) and `data-height-tier` (how much vertical room there is).
+ * One attribute on `.app-shell` decides the whole layout: `data-height-tier`
+ * (how much vertical room there is). There is no route attribute — the library
+ * is the only view, and Now Playing / Settings / the Tag Editor are modal
+ * `<dialog>`s in the top layer (see `.overlay-dialog` in components.css).
  * Nothing here is shown or hidden from JS.
  *
- * Motion: every state change animates in *and* out. The three mechanisms are
- * a registered `--player-h` for the player's growth, an animating sidebar
+ * Motion: every state change animates in *and* out. The mechanisms are a
+ * registered `--player-h` for the player bar's height, an animating sidebar
  * `flex-basis`, and `transition-behavior: allow-discrete` plus `@starting-style`
  * for anything that toggles `display`.
  */
@@ -43,26 +45,13 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  transition:
-    opacity var(--duration) var(--ease-exit),
-    translate var(--duration) var(--ease-exit);
-
-  /*
-   * Not `display: none` — the player growing over it has to be watchable.
-   * `.app-content` already clips, so the squeezed remainder never spills.
-   */
-  .app-shell[data-view='player'] & {
-    opacity: 0;
-    translate: 0 calc(-1 * var(--shift-md));
-    pointer-events: none;
-  }
 }
 
 /*
- * The player's height *is* the now-playing transition. `--player-h` is a
- * registered property (see tokens.css), so it interpolates: the footer bar's
- * top edge slides up to the top of the window and back down again, with no
- * JS and no remount.
+ * `--player-h` is a registered property (see tokens.css), so it interpolates:
+ * the bar's top edge travels rather than jumping when a track starts or the
+ * window crosses a tier. Now Playing is an overlay, not a taller footer, so
+ * `100%` here is only ever the small-window case.
  */
 .app-player {
   flex: 0 0 var(--player-h);
@@ -71,16 +60,16 @@
   overflow: hidden;
   transition: --player-h var(--duration) var(--ease-emphasis);
 
-  .app-shell[data-height-tier='normal']:not([data-view='player']) & {
+  .app-shell[data-height-tier='normal'] & {
     --player-h: var(--player-bar-h);
   }
 
   /* Nothing playing: the bar retracts instead of blinking out. */
-  .app-shell[data-height-tier='normal']:not([data-view='player']) &:has(.player-view[data-empty]) {
+  .app-shell[data-height-tier='normal'] &:has(.player-view[data-empty]) {
     --player-h: 0px;
   }
 
-  .app-shell[data-view='player'] &,
+  /* Below the chrome threshold the player *is* the window. */
   .app-shell:is([data-height-tier='snug'], [data-height-tier='compact'], [data-height-tier='mini']) & {
     --player-h: 100%;
   }
@@ -100,45 +89,9 @@
     flex-basis var(--duration) var(--ease-emphasis),
     opacity var(--duration-fast) var(--ease);
 
-  .app-shell:not([data-sidebar-open]) &,
-  .app-shell[data-view='player'] & {
+  .app-shell:not([data-sidebar-open]) & {
     flex-basis: 0;
     opacity: 0;
-  }
-}
-
-/*
- * Every primary view stays mounted; `data-view` only changes layout.
- * `allow-discrete` on `display` is what buys the *exit* animation — without
- * it the outgoing view would vanish on the first frame.
- */
-.app-view {
-  display: none;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  opacity: 0;
-  translate: 0 var(--shift-sm);
-  transition:
-    opacity var(--duration) var(--ease-exit),
-    translate var(--duration) var(--ease-exit),
-    display var(--duration) allow-discrete;
-}
-
-.app-view-settings,
-.app-view-tag-editor { overflow: auto; container-type: inline-size; }
-
-.app-shell:is([data-view='library'], [data-view='player']) .app-view-library,
-.app-shell[data-view='settings'] .app-view-settings,
-.app-shell[data-view='tag-editor'] .app-view-tag-editor {
-  display: flex;
-  opacity: 1;
-  translate: 0 0;
-  transition-timing-function: var(--ease-emphasis);
-
-  @starting-style {
-    opacity: 0;
-    translate: 0 var(--shift-sm);
   }
 }
 
@@ -180,8 +133,6 @@
   opacity: 1;
   transition: opacity var(--duration-fast) var(--ease);
   -webkit-app-region: no-drag;
-
-  .app-shell:not([data-view='library']) & { display: none; }
 }
 
 .logo-icon {
@@ -191,27 +142,6 @@
   color: var(--accent);
   -webkit-app-region: no-drag;
 }
-
-.titlebar-nav { display: flex; gap: var(--sp-1); -webkit-app-region: no-drag; }
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--control-radius);
-  color: var(--text-dim);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  transition:
-    color var(--duration-fast) var(--ease),
-    background-color var(--duration-fast) var(--ease);
-
-  &:hover { color: var(--text); background: var(--bg-hover); }
-  &[aria-current='page'] { color: var(--accent); background: var(--accent-muted); }
-}
-
-.nav-icon { font-size: var(--text-base); }
 
 .titlebar-controls {
   display: flex;
@@ -242,12 +172,11 @@
 
 /*
  * Titlebar breakpoints. Media queries cannot read custom properties, so the
- * two widths are spelled out: 900px is where the nav labels stop fitting
- * beside the toolbar, 500px is where the window controls have to shrink to
- * the titlebar's own height.
+ * two widths are spelled out: 900px is where the context slot has to tighten,
+ * 500px is where the window controls have to shrink to the titlebar's own
+ * height.
  */
 @media (max-width: 900px) {
-  .nav-item { padding-inline: var(--sp-2); }
   .titlebar-context { gap: var(--sp-1); }
 }
 
@@ -257,6 +186,35 @@
 }
 
 /* ─── sidebar ──────────────────────────────────────────────────────────── */
+
+/*
+ * Settings sits at the foot of the sidebar rather than in the titlebar: it is
+ * the one destination left once the views became overlays, and this is where
+ * the rest of the library's navigation already lives. `margin-top: auto`
+ * pins it to the bottom of the flex column.
+ */
+.sidebar-footer {
+  margin-top: auto;
+  padding: var(--sp-2);
+  border-top: 1px solid var(--border);
+
+  .settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    width: 100%;
+    padding: var(--sp-2);
+    border-radius: var(--radius);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    text-align: start;
+    transition:
+      color var(--duration-fast) var(--ease),
+      background-color var(--duration-fast) var(--ease);
+
+    &:hover { color: var(--text); background: var(--bg-hover); }
+  }
+}
 
 .library-sidebar {
   position: relative;
@@ -599,7 +557,7 @@ body::before {
 .player-actions {
   display: none;
 
-  .app-shell[data-view='player'][data-height-tier='normal'] & {
+  .player-overlay & {
     position: absolute;
     z-index: var(--z-sticky);
     top: var(--sp-4);
@@ -888,8 +846,12 @@ body::before {
 
 /* ─── footer bar ───────────────────────────────────────────────────────── */
 
-/* Normal-height non-player routes arrange the same tree as a footer bar. */
-.app-shell[data-height-tier='normal']:not([data-view='player']) {
+/*
+ * At normal height the shell's own player copy is the footer bar. The
+ * overlay's copy is portaled outside `.app-shell`, so none of this reaches it
+ * and it keeps the full-window layout above.
+ */
+.app-shell[data-height-tier='normal'] {
   .player-view {
     height: var(--player-bar-h);
     min-height: var(--player-bar-h);
@@ -962,7 +924,7 @@ body::before {
 }
 
 @container player (max-width: 520px) {
-  .app-shell[data-height-tier='normal']:not([data-view='player']) {
+  .app-shell[data-height-tier='normal'] {
     .player-content {
       grid-template-columns: var(--titlebar-h) minmax(80px, 1fr) auto minmax(60px, 1fr);
       gap: var(--sp-2);
@@ -978,7 +940,7 @@ body::before {
 }
 
 @container player (max-width: 380px) {
-  .app-shell[data-height-tier='normal']:not([data-view='player']) {
+  .app-shell[data-height-tier='normal'] {
     .player-content {
       grid-template-columns: minmax(0, 1fr) auto;
       grid-template-rows: auto 20px;

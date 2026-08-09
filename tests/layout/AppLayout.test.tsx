@@ -10,19 +10,21 @@ type UIValue = NonNullable<ComponentProps<typeof UIProvider>['value']>
 
 function makeUIValue (overrides: Partial<UIValue> = {}): UIValue {
   return {
-    currentView: 'library',
-    previousView: null,
+    overlay: null,
     sidebarOpen: false,
     selectedFolderPath: null,
     selectedPlaylistId: null,
+    selectedGroup: null,
     editingTrackId: null,
     density: 'normal',
     grouping: 'none',
     sidebarWidth: 220,
-    setView: noop,
+    openOverlay: noop,
+    closeOverlay: noop,
     toggleSidebar: noop,
     selectFolder: noop,
     selectPlaylist: noop,
+    selectGroup: noop,
     setEditingTrack: noop,
     setDensity: noop,
     setGrouping: noop,
@@ -76,15 +78,15 @@ describe('AppLayout', () => {
     expect(sidebar).toHaveAttribute('inert')
   })
 
-  it('exposes the active view on the app shell', () => {
+  it('renders the overlays slot outside the workspace', () => {
     const { container } = render(
-      <UIProvider value={makeUIValue({ currentView: 'settings' })}>
-        <AppLayout main={<div>Content</div>} />
+      <UIProvider value={makeUIValue()}>
+        <AppLayout main={<div>Content</div>} overlays={<div data-testid='overlays' />} />
       </UIProvider>
     )
 
     expect(container.firstChild).toHaveClass('app-shell')
-    expect(container.firstChild).toHaveAttribute('data-view', 'settings')
+    expect(screen.getByTestId('overlays').closest('.app-workspace')).toBeNull()
   })
 
   it('exposes the persisted sidebar width as a shell custom property', () => {
@@ -111,7 +113,7 @@ describe('AppLayout', () => {
     Object.defineProperty(window, 'innerHeight', { value: 240, configurable: true, writable: true })
 
     render(
-      <UIProvider value={makeUIValue({ currentView: 'player', previousView: 'library' })}>
+      <UIProvider value={makeUIValue()}>
         <AppLayout main={<span data-testid='content'>Hello</span>} />
       </UIProvider>
     )

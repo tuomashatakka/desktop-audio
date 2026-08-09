@@ -1,9 +1,12 @@
 import { useMemo, useEffect, useState, useCallback, useRef } from 'react'
-import { useUI, useLibrary, useAudio, useSettings } from '../contexts'
-import type { Track } from '../contexts'
+import { useUI, useLibrary, useAudio, useSettings, isGridDensity } from '../contexts'
+import type { GroupScope, Track } from '../contexts'
 import { useLibraryScanner } from '../hooks'
 import { Button, PromptDialog } from '../components/atomic'
 import { TrackTable } from '../components/composite/TrackTable'
+import { LibraryGrid } from '../components/composite/LibraryGrid'
+import { LibraryToolbar } from './LibraryToolbar'
+import { bucketKey } from '../utils/grouping'
 import { useHost } from '../data'
 import type { ContextMenuPoint, SerializableMenuItem } from '../services/types'
 
@@ -25,33 +28,80 @@ const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(item =>
                          item.separator).length * SEPARATOR_HEIGHT +
                        PADDING * 2
 
-/** Scrollable track collection; its heading and controls live in the shell titlebar. */
+/**
+ * The library: its toolbar, and the collection as either a list or a grid.
+ *
+ * Which one is a function of density — the two `grid-*` values *are* the grid
+ * — except that a drilled-into scope always renders as a list, since drilling
+ * in is how you ask to see the tracks. Density is deliberately left alone
+ * while that is true, so backing out restores the card size you chose.
+ */
 export function LibraryView () {
-  const { setView, setEditingTrack, selectedFolderPath, selectedPlaylistId, selectFolder } = useUI()
-  const { filteredTracks, playlists, addPlaylist, selectTrack, isLoading }                 = useLibrary()
-  const { play, currentTrack, isPlaying }                                                  = useAudio()
-  const { libraryPaths, theme }                                                            = useSettings()
-  const host                                                                               = useHost()
+  const {
+    setEditingTrack, selectedFolderPath, selectedPlaylistId, selectedGroup,
+    selectFolder, selectGroup, density, grouping, openOverlay,
+  }                                                                        = useUI()
+  const { filteredTracks, playlists, addPlaylist, selectTrack, isLoading } = useLibrary()
+  const { playQueue, currentTrack, isPlaying }                             = useAudio()
+  const { libraryPaths, theme }                                            = useSettings()
+  const host                                                               = useHost()
 
   const { isInitialLoading } = useLibraryScanner()
 
-  const goToLibrarySettings = useCallback(() => {
-    setView('settings')
-    location.hash = '#settings-library'
-  }, [ setView ])
-
   const [ promptOpen, setPromptOpen ] = useState(false)
   const contextTrackRef               = useRef<Track | null>(null)
+
+  const goToLibrarySettings = useCallback(() => {
+    openOverlay('settings')
+    location.hash = '#settings-library'
+  }, [ openOverlay ])
 
   const activePlaylist = selectedPlaylistId
     ? playlists.find(playlist =>
       playlist.id === selectedPlaylistId)
     : undefined
 
+  /**
+   * A playlist is its own list. Otherwise the folder and the drilled-into
+   * group are *both* applied — a card counted inside a folder has to open the
+   * same set it advertised.
+   */
+  const displayTracks = useMemo(() => {
+    if (activePlaylist)
+      return activePlaylist.tracks
+
+    let tracks = filteredTracks
+    if (selectedFolderPath)
+      tracks = tracks.filter(track =>
+        track.path.startsWith(selectedFolderPath))
+    if (selectedGroup)
+      tracks = tracks.filter(track =>
+        bucketKey(track, selectedGroup.grouping) === selectedGroup.key)
+    return tracks
+  }, [ activePlaylist, selectedGroup, selectedFolderPath, filteredTracks ])
+
+  /**
+   * Starting a track queues the list it came from, not the whole library.
+   *
+   * `index` is the row's position in the table's *sorted* order, which is not
+   * necessarily its position in `displayTracks` — the queue has to be built
+   * from the latter, so the track is looked up rather than trusted.
+   */
   const handleTrackPlay = useCallback((track: Track, index: number) => {
     selectTrack(index)
-    play(track)
-  }, [ selectTrack, play ])
+
+    const queueIndex = displayTracks.findIndex(candidate =>
+      candidate.id === track.id)
+    playQueue(displayTracks, queueIndex >= 0 ? queueIndex : 0)
+  }, [ selectTrack, playQueue, displayTracks ])
+
+  const handleQueue = useCallback((tracks: readonly Track[], startIndex: number) => {
+    playQueue(tracks, startIndex)
+  }, [ playQueue ])
+
+  const handleOpenGroup = useCallback((scope: GroupScope) => {
+    selectGroup(scope)
+  }, [ selectGroup ])
 
   const handleContextMenu = useCallback((track: Track, point: ContextMenuPoint) => {
     contextTrackRef.current = track
@@ -88,16 +138,31 @@ export function LibraryView () {
       contextTrackRef.current = null
     }), [ handleTrackPlay, setEditingTrack, host ])
 
-  const displayTracks = useMemo(() => {
-    if (activePlaylist)
-      return activePlaylist.tracks
-    if (selectedFolderPath)
-      return filteredTracks.filter(track =>
-        track.path.startsWith(selectedFolderPath))
-    return filteredTracks
-  }, [ activePlaylist, selectedFolderPath, filteredTracks ])
+  const scoped   = Boolean(selectedGroup || activePlaylist)
+  const showGrid = isGridDensity(density) && !scoped
 
-  return <section className='library' aria-label='Library tracks'>
+  const collection = showGrid
+    ? <LibraryGrid
+      tracks={ displayTracks }
+      grouping={ grouping }
+      density={ density }
+      onOpen={ handleOpenGroup }
+      onPlay={ handleQueue } />
+    : <TrackTable
+      tracks={ displayTracks }
+      isLoading={ isLoading }
+      currentTrack={ currentTrack }
+      isPlaying={ isPlaying }
+      roots={ libraryPaths }
+      onPlay={ handleTrackPlay }
+      onPlayGroup={ tracks =>
+        handleQueue(tracks, 0) }
+      onContextMenu={ handleContextMenu }
+      onNavigate={ selectFolder } />
+
+  return <section className='library' aria-label='Library'>
+    {libraryPaths.length > 0 && <LibraryToolbar />}
+
     {libraryPaths.length === 0
       ? <div className='library-empty'>
         <article className='library-empty-card'>
@@ -122,15 +187,7 @@ export function LibraryView () {
                 : 'Select a folder or add library paths in Settings'}
             </small>
           </p>
-          : <TrackTable
-            tracks={ displayTracks }
-            isLoading={ isLoading }
-            currentTrack={ currentTrack }
-            isPlaying={ isPlaying }
-            roots={ libraryPaths }
-            onPlay={ handleTrackPlay }
-            onContextMenu={ handleContextMenu }
-            onNavigate={ selectFolder } />
+          : collection
     }
 
     <PromptDialog

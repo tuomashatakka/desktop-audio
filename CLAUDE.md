@@ -1,6 +1,6 @@
 # Project: desktop-audio
 
-Electron desktop music player. **Electron + React 18 + TypeScript + Vite + bun.**
+Electron desktop music player. **Electron + React 19 + TypeScript + Vite + bun.**
 
 ## Commands
 
@@ -26,6 +26,18 @@ Linting is `@tuomashatakka/eslint-config` applied whole. The 36 remaining
 rewriting those effects is a separate refactor, not part of adopting the
 config.
 
+## Dependency security
+
+`package.json` and `bun.lock` are one dependency change: update and review them
+together. Electron is pinned exactly so a Chromium security update is an
+intentional app-runtime upgrade rather than incidental lockfile churn. After
+changing it, run `bun install`, `bun run rebuild`, verify the installed Electron
+version, and exercise both the dev and packaged apps.
+
+GitHub Dependabot and `bun audit` are separate inventories. Remediating every
+open Dependabot alert does not imply that the wider development/build graph has
+no transitive audit findings; query and report both explicitly.
+
 ## Architecture
 
 ```
@@ -36,12 +48,76 @@ src/
   app/
     contexts/          # React contexts: Library, Audio, Settings, UI
     hooks/             # useLibraryScanner (scan + subscribe), useKeyboardShortcuts
+    layout/            # AppLayout, Titlebar, LibrarySidebar, OverlayHost
+    components/
+      atomic/          # Overlay, Dialog, SegmentedControl, Rating, AlbumArt, …
+      composite/       # TrackTable, LibraryGrid, MediaCard, Player, Breadcrumbs
     services/
       contextBridge.ts # ElectronAPI interface + bridge accessor
       audioEngine.ts   # Web Audio API waveform/analyzer
       types.ts         # Track, FolderNode, AudioMetadata
-    views/             # LibraryView, PlayerView, SettingsView, TagEditorView
+    utils/
+      grouping.ts      # bucketKey / buildGroups — shared by the table and the grid
+    views/             # LibraryView (+ LibraryToolbar, LibrarySearch), Settings, TagEditor
 ```
+
+## Views are overlays, not routes
+
+The library is the only view. Now Playing, Settings and the Tag Editor are
+modal `<dialog>`s over it, so opening one keeps the library — its scroll
+position, its selection, the sidebar — exactly where it was.
+
+- `UIContext` has no route state. `overlay: 'player' | 'settings' | 'tag-editor'
+  | null` names at most one, via `openOverlay` / `closeOverlay`. There is no
+  `currentView`, no `previousView`, and `.app-shell` carries no `data-view`.
+- `components/atomic/Overlay.tsx` is the single modal surface: a native
+  `<dialog>` opened with `showModal()` and portaled to `document.body`. That
+  buys the focus trap, the inert background, `::backdrop` and Escape; adding
+  `closedby='any'` buys backdrop dismissal. `Dialog` is `Overlay` plus a titled
+  header. Three sizes via `data-variant`: `panel`, `sheet`, `full`.
+- `layout/OverlayHost.tsx` mounts only the active one. Its exit animation is
+  CSS, so unmounting on close still animates out.
+
+With no routes left, the titlebar has no nav strip: it is sidebar toggle,
+wordmark, a context slot holding only `LibrarySearch`, and the window buttons.
+Settings moved to `.sidebar-footer`, next to the rest of the library's
+navigation. Now Playing opens from `.player-promote`, the invisible full-bar
+button over the footer player.
+
+The search field is `<search>` (`role="search"` natively) wrapping the input.
+It collapses to its own glyph with no state at all: `:not(:focus-within):has(>
+input:placeholder-shown)` shrinks the pill to `--sp-8` and re-centres the icon
+at `left: 50%`. It stays transparent until hovered or focused, so it reads as
+chrome rather than as a field sitting in the titlebar.
+
+**The player is rendered twice from one component, and where it sits is the
+whole layout switch.** The footer bar's copy is inside `.app-shell`, so the
+height-tier and footer-bar rules in `layout.css` reach it; the overlay's copy
+is portaled outside the shell, so none of those descendant selectors match and
+it falls through to the full-window layout. `Player`'s `expanded` prop only
+decides what is in the DOM (promote button vs close button and lyrics toggle),
+never how it is laid out.
+
+## The playback queue
+
+`AudioContext` owns a real queue. Callers hand over a list **once**, when they
+start playback:
+
+- `playQueue(tracks, startIndex)` replaces the queue; `playNext()` /
+  `playPrevious()` take no arguments and walk it by index; `enqueue(tracks)`
+  appends. `play(track)` is a queue of one, and is honest about that.
+- `pickIndex(length, current, step, shuffle, repeat)` is the one place that
+  knows what a step means. Shuffle still ignores direction (no play history);
+  repeat `all` wraps; repeat `none` returns `null`; repeat `one` re-seeks in
+  the caller.
+- `queueRef` / `queueIndexRef` are the source of truth because the `ended`
+  listener is registered once and must not close over a stale queue; state
+  mirrors them for the UI.
+
+Before this, `playNext(tracks)` took a list on every call and `App.tsx` set the
+queue globally to `filteredTracks` — so folder and album scoping never reached
+playback, and starting a track inside an album left it on the next press.
+`LibraryView` now queues `displayTracks`, the list actually on screen.
 
 ## IPC Conventions
 
@@ -213,9 +289,12 @@ that stays put is `position: sticky` inside it:
   (`--track-head-h`) so group headers can pin at `top: var(--head-h)`.
 - The flat list is virtualized (absolutely positioned rows inside a spacer);
   grouped views render in full.
+- `.library-toolbar` — breadcrumb + the grouping and density switches — is a
+  `<header>` inside `<section class="library">`, sticky at its top. Scoped to a
+  sectioning element it maps to `generic`, **not** a second `banner`; jsdom's
+  a11y shim gets this wrong, so don't trust a `getByRole('banner')` there.
 - Ancestors (`.app-main`, `.view-content`) are `overflow: hidden` for views
-  that scroll internally — `.view-content:has(> .library)`. Document-style
-  views (settings, tag editor) still scroll in `.view-content`.
+  that scroll internally — `.view-content:has(> .library)`.
 - Every grouping mode (album / artist / path) collapses via one `GroupToggle`
   button next to the heading, keyed by group in a `collapsedGroups` set — not
   `<details>`. Album groups put artwork outside the heading and path groups put
@@ -225,6 +304,60 @@ that stays put is `position: sticky` inside it:
   navigation order.
 - `data-group-key` on each group section is what ArrowLeft uses to find the
   heading to move focus to.
+- **The album group heading's cover is a play button** (`.album-art-play` →
+  `onPlayGroup`), which queues that album from track 1. It can be a button
+  because it sits outside `<header>` and outside every row — a grouped row is
+  itself a `<button>`, so a control nested in one would be invalid markup and
+  silently unnested by the parser. Row thumbnails have no handler; clicking a
+  row already plays it.
+
+## Layout: list or grid
+
+Density is the layout selector, not just a row height. `Density` is
+`compact | normal | relaxed | grid-sm | grid-lg`, and `isGridDensity()` — a
+type predicate, so call sites narrow — decides which component `LibraryView`
+renders.
+
+- **What a grid card is follows the grouping selector.** Ungrouped shows one
+  card per track that plays on click; album / artist / path show one card per
+  bucket that drills in. That is why there is no separate "browse by" control.
+- Drilling in sets `UIContext.selectedGroup` (a `GroupScope`: grouping, the
+  `bucketKey`, and a label) and **always renders a list**, whatever density is
+  selected. Density is deliberately left untouched so backing out restores the
+  chosen card size; `TrackTable.rowDensityOf()` maps a grid density to `normal`
+  for the rows it has to draw meanwhile.
+- **`selectedFolderPath` and `selectedGroup` compose; a playlist excludes
+  both.** A playlist is its own list rather than a filter over the tree, so
+  `selectPlaylist` clears the other two (`NO_SCOPE`). But drilling into a card
+  narrows the folder you were already browsing: `selectGroup` keeps the folder
+  and `displayTracks` applies *both* filters. Clearing the folder there made a
+  card labelled "3 tracks" open 5 — the same album, but library-wide. Picking a
+  different folder still drops the drill-in, since the bucket may not exist
+  under it.
+- `MediaCard` uses the stretched-link pattern: the heading holds the button and
+  `.card-open::after { inset: 0 }` spreads its hit area over the card. A
+  `<button>` takes only *phrasing* content, so `<button><h3>…</h3></button>`
+  would be invalid; the play button is a *sibling*, never a descendant.
+- `utils/grouping.ts` (`bucketKey`, `groupLabel`, `buildGroups`) is shared by
+  `TrackTable`, `LibraryGrid` and `LibraryView`'s scope filter. It used to be
+  module-private inside `TrackTable`.
+
+## One-of-N controls
+
+`SegmentedControl` and `Rating` are the same native pattern: `<fieldset>` +
+`<legend class="sr-only">` + radios shrunk to a pixel (not `display: none`, so
+they stay focusable) with `label:has(:checked)` carrying the look. A radio
+group *is* a radiogroup — no `role`, no `tabIndex`, no key handlers, and arrow
+navigation comes from the platform.
+
+`SegmentedControl` generates its own radio `name` per instance: grouping and
+density sit side by side, and a shared name would make them one group.
+
+`Rating` renders its stars in reverse DOM order and flips them back with
+`flex-direction: row-reverse`, which is what lets `:checked ~ label` fill every
+star to the left with a plain sibling selector. A separate clear button exists
+because a radio group has no uncheck gesture. `rating` was already in the
+schema, the scanner and the model — only the editor was missing it.
 
 ## Keyboard browsing
 
@@ -270,7 +403,10 @@ and writes `--ambient-1/2/3` (dark → light) to the root element.
 
 ## Player tiers
 
-Two independent axes collapse the player, both in `player.css`:
+Two independent axes collapse the player, both in `layout.css`. Note these
+apply to the **footer bar's** copy of the player — the overlay's copy is
+portaled outside `.app-shell`, so every `.app-shell[…] &` rule below misses it
+and it keeps the full-window layout.
 
 - **Height** → `data-height-tier` on `.app-shell` (`normal` / `snug` /
   `compact` / `mini`, from `useHeightTier`). Height has to be JS because it
@@ -284,8 +420,10 @@ Two independent axes collapse the player, both in `player.css`:
 Two separate height thresholds, and conflating them is a trap:
 
 - `CHROME_MAX_HEIGHT` (480) — a **geometric floor**. Titlebar (40) + player bar
-  (72) stop being affordable, so they're hidden and PlayerView takes the whole
-  window. `useWindowScale` uses this one for "am I the small window?".
+  (72) stop being affordable, so they're hidden and the footer player takes the
+  whole window — no overlay involved. `useWindowScale` uses this one for "am I
+  the small window?", and closes the overlay on the way down so the same screen
+  isn't stacked on itself.
 - `COMPACT_MAX_HEIGHT` (300) — a **styling choice**. The normal centred stack
   still reads fine above this once the chrome is gone; the 300–479 band is the
   `snug` tier (chrome hidden, normal layout, compressed in two steps by
@@ -305,17 +443,18 @@ no `.is-overflowing` class.
 
 Shuffle and repeat live in `SettingsContext` (persisted) and are *read* by
 `AudioContext` through `useOptionalSettings` — playback stays usable, and
-testable, without a settings provider above it. `pickTrack()` is the one place
+testable, without a settings provider above it. `pickIndex()` is the one place
 that knows what next/previous mean under shuffle and repeat; the `ended`
-handler goes through `advanceRef` so it never closes over stale modes.
+handler goes through `advanceRef` so it never closes over stale modes. See
+"The playback queue" above.
 
 Shuffle ignores direction: "previous" in a shuffled queue is another arbitrary
 track, because the engine keeps no play history.
 
 The lyrics panel replaces the progress bar and transport, and only in the
-full-window player at the `normal` height tier — the footer bar and the mini
-tiers have nowhere to put a column of text, so the toggle is hidden there
-rather than being a control that does nothing. Lyrics come from the file's
+now-playing overlay — the footer bar and the mini tiers have nowhere to put a
+column of text, so `.player-actions` (lyrics toggle + close) is not rendered at
+all unless `expanded`, rather than being controls that do nothing. Lyrics come from the file's
 tags (`common.lyrics`, synced frames flattened); there is no fetching.
 
 The footer bar has **no volume slider** — the system volume and the full player
@@ -331,20 +470,24 @@ read the same. `--shift-sm` / `--shift-md` are the travel distances.
 
 Three mechanisms carry the structural transitions:
 
-- **Now playing slides up and down** off `--player-h`, a registered
-  `@property` on `.app-player`. `display` and `flex: 1` cannot interpolate;
-  a registered length-percentage can, so the footer bar's top edge travels to
-  the top of the window and back. `.app-main` is *not* `display: none` in
-  player view any more — it fades and is squeezed by the growing player, which
-  is what makes the growth watchable.
+- **The player bar's height** is `--player-h`, a registered `@property` on
+  `.app-player`. `display` and `flex: 1` cannot interpolate; a registered
+  length-percentage can, so the bar's top edge travels rather than jumping when
+  a track starts (`0px` → `--player-bar-h`, via the `:has(.player-view[data-empty])`
+  retract) or when the window crosses a height tier. Now Playing is an overlay,
+  so `100%` here is only ever the small-window case.
+- **Now playing rises from the bottom edge** — `.overlay-dialog[data-variant='full']`
+  starts at `translate: 0 var(--shift-md)` with `@starting-style`, which reads
+  as the bar expanding upward. The dialog's `::backdrop` fades with it.
 - **The sidebar** animates the outer `.app-sidebar`'s `flex-basis` from its
   persisted pixel width to `0`. `UIContext` exposes that width as
   `--sidebar-w` on the shell; `.library-sidebar` keeps the fixed width while
   the outer box clips it, so the contents slide out without reflowing.
-- **Anything that toggles `display`** — the four `.app-view`s, dialogs,
-  popovers — pairs `transition-behavior: allow-discrete` with
-  `@starting-style`. Without `allow-discrete` the outgoing element vanishes on
-  frame one and only the enter would animate.
+- **Anything that toggles `display`** — every overlay, dialog and popover —
+  pairs `transition-behavior: allow-discrete` with `@starting-style`. Without
+  `allow-discrete` the outgoing element vanishes on frame one and only the
+  enter would animate. On a `<dialog>` the `overlay` property needs the same
+  treatment, or it leaves the top layer immediately.
 
 Two deliberate exceptions:
 

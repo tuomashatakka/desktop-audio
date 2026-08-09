@@ -10,6 +10,14 @@ export { Skeleton } from './Skeleton'
 
 export { WaveformProgress } from './WaveformProgress'
 
+export { AlbumArt } from './AlbumArt'
+
+export { SegmentedControl, type SegmentedOption } from './SegmentedControl'
+
+export { Rating, MAX_RATING } from './Rating'
+
+export { Overlay, type OverlayVariant } from './Overlay'
+
 export { Dialog } from './Dialog'
 
 export { PromptDialog } from './PromptDialog'

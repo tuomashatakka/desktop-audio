@@ -23,6 +23,8 @@ export type IconName =
   'density-normal' |
   'density-relaxed' |
   'edit' |
+  'grid-lg' |
+  'grid-sm' |
   'library' |
   'lyrics' |
   'maximize' |
@@ -37,6 +39,7 @@ export type IconName =
   'search' |
   'settings' |
   'shuffle' |
+  'star' |
   'waveform'
 
 export interface TrackFields {
@@ -92,6 +95,7 @@ export type TrackDTO = Track
  */
 export const PRIMARY_TAG_FIELDS = [
   'title', 'artist', 'album', 'albumArtist', 'year', 'genre', 'trackNumber',
+  'rating',
 ] as const
 
 export const EXTENDED_TAG_FIELDS = [

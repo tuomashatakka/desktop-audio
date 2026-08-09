@@ -27,8 +27,11 @@ import { useSortableTable } from '../../hooks/useSortableTable'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useArtwork } from '../../hooks/useArtwork'
 import type { ColumnKey, ColumnConfig } from '../../hooks/useColumnConfig'
-import { useUI } from '../../contexts'
+import { useUI, isGridDensity } from '../../contexts'
 import type { Density, Grouping, Track } from '../../contexts'
+import { buildGroups } from '../../utils/grouping'
+import type { GroupBlock } from '../../utils/grouping'
+import { AlbumArt } from '../atomic/AlbumArt'
 import { Skeleton } from '../atomic/Skeleton'
 import { Popover } from '../atomic/Popover'
 import type { PopoverPoint } from '../atomic/Popover'
@@ -40,10 +43,23 @@ import { formatTime, isoDuration } from '../../utils/time'
 import { listenAll } from '../../utils/events'
 
 
-const ROW_HEIGHT_BY_DENSITY: Record<Density, number> = {
+/** List densities only — a grid density renders `LibraryGrid`, not this. */
+type RowDensity = Exclude<Density, 'grid-sm' | 'grid-lg'>
+
+const ROW_HEIGHT_BY_DENSITY: Record<RowDensity, number> = {
   compact: 28,
   normal:  40,
   relaxed: 64,
+}
+
+/**
+ * A drilled-into scope renders as a list even while a grid density is
+ * selected, so the table has to have an answer for one. Normal rows are it —
+ * and the selected density is left untouched so backing out of the scope
+ * restores the grid.
+ */
+function rowDensityOf (density: Density): RowDensity {
+  return isGridDensity(density) ? 'normal' : density
 }
 
 const SKELETON_ROW_COUNT = 20
@@ -73,11 +89,14 @@ function withTableSemantics<T> (enabled: boolean, value: T): T | undefined {
 }
 
 interface TrackTableProps {
-  readonly tracks:         readonly Track[]
-  readonly isLoading:      boolean
-  readonly currentTrack:   Track | null
-  readonly isPlaying:      boolean
-  readonly onPlay:         (track: Track, index: number) => void
+  readonly tracks:       readonly Track[]
+  readonly isLoading:    boolean
+  readonly currentTrack: Track | null
+  readonly isPlaying:    boolean
+  readonly onPlay:       (track: Track, index: number) => void
+
+  /** Play a whole group — the album heading's cover. */
+  readonly onPlayGroup?:   (tracks: readonly Track[]) => void
   readonly onContextMenu?: (track: Track, point: PopoverPoint) => void
   readonly onNavigate?:    (path: string | null) => void
   readonly roots?:         readonly string[]
@@ -94,37 +113,12 @@ function formatSize (bytes: number): string {
     : `${Math.round(bytes / BYTES_PER_KB)} KB`
 }
 
-/** The directory holding `path`, handling both `/` and `\\` separators. */
-function parentDir (path: string): string {
-  const idx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-  return idx > 0 ? path.slice(0, idx) : '/'
-}
-
 /** Art and index columns carry no orderable value. */
 function isSortableKey (key: ColumnKey): key is SortKey {
   return key !== 'art' && key !== 'index'
 }
 
-/** Always square, always cropped — see `.album-art` in views.css. */
-type AlbumArtProps = { readonly trackId?: string; readonly color?: string }
-
-/**
- * Art arrives after the row does.
- *
- * Track DTOs carry no `albumArt` — it is fetched per track, downscaled to a
- * thumbnail host-side, and cached across mounts by {@link useArtwork}. The
- * `coverColor` block is not a placeholder so much as the resting state: most
- * tracks have no cover at all, and this is what they keep showing.
- */
-function AlbumArt ({ trackId, color }: AlbumArtProps) {
-  const src = useArtwork(trackId)
-
-  return src
-    ? <img className='album-art' src={ src } alt='' loading='lazy' />
-    : <span className='album-art' style={{ background: color }} />
-}
-
-type CellRenderer = (track: Track, index: number, density: Density) => React.ReactNode
+type CellRenderer = (track: Track, index: number, density: RowDensity) => React.ReactNode
 
 /** Column renderers keep adding a column from inflating one giant switch. */
 const CELL_RENDERERS: Record<ColumnKey, CellRenderer> = {
@@ -165,7 +159,7 @@ const CELL_RENDERERS: Record<ColumnKey, CellRenderer> = {
     track.path,
 }
 
-function cellValue (track: Track, key: ColumnKey, index: number, density: Density): React.ReactNode {
+function cellValue (track: Track, key: ColumnKey, index: number, density: RowDensity): React.ReactNode {
   return CELL_RENDERERS[key](track, index, density)
 }
 
@@ -301,22 +295,6 @@ function ColumnMenu ({
   </Popover>
 }
 
-/** Group identity for a track under the active grouping mode. */
-function bucketKey (track: Track, grouping: Grouping): string {
-  switch (grouping) {
-    case 'album': return `${track.artist}​${track.album}`
-    case 'artist': return track.artist || 'Unknown Artist'
-    case 'path': return parentDir(track.path)
-    default: return ''
-  }
-}
-
-interface GroupBlock {
-  readonly key:      string
-  readonly label:    string
-  readonly subtitle: string
-  readonly tracks:   readonly Track[]
-}
 
 /**
  * The disclosure control for a group heading.
@@ -345,14 +323,6 @@ function GroupToggle ({ open, controls, label, onToggle }: GroupToggleProps) {
       onToggle(event.altKey) }>
     <Icon name='chevron-right' />
   </button>
-}
-
-function groupLabel (track: Track, grouping: Grouping, path: string): string {
-  if (grouping === 'album')
-    return track.album || 'Unknown Album'
-  if (grouping === 'artist')
-    return track.artist || 'Unknown Artist'
-  return path
 }
 
 /** Absolute placement for one virtualized row inside the spacer. */
@@ -400,6 +370,7 @@ interface TrackGroupProps {
   readonly indexOf:     (track: Track, fallback: number) => number
   readonly onToggle:    (key: string, toggleAll: boolean) => void
   readonly onNavigate?: (path: string | null) => void
+  readonly onPlay?:     (tracks: readonly Track[]) => void
 }
 
 /**
@@ -410,7 +381,7 @@ interface TrackGroupProps {
  * it, and artist groups use a plain title.
  */
 function TrackGroup ({
-  group, grouping, headingId, collapsed, roots, renderRow, indexOf, onToggle, onNavigate,
+  group, grouping, headingId, collapsed, roots, renderRow, indexOf, onToggle, onNavigate, onPlay,
 }: TrackGroupProps) {
   const rowsId = `${headingId}-rows`
 
@@ -438,7 +409,19 @@ function TrackGroup ({
       data-collapsed={ collapsed || undefined }
       data-group-key={ group.key }
       aria-labelledby={ headingId }>
-      <AlbumArt trackId={ group.tracks[0].id } color={ group.tracks[0].coverColor } />
+      {/* The cover plays the album. It can be a button here because the
+            artwork sits outside <header> and outside every row — a row is
+            itself a <button> in grouped mode, so a nested control there
+            would be invalid and silently unnested by the parser. */}
+      <button
+        className='album-art-play'
+        aria-label={ `Play ${group.label}` }
+        type='button'
+        onClick={ () =>
+          onPlay?.(group.tracks) }>
+        <AlbumArt trackId={ group.tracks[0].id } color={ group.tracks[0].coverColor } />
+        <Icon name='play' />
+      </button>
 
       <header>
         {toggle}
@@ -495,34 +478,6 @@ function indexOfTrack (sorted: readonly Track[], track: Track, fallback = 0): nu
   return index >= 0 ? index : fallback
 }
 
-/** Buckets an already-sorted list into labelled groups; empty when ungrouped. */
-function buildGroups (sorted: readonly Track[], grouping: Grouping): readonly GroupBlock[] {
-  if (grouping === 'none')
-    return []
-
-  const buckets = new Map<string, Track[]>()
-  for (const t of sorted) {
-    const k = bucketKey(t, grouping)
-    if (!buckets.has(k))
-      buckets.set(k, [])
-    buckets.get(k)!.push(t)
-  }
-
-  const out: GroupBlock[] = []
-  for (const [ key, tracks ] of buckets) {
-    const first = tracks[0]
-    const label = groupLabel(first, grouping, key)
-
-    const count    = `${tracks.length} track${tracks.length === 1 ? '' : 's'}`
-    const subtitle = grouping === 'album'
-      ? `${first.artist || 'Unknown Artist'} · ${count}`
-      : count
-
-    out.push({ key, label, subtitle, tracks })
-  }
-  return out
-}
-
 /** See module docstring. */
 export function TrackTable ({
   tracks,
@@ -530,12 +485,14 @@ export function TrackTable ({
   currentTrack,
   isPlaying,
   onPlay,
+  onPlayGroup,
   onContextMenu,
   onNavigate,
   roots = [],
 }: TrackTableProps) {
   const scrollRef             = useRef<HTMLDivElement>(null)
   const { density, grouping } = useUI()
+  const rowDensity            = rowDensityOf(density)
   const {
     columns,
     visible,
@@ -577,7 +534,7 @@ export function TrackTable ({
     })
   }, [ groups ])
 
-  const rowHeight = ROW_HEIGHT_BY_DENSITY[density]
+  const rowHeight = ROW_HEIGHT_BY_DENSITY[rowDensity]
 
   /** Skeletons stand in for an empty list only — never over cached rows. */
   const showSkeleton   = isLoading && sorted.length === 0
@@ -724,7 +681,7 @@ export function TrackTable ({
         role={ tableSemantics ? 'cell' : undefined }>
         {col.key === 'index' && active && isPlaying
           ? <Icon name='play' />
-          : cellValue(track, col.key, index, density)}
+          : cellValue(track, col.key, index, rowDensity)}
       </span>
     )
 
@@ -761,7 +718,7 @@ export function TrackTable ({
       onKeyDown={ handleKeyDown }>
       {cells}
     </div>
-  }, [ tableSemantics, visible, density, currentTrack, isPlaying, onPlay, onContextMenu, focusedIndex, moveRowFocus, focusRowAt, collapseGroupOf, expandGroupOf ])
+  }, [ tableSemantics, visible, rowDensity, currentTrack, isPlaying, onPlay, onContextMenu, focusedIndex, moveRowFocus, focusRowAt, collapseGroupOf, expandGroupOf ])
 
   // Keep the playing track in view (flat list only — grouped views aren't
   // virtualized, so the virtualizer has no offsets to scroll to).
@@ -792,7 +749,7 @@ export function TrackTable ({
   return <section
     className='track-table'
     style={ style }
-    data-density={ density }
+    data-density={ rowDensity }
     aria-label='Tracks'
     aria-colcount={ withTableSemantics(tableSemantics, visible.length) }
     aria-rowcount={ withTableSemantics(tableSemantics, bodyRowCount + ARIA_HEADER_ROW_INDEX) }
@@ -841,7 +798,8 @@ export function TrackTable ({
               renderRow={ renderRow }
               indexOf={ indexOf }
               onToggle={ toggleGroup }
-              onNavigate={ onNavigate } />
+              onNavigate={ onNavigate }
+              onPlay={ onPlayGroup } />
           )}
         </div>
       }

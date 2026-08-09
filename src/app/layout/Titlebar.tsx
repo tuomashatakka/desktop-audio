@@ -1,39 +1,22 @@
 import type { ReactNode } from 'react'
 import { useUI } from '../contexts'
-import type { ViewType } from '../contexts'
 import { useHost } from '../data'
 import { Icon } from '../components/atomic'
-import type { IconName } from '../services/types'
 
-
-const NAV_ITEMS: readonly { view: ViewType; icon: IconName }[] = [
-  { view: 'library', icon: 'library' },
-  { view: 'player', icon: 'play' },
-  { view: 'settings', icon: 'settings' },
-]
-
-const NAV_LABELS: Record<ViewType, string> = {
-  'library':    'Library',
-  'player':     'Player',
-  'settings':   'Settings',
-  'tag-editor': 'Tag Editor',
-}
 
 type TitlebarProps = { readonly children?: ReactNode }
 
+/**
+ * Window chrome: sidebar toggle, wordmark, a context slot, window buttons.
+ *
+ * There is no view switcher any more. The library is the only view — Now
+ * Playing, Settings and the Tag Editor are overlays over it — so the slot
+ * carries just the library search, and Settings lives at the foot of the
+ * sidebar where the rest of the library navigation is.
+ */
 export function Titlebar ({ children }: TitlebarProps) {
-  const { currentView, setView, sidebarOpen, toggleSidebar } = useUI()
-  const host                                                 = useHost()
-
-  const handleSidebar = () => {
-    if (currentView === 'player') {
-      setView('library')
-      if (!sidebarOpen)
-        toggleSidebar()
-      return
-    }
-    toggleSidebar()
-  }
+  const { sidebarOpen, toggleSidebar } = useUI()
+  const host                           = useHost()
 
   return <>
     <button
@@ -41,34 +24,11 @@ export function Titlebar ({ children }: TitlebarProps) {
       aria-label={ sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar' }
       aria-expanded={ sidebarOpen }
       type='button'
-      onClick={ handleSidebar }>
+      onClick={ toggleSidebar }>
       <Icon name='menu' />
     </button>
 
     <Icon className='logo-icon' name='waveform' />
-
-    {/* Icon-only: the label is carried by `aria-label` and the `title`
-          tooltip, so the tab strip costs the titlebar three glyphs of width
-          instead of a third of it. */}
-    <nav aria-label='Primary'>
-      <ul className='titlebar-nav'>
-        {NAV_ITEMS.map(({ view, icon }) =>
-          <li key={ view }>
-            <button
-              className='nav-item'
-              aria-label={ NAV_LABELS[view] }
-              aria-current={ currentView === view ? 'page' : undefined }
-              type='button'
-              title={ NAV_LABELS[view] }
-              onClick={ () =>
-                setView(view) }>
-              <Icon className='nav-icon' name={ icon } />
-            </button>
-          </li>
-        )}
-      </ul>
-    </nav>
-
     {children && <div className='titlebar-context'>{children}</div>}
 
     <menu className='titlebar-controls' aria-label='Window controls'>

@@ -23,7 +23,7 @@ import type { TagField, TrackDTO } from '../services/types'
 import { PRIMARY_TAG_FIELDS, EXTENDED_TAG_FIELDS } from '../services/types'
 import { useData } from '../data'
 import { useArtwork } from '../hooks/useArtwork'
-import { Button, Icon, Input } from '../components/atomic'
+import { Button, Icon, Input, Rating } from '../components/atomic'
 import { formatTime, isoDuration } from '../utils/time'
 
 
@@ -31,7 +31,7 @@ import { formatTime, isoDuration } from '../utils/time'
 /** How a tag field is presented: its visible label and which control it gets. */
 interface TagFieldMeta {
   label: string
-  type:  'text' | 'number' | 'multiline'
+  type:  'text' | 'number' | 'multiline' | 'rating'
 }
 
 const FIELD_META: Record<TagField, TagFieldMeta> = {
@@ -42,6 +42,7 @@ const FIELD_META: Record<TagField, TagFieldMeta> = {
   year:        { label: 'Year', type: 'number' },
   genre:       { label: 'Genre', type: 'text' },
   trackNumber: { label: 'Track No.', type: 'number' },
+  rating:      { label: 'Rating', type: 'rating' },
   composer:    { label: 'Composer', type: 'text' },
   trackTotal:  { label: 'Track Total', type: 'number' },
   discNumber:  { label: 'Disc No.', type: 'number' },
@@ -84,7 +85,7 @@ function parseField (field: TagField, value: string): string | number | undefine
   if (!trimmed)
     return undefined
 
-  if (FIELD_META[field].type !== 'number')
+  if (!(FIELD_META[field].type === 'number' || FIELD_META[field].type === 'rating'))
     return trimmed
 
   const parsed = Number(trimmed)
@@ -112,6 +113,20 @@ function TagInput ({ field, value, onChange }: TagInputProps) {
 
   const handleChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     onChange(field, event.target.value)
+
+  // A rating is a fixed 0-5 scale, so it gets a control that says so rather
+  // than a number box the user has to guess the range of. `0` clears it,
+  // which `parseField` maps back to "no tag" via the blank string.
+  if (type === 'rating')
+    return <div className='field rating-field'>
+      <span>{label}</span>
+
+      <Rating
+        legend={ label }
+        value={ value ? Number(value) : undefined }
+        onChange={ next =>
+          onChange(field, next ? String(next) : '') } />
+    </div>
 
   if (type === 'multiline')
     return <label className='field'>
@@ -360,10 +375,10 @@ function TagEditorForm ({ track, onClose, onSaved }: TagEditorFormProps) {
 }
 
 export function TagEditorView () {
-  const { setView, editingTrackId } = useUI()
-  const { registry, setTracks }     = useLibrary()
-  const tracks                      = registry.getAllTracks()
-  const track                       = tracks.find(candidate =>
+  const { closeOverlay, editingTrackId } = useUI()
+  const { registry, setTracks }          = useLibrary()
+  const tracks                           = registry.getAllTracks()
+  const track                            = tracks.find(candidate =>
     candidate.id === editingTrackId) || tracks[0]
 
   if (!track)
@@ -374,8 +389,7 @@ export function TagEditorView () {
   return <TagEditorForm
     key={ track.id }
     track={ track }
-    onClose={ () =>
-      setView('library') }
+    onClose={ closeOverlay }
     onSaved={ () =>
     // The models were edited in place, so nothing downstream has changed
     // identity. Republishing them is what tells React to re-render the

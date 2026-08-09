@@ -4,28 +4,32 @@ import { UIProvider, useUI } from '../../src/app/contexts/UIContext'
 
 function TestConsumer () {
   const {
-    currentView,
-    previousView,
+    overlay,
+    selectedGroup,
     sidebarOpen,
     selectedFolderPath,
     editingTrackId,
     sidebarWidth,
-    setView,
+    openOverlay,
+    closeOverlay,
     toggleSidebar,
     selectFolder,
+    selectGroup,
     setEditingTrack,
     setSidebarWidth,
   } = useUI()
 
   return (
     <div>
-      <span data-testid='view'>{currentView}</span>
-      <span data-testid='previous-view'>{previousView ?? 'null'}</span>
+      <span data-testid='overlay'>{overlay ?? 'null'}</span>
+      <span data-testid='group'>{selectedGroup?.label ?? 'null'}</span>
       <span data-testid='sidebar'>{sidebarOpen.toString()}</span>
       <span data-testid='folder'>{selectedFolderPath ?? 'null'}</span>
       <span data-testid='editing'>{editingTrackId ?? 'null'}</span>
       <span data-testid='sidebar-width'>{sidebarWidth}</span>
-      <button onClick={() => setView('player')}>setView</button>
+      <button onClick={() => openOverlay('player')}>openOverlay</button>
+      <button onClick={closeOverlay}>closeOverlay</button>
+      <button onClick={() => selectGroup({ grouping: 'album', key: 'k', label: 'Kid A' })}>selectGroup</button>
       <button onClick={toggleSidebar}>toggleSidebar</button>
       <button onClick={() => selectFolder('/test/path')}>selectFolder</button>
       <button onClick={() => setEditingTrack('track-1')}>setEditingTrack</button>
@@ -42,15 +46,15 @@ describe('UIContext', () => {
       </UIProvider>
     )
 
-    expect(screen.getByTestId('view')).toHaveTextContent('library')
-    expect(screen.getByTestId('previous-view')).toHaveTextContent('null')
+    expect(screen.getByTestId('overlay')).toHaveTextContent('null')
+    expect(screen.getByTestId('group')).toHaveTextContent('null')
     expect(screen.getByTestId('sidebar')).toHaveTextContent('false')
     expect(screen.getByTestId('folder')).toHaveTextContent('null')
     expect(screen.getByTestId('editing')).toHaveTextContent('null')
     expect(screen.getByTestId('sidebar-width')).toHaveTextContent('220')
   })
 
-  it('setView updates the current and previous views', async () => {
+  it('opens and closes one overlay at a time', async () => {
     render(
       <UIProvider>
         <TestConsumer />
@@ -58,11 +62,53 @@ describe('UIContext', () => {
     )
 
     await act(async () => {
-      screen.getByText('setView').click()
+      screen.getByText('openOverlay').click()
+    })
+    expect(screen.getByTestId('overlay')).toHaveTextContent('player')
+
+    await act(async () => {
+      screen.getByText('closeOverlay').click()
+    })
+    expect(screen.getByTestId('overlay')).toHaveTextContent('null')
+  })
+
+  it('a group narrows within the folder instead of replacing it', async () => {
+    render(
+      <UIProvider>
+        <TestConsumer />
+      </UIProvider>
+    )
+
+    await act(async () => {
+      screen.getByText('selectFolder').click()
+    })
+    await act(async () => {
+      screen.getByText('selectGroup').click()
     })
 
-    expect(screen.getByTestId('view')).toHaveTextContent('player')
-    expect(screen.getByTestId('previous-view')).toHaveTextContent('library')
+    // Both survive: an album card counted inside a folder must open the same
+    // set it advertised, not that album across the whole library.
+    expect(screen.getByTestId('group')).toHaveTextContent('Kid A')
+    expect(screen.getByTestId('folder')).toHaveTextContent('/test/path')
+  })
+
+  it('picking a different folder drops the drilled-into group', async () => {
+    render(
+      <UIProvider>
+        <TestConsumer />
+      </UIProvider>
+    )
+
+    await act(async () => {
+      screen.getByText('selectGroup').click()
+    })
+    await act(async () => {
+      screen.getByText('selectFolder').click()
+    })
+
+    // The bucket may not exist under the new folder, so it cannot survive.
+    expect(screen.getByTestId('folder')).toHaveTextContent('/test/path')
+    expect(screen.getByTestId('group')).toHaveTextContent('null')
   })
 
   it('toggleSidebar toggles sidebar state', async () => {
@@ -95,7 +141,7 @@ describe('UIContext', () => {
     expect(screen.getByTestId('folder')).toHaveTextContent('/test/path')
   })
 
-  it('setEditingTrack updates editing track and switches to tag-editor view', async () => {
+  it('setEditingTrack updates editing track and opens the tag-editor overlay', async () => {
     render(
       <UIProvider>
         <TestConsumer />
@@ -107,8 +153,7 @@ describe('UIContext', () => {
     })
 
     expect(screen.getByTestId('editing')).toHaveTextContent('track-1')
-    expect(screen.getByTestId('view')).toHaveTextContent('tag-editor')
-    expect(screen.getByTestId('previous-view')).toHaveTextContent('library')
+    expect(screen.getByTestId('overlay')).toHaveTextContent('tag-editor')
   })
 
   it('clamps and persists sidebar width updates', async () => {

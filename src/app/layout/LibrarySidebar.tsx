@@ -31,7 +31,7 @@ export function LibrarySidebar () {
     selectFolder,
     selectPlaylist,
     setSidebarWidth,
-    setView,
+    openOverlay,
   } = useUI()
 
   const folders = Array.from(registry.folders.values())
@@ -90,10 +90,7 @@ export function LibrarySidebar () {
       <FolderTree
         folders={ folders }
         selectedPath={ selectedFolderPath }
-        onSelect={ path => {
-          selectFolder(path)
-          setView('library')
-        } }
+        onSelect={ selectFolder }
         onToggle={ toggleFolder } />
     </details>
 
@@ -113,10 +110,8 @@ export function LibrarySidebar () {
               className={ selectedPlaylistId === playlist.id ? 'active' : '' }
               aria-current={ selectedPlaylistId === playlist.id || undefined }
               type='button'
-              onClick={ () => {
-                selectPlaylist(playlist.id)
-                setView('library')
-              } }>
+              onClick={ () =>
+                selectPlaylist(playlist.id) }>
               <Icon name='music' />
               <span className='name'>{playlist.name}</span>
               <small>{playlist.tracks.length}</small>
@@ -136,5 +131,19 @@ export function LibrarySidebar () {
         </li>
       </ul>
     </details>
+
+    {/* Settings used to be a titlebar tab. It sits here now because it is the
+        one destination left, and this is where the rest of the library's
+        navigation already lives. */}
+    <footer className='sidebar-footer'>
+      <button
+        className='settings-toggle'
+        type='button'
+        onClick={ () =>
+          openOverlay('settings') }>
+        <Icon name='settings' />
+        <span className='name'>Settings</span>
+      </button>
+    </footer>
   </nav>
 }

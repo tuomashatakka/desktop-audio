@@ -64,12 +64,23 @@
 
 /* ─── library toolbar ──────────────────────────────────────────────────── */
 
-.library-heading {
+/*
+ * Where you are, and how the collection is laid out. It sits above the list
+ * it acts on rather than in the titlebar, and it is sticky inside `.library`
+ * so it stays put while the collection scrolls under it.
+ */
+.library-toolbar {
+  position: sticky;
+  z-index: var(--z-sticky);
+  top: 0;
   display: flex;
-  flex: 1;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
   align-items: center;
-  gap: var(--sp-2);
-  min-width: 0;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
 
   h1 {
     color: var(--text);
@@ -80,46 +91,67 @@
   }
 }
 
+.toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
+}
+
 .scan-status {
   flex: 0 0 auto;
   font-size: var(--text-xs);
   animation: view-enter var(--duration-fast) var(--ease-emphasis) both;
 }
 
-.view-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-
-  > li { display: flex; }
-}
-
 /*
  * The search field collapses to its own icon when it is neither focused nor
  * holding a query. `:placeholder-shown` is the "is it empty" test — no state,
  * no class, no JS — and the input already has a pill radius, so shrinking it
- * to the width of the glyph *is* the circle.
+ * to the width of the glyph *is* the circle. Collapsed, the glyph centres in
+ * that circle; expanded it returns to the leading edge and the text follows.
+ *
+ * It reads as chrome rather than as a field: no fill or border until you
+ * touch it.
  */
+.titlebar-search { display: flex; align-items: center; }
+
 .search-input {
   position: relative;
   width: clamp(8rem, 18vw, 250px);
   margin-block: var(--sp-2);
+  margin-inline: var(--sp-3);
   transition: width var(--duration) var(--ease-emphasis);
 
-  > input { padding-left: var(--sp-8); }
+  > input {
+    padding-left: var(--sp-8);
+    border-color: transparent;
+    background: transparent;
+    transition:
+      border-color var(--duration-fast) var(--ease),
+      background-color var(--duration-fast) var(--ease);
+  }
+
+  &:hover > input { background: var(--bg-input); }
+  &:focus-within > input { border-color: var(--border-focus); background: var(--bg-input); }
 
   > .icon {
     position: absolute;
     top: 50%;
-    left: var(--sp-2);
+    left: var(--sp-3);
     z-index: var(--z-raised);
     color: var(--text-muted);
     font-size: var(--text-lg);
     pointer-events: none;
     transform: translateY(-50%);
+    transition: left var(--duration) var(--ease-emphasis);
   }
 
-  &:not(:focus-within):has(> input:placeholder-shown) { width: var(--sp-8); }
+  &:not(:focus-within):has(> input:placeholder-shown) {
+    width: var(--sp-8);
+
+    > .icon { left: 50%; transform: translate(-50%, -50%); }
+  }
 }
 
 .menu-toggle {
@@ -160,64 +192,25 @@
   [aria-current] { color: var(--text); }
 }
 
-.density-toggle {
-  display: flex;
-  gap: var(--sp-0-5);
-  padding: var(--sp-0-5);
-  border: 0;
-  border-radius: var(--control-radius);
-  background: var(--bg-raised);
+/* ─── library grid ─────────────────────────────────────────────────────── */
 
-  label {
-    position: relative;
-    display: grid;
-    padding: var(--sp-1) var(--sp-2);
-    place-items: center;
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-    cursor: pointer;
-    transition:
-      color var(--duration-fast) var(--ease),
-      background-color var(--duration-fast) var(--ease);
+/*
+ * Card browsing. One custom property carries the size, so the two grid
+ * densities differ by a single value rather than by a second rule set.
+ */
+.library-grid {
+  --card: 128px;
 
-    &:hover { color: var(--text); background: var(--bg-hover); }
-    &:has(:checked) { color: var(--accent-contrast); background: var(--accent); }
-    &:focus-within { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-  }
-
-  input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-}
-
-.config-toggle {
-  padding: var(--sp-1) var(--sp-2);
-  color: var(--text-muted);
-  font-size: var(--text-base);
-  transition:
-    color var(--duration-fast) var(--ease),
-    background-color var(--duration-fast) var(--ease);
-
-  > .icon { transform: rotate(90deg); }
-  &:hover { color: var(--text); background: var(--bg-hover); }
-}
-
-.config-menu {
-  min-width: 200px;
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(auto-fill, minmax(var(--card), 1fr));
+  gap: var(--sp-2);
+  align-content: start;
+  min-height: 0;
+  overflow: auto;
   padding: var(--sp-3);
-  border: 0;
 
-  legend { padding-bottom: var(--sp-2); color: var(--text-muted); font-size: var(--text-xs); text-transform: uppercase; }
-
-  label {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-1) var(--sp-2);
-    font-size: var(--text-sm);
-    cursor: pointer;
-    transition: background-color var(--duration-fast) var(--ease);
-
-    &:hover { background: var(--bg-hover); }
-  }
+  &[data-size='lg'] { --card: 200px; }
 }
 
 /* ─── track table ──────────────────────────────────────────────────────── */
@@ -383,11 +376,37 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
     background: var(--bg-raised);
     transition: grid-template-columns var(--duration) var(--ease-emphasis);
 
-    > .album-art {
+    /*
+     * The cover is a button that plays the album. It is legal here because
+     * it sits outside <header> and outside every row — a grouped row is
+     * itself a <button>, and a button inside a button is invalid.
+     */
+    > .album-art-play {
+      position: relative;
       grid-row: 1;
+      display: grid;
       width: var(--album-art-lg);
+      padding: 0;
+      overflow: hidden;
       border-radius: var(--radius-lg);
       transition: width var(--duration) var(--ease-emphasis);
+
+      > .album-art { width: 100%; height: 100%; border-radius: inherit; }
+
+      > .icon {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        padding: 28%;
+        color: var(--text);
+        background: rgb(0 0 0 / 45%);
+        opacity: 0;
+        transition: opacity var(--duration-fast) var(--ease);
+      }
+
+      &:hover > .icon,
+      &:focus-visible > .icon { opacity: 1; }
     }
 
     > header {
@@ -407,7 +426,7 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
     &[data-collapsed] {
       grid-template-columns: var(--album-art-sm) minmax(0, 1fr);
 
-      > .album-art { grid-row: auto; width: var(--album-art-sm); }
+      > .album-art-play { grid-row: auto; width: var(--album-art-sm); }
     }
 
     > .group-rows {
@@ -439,20 +458,22 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
 }
 
 /*
- * Library breakpoints. 720px is where the heading stops fitting beside the
- * toolbar controls, 620px where the density switch goes, 500px the search box.
+ * Library breakpoints. 720px is where the toolbar's two switches stop fitting
+ * beside the breadcrumb, so the controls wrap to their own row; 620px is
+ * where the grouping labels have to give way to the track list's width; 500px
+ * is where the titlebar can no longer spare room for the search box.
  */
 @media (max-width: 720px) {
-  .library-heading { display: none; }
+  .toolbar-controls { margin-left: 0; }
 }
 
 @media (max-width: 620px) {
-  .view-controls > li:has(.density-toggle) { display: none; }
   .track-table { padding-inline: var(--sp-2); }
+  .library-toolbar .segmented:not([data-icon-only]) label { padding-inline: var(--sp-2); }
 }
 
 @media (max-width: 500px) {
-  .view-controls > li:has(.search-input) { display: none; }
+  .titlebar-search { display: none; }
 }
 
 /* ─── settings ─────────────────────────────────────────────────────────── */

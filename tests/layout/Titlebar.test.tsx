@@ -16,12 +16,21 @@ describe('Titlebar', () => {
     expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('marks the active route and renders the combined context', () => {
+  it('renders the context slot and no route navigation', () => {
     renderWithProviders(<Titlebar><span>Library context</span></Titlebar>)
 
-    expect(screen.getByRole('button', { name: 'Library' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('button', { name: 'Player' })).toHaveAttribute('aria-label', 'Player')
-    expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-label', 'Settings')
     expect(screen.getByText('Library context')).toBeInTheDocument()
+
+    // The views became overlays, so there is nothing to navigate between.
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Player' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
+  })
+
+  it('keeps the window controls', () => {
+    renderWithProviders(<Titlebar />)
+
+    for (const name of [ 'Minimize', 'Maximize', 'Close' ])
+      expect(screen.getByRole('button', { name })).toBeInTheDocument()
   })
 })

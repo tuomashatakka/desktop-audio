@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef } from 'react'
+import { useId } from 'react'
 import type { ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { Overlay } from './Overlay'
 import { IconButton } from './IconButton'
 import { Icon } from './Icon'
 
@@ -12,41 +12,24 @@ interface DialogProps {
   readonly children: ReactNode
 }
 
+/** A small titled card — {@link Overlay} plus a heading and a close button. */
 export function Dialog ({ open, onClose, title, children }: DialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
-  const titleId   = useId()
+  const titleId = useId()
 
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog)
-      return
+  return <Overlay
+    className='dialog-panel'
+    open={ open }
+    labelledBy={ titleId }
+    variant='panel'
+    onClose={ onClose }>
+    <header className='dialog-header'>
+      <h2 id={ titleId }>{title}</h2>
 
-    if (open && !dialog.open)
-      dialog.showModal()
-    else if (!open && dialog.open)
-      dialog.close()
-  }, [ open ])
+      <IconButton type='button' label='Close dialog' onClick={ onClose }>
+        <Icon name='close' />
+      </IconButton>
+    </header>
 
-  return createPortal(
-    <dialog
-      ref={ dialogRef }
-      className='dialog-panel'
-      aria-labelledby={ titleId }
-      closedby='any'
-      onClose={ () => {
-        if (open)
-          onClose()
-      } }>
-      <header className='dialog-header'>
-        <h2 id={ titleId }>{title}</h2>
-
-        <IconButton type='button' label='Close dialog' onClick={ onClose }>
-          <Icon name='close' />
-        </IconButton>
-      </header>
-
-      <div className='dialog-body'>{children}</div>
-    </dialog>,
-    document.body
-  )
+    <div className='dialog-body'>{children}</div>
+  </Overlay>
 }

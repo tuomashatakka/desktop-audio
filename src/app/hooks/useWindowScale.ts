@@ -3,8 +3,11 @@
  *
  * Both sizes live in {@link useSettings} so they survive a restart, and each
  * is re-captured on the way *out* of that size — resize the mini window and
- * that becomes the size you get next time. Shrinking forces the player view;
- * growing restores whichever view was active before.
+ * that becomes the size you get next time.
+ *
+ * Shrinking closes the now-playing overlay: below `CHROME_MAX_HEIGHT` the
+ * footer player already fills the window on its own (see `.app-player` in
+ * layout.css), so a dialog on top of it would be the same screen twice.
  */
 import { useCallback } from 'react'
 import { useSettings, useUI } from '../contexts'
@@ -15,7 +18,7 @@ import { CHROME_MAX_HEIGHT } from './useHeightTier'
 /** Returns a callback that toggles the window between compact and expanded. */
 export function useWindowScale () {
   const { compactSize, expandedSize, setCompactSize, setExpandedSize } = useSettings()
-  const { previousView, setView }                                      = useUI()
+  const { closeOverlay }                                               = useUI()
   const host                                                           = useHost()
 
   return useCallback(() => {
@@ -25,21 +28,19 @@ export function useWindowScale () {
     // the layout one: everything below it is a chrome-less mini window.
     if (current.height < CHROME_MAX_HEIGHT) {
       setCompactSize(current)
-      setView(previousView ?? 'library')
       host.setWindowSize(expandedSize.width, expandedSize.height)
       return
     }
 
     setExpandedSize(current)
-    setView('player')
+    closeOverlay()
     host.setWindowSize(compactSize.width, compactSize.height)
   }, [
     compactSize,
     expandedSize,
     setCompactSize,
     setExpandedSize,
-    previousView,
-    setView,
+    closeOverlay,
     host,
   ])
 }

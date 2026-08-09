@@ -29,6 +29,8 @@ const mockDataSource: DataSource = {
   subscribe: vi.fn(() => () => {}),
   readBytes: vi.fn(),
   readMetadata: vi.fn(),
+  // A current track pulls its full-size art for the OS media session.
+  readArtwork: vi.fn(async () => null),
   upsertTrack: vi.fn(),
   deleteTrack: vi.fn(),
 }
@@ -55,6 +57,15 @@ const mockTrack: Track = {
   coverColor: 'hsl(300, 65%, 38%)',
 }
 
+/** Three tracks so next/previous have somewhere to go. */
+const album: Track[] = [
+  mockTrack,
+  { ...mockTrack, id: 'track-2', title: 'Second' },
+  { ...mockTrack, id: 'track-3', title: 'Third' },
+]
+
+const extraTrack: Track = { ...mockTrack, id: 'track-4', title: 'Fourth' }
+
 function TestConsumer () {
   const {
     isPlaying,
@@ -71,9 +82,11 @@ function TestConsumer () {
     setVolume,
     playNext,
     playPrevious,
+    playQueue,
+    enqueue,
+    queue,
+    queueIndex,
   } = useAudio()
-
-  const tracks: Track[] = [mockTrack]
 
   return (
     <div>
@@ -83,14 +96,18 @@ function TestConsumer () {
       <span data-testid='track'>{currentTrack?.title ?? 'null'}</span>
       <span data-testid='vol'>{volume.toString()}</span>
       <span data-testid='loading'>{isLoading.toString()}</span>
+      <span data-testid='queue'>{queue.map(t => t.id).join(',') || 'empty'}</span>
+      <span data-testid='queue-index'>{queueIndex.toString()}</span>
       <button onClick={() => play(mockTrack)}>play</button>
       <button onClick={pause}>pause</button>
       <button onClick={resume}>resume</button>
       <button onClick={stop}>stop</button>
       <button onClick={() => seek(60)}>seek</button>
       <button onClick={() => setVolume(0.5)}>setVolume</button>
-      <button onClick={() => playNext(tracks)}>next</button>
-      <button onClick={() => playPrevious(tracks)}>prev</button>
+      <button onClick={playNext}>next</button>
+      <button onClick={playPrevious}>prev</button>
+      <button onClick={() => playQueue(album, 1)}>playQueue</button>
+      <button onClick={() => enqueue([extraTrack])}>enqueue</button>
     </div>
   )
 }
@@ -161,5 +178,123 @@ describe('AudioContext', () => {
     expect(() => render(<TestConsumer />)).toThrow('useAudio must be used within AudioProvider')
 
     consoleError.mockRestore()
+  })
+
+  it('starts with an empty queue and no position in it', () => {
+    render(
+      wrapWithProviders(
+        <AudioProvider>
+          <TestConsumer />
+        </AudioProvider>
+      )
+    )
+
+    expect(screen.getByTestId('queue')).toHaveTextContent('empty')
+    expect(screen.getByTestId('queue-index')).toHaveTextContent('-1')
+  })
+
+  it('playQueue takes the whole list and starts where it was told', async () => {
+    render(
+      wrapWithProviders(
+        <AudioProvider>
+          <TestConsumer />
+        </AudioProvider>
+      )
+    )
+
+    await act(async () => {
+      screen.getByText('playQueue').click()
+    })
+
+    expect(screen.getByTestId('queue')).toHaveTextContent('track-1,track-2,track-3')
+    expect(screen.getByTestId('queue-index')).toHaveTextContent('1')
+    expect(screen.getByTestId('track')).toHaveTextContent('Second')
+  })
+
+  it('next and previous walk the queue that was handed over', async () => {
+    render(
+      wrapWithProviders(
+        <AudioProvider>
+          <TestConsumer />
+        </AudioProvider>
+      )
+    )
+
+    await act(async () => {
+      screen.getByText('playQueue').click()
+    })
+
+    await act(async () => {
+      screen.getByText('next').click()
+    })
+    expect(screen.getByTestId('track')).toHaveTextContent('Third')
+
+    await act(async () => {
+      screen.getByText('prev').click()
+    })
+    expect(screen.getByTestId('track')).toHaveTextContent('Second')
+  })
+
+  it('stops at the end of the queue with repeat off', async () => {
+    render(
+      wrapWithProviders(
+        <AudioProvider>
+          <TestConsumer />
+        </AudioProvider>
+      )
+    )
+
+    await act(async () => {
+      screen.getByText('playQueue').click()
+    })
+    await act(async () => {
+      screen.getByText('next').click()
+    })
+
+    // Already on the last track; there is nowhere further to go.
+    await act(async () => {
+      screen.getByText('next').click()
+    })
+
+    expect(screen.getByTestId('queue-index')).toHaveTextContent('2')
+    expect(screen.getByTestId('track')).toHaveTextContent('Third')
+  })
+
+  it('a bare play is a queue of one, so next has nowhere to go', async () => {
+    render(
+      wrapWithProviders(
+        <AudioProvider>
+          <TestConsumer />
+        </AudioProvider>
+      )
+    )
+
+    await act(async () => {
+      screen.getByText('play').click()
+    })
+
+    expect(screen.getByTestId('queue')).toHaveTextContent('track-1')
+    expect(screen.getByTestId('queue-index')).toHaveTextContent('0')
+  })
+
+  it('enqueue appends without disturbing the current position', async () => {
+    render(
+      wrapWithProviders(
+        <AudioProvider>
+          <TestConsumer />
+        </AudioProvider>
+      )
+    )
+
+    await act(async () => {
+      screen.getByText('playQueue').click()
+    })
+    await act(async () => {
+      screen.getByText('enqueue').click()
+    })
+
+    expect(screen.getByTestId('queue')).toHaveTextContent('track-1,track-2,track-3,track-4')
+    expect(screen.getByTestId('queue-index')).toHaveTextContent('1')
+    expect(screen.getByTestId('track')).toHaveTextContent('Second')
   })
 })

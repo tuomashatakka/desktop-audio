@@ -15,7 +15,9 @@
 }
 
 :where(
-  .library-heading h1,
+  .library-toolbar h1,
+  .media-card .card-open,
+  .media-card .card-sub,
   .breadcrumbs button,
   .breadcrumbs [aria-current],
   .track-header .label,
