@@ -380,8 +380,13 @@ export function AudioProvider ({ children }: AudioProviderProps) {
 
     const ctx = audioContextRef.current
     if (!analyzerRef.current) {
-      analyzerRef.current         = ctx.createAnalyser()
-      analyzerRef.current.fftSize = 256
+      analyzerRef.current = ctx.createAnalyser()
+
+      // 4096 puts a bin at ~10.8 Hz (44.1 kHz), which is what lets the
+      // spectrum panel name the note under a peak rather than guess at it —
+      // 256 bins were ~172 Hz apart, most of an octave in the low register.
+      // The wider window costs ~93 ms of time resolution, invisible here.
+      analyzerRef.current.fftSize = 4096
       analyzerRef.current.connect(ctx.destination)
       setAnalyzer(analyzerRef.current)
     }
