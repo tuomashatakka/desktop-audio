@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useUI, useAudio, useSettings } from '../../contexts'
+import { FrequencyMatrix } from './FrequencyMatrix'
 import type { Track, RepeatMode } from '../../contexts'
 import { Icon, IconButton, Button } from '../atomic'
 import { WaveformProgress } from '../atomic/WaveformProgress'
@@ -138,6 +139,106 @@ function PlayerLyrics ({ lyrics }: PlayerLyricsProps) {
   </section>
 }
 
+/**
+ * What fills the middle of the now-playing screen.
+ *
+ * One mode at a time rather than two independent toggles: lyrics and the
+ * spectrum both claim the same space, so a boolean each would let the user ask
+ * for both and leave the answer to selector order.
+ */
+type PlayerMode = 'default' | 'lyrics' | 'visualizer'
+
+type PlayerInfoProps = { readonly track: Track | null }
+
+/**
+ * Title, artist, album.
+ *
+ * The inner span on the title is the marquee track: it sizes to the text so
+ * CSS can compare it against the title box and scroll only the overflow. See
+ * `.track-title` in layout.css.
+ */
+function PlayerInfo ({ track }: PlayerInfoProps) {
+  return <hgroup className='player-info'>
+    <h2 className='track-title'>
+      <span>{track?.title ?? 'Nothing playing'}</span>
+    </h2>
+
+    <p className='track-artist'>{track?.artist}</p>
+    <p className='track-album'>{track?.album}</p>
+  </hgroup>
+}
+
+type PlayerPanelProps = {
+  readonly mode:     PlayerMode
+  readonly lyrics?:  string
+  readonly analyzer: AnalyserNode | null
+}
+
+/** Whatever the chosen mode puts in the middle of the screen. */
+function PlayerPanel ({ mode, lyrics, analyzer }: PlayerPanelProps) {
+  if (mode === 'lyrics')
+    return <PlayerLyrics lyrics={ lyrics } />
+
+  if (mode === 'visualizer')
+    return <FrequencyMatrix analyzer={ analyzer } active />
+
+  return null
+}
+
+type PlayerActionsProps = {
+  readonly mode:     PlayerMode
+  readonly hasTrack: boolean
+  readonly onMode:   (mode: Exclude<PlayerMode, 'default'>) => void
+  readonly onClose:  () => void
+}
+
+/**
+ * The overlay's top-right controls: pick what fills the middle, or leave.
+ *
+ * A menu of controls, like `.playback-controls` — same shape, so the two read
+ * alike and neither is a bare `<div>`. Each mode button is `aria-pressed`
+ * rather than a radio group: they are toggles that also happen to be mutually
+ * exclusive, and pressing the active one returns to the artwork.
+ */
+function PlayerActions ({ mode, hasTrack, onMode, onClose }: PlayerActionsProps) {
+  const showing = (target: Exclude<PlayerMode, 'default'>) =>
+    mode === target
+
+  return <menu className='player-actions' aria-label='Player'>
+    <li>
+      <IconButton
+        aria-pressed={ showing('visualizer') }
+        className='visualizer-toggle'
+        label={ showing('visualizer') ? 'Show album art' : 'Show frequency spectrum' }
+        type='button'
+        disabled={ !hasTrack }
+        onClick={ () =>
+          onMode('visualizer') }>
+        <Icon name='spectrum' />
+      </IconButton>
+    </li>
+
+    <li>
+      <IconButton
+        aria-pressed={ showing('lyrics') }
+        className='lyrics-toggle'
+        label={ showing('lyrics') ? 'Show album art' : 'Show lyrics' }
+        type='button'
+        disabled={ !hasTrack }
+        onClick={ () =>
+          onMode('lyrics') }>
+        <Icon name='lyrics' />
+      </IconButton>
+    </li>
+
+    <li>
+      <IconButton className='player-close' label='Close player' type='button' onClick={ onClose }>
+        <Icon name='close' />
+      </IconButton>
+    </li>
+  </menu>
+}
+
 function playerAriaLabel (track: Track | null): string {
   return track ? `Now playing: ${track.title}` : 'Player'
 }
@@ -169,18 +270,23 @@ type PlayerProps = {
 export function Player ({ expanded = false }: PlayerProps) {
   const { openOverlay, closeOverlay } = useUI()
   const {
-    currentTrack, isPlaying, currentTime, duration, waveformBars,
+    currentTrack, isPlaying, currentTime, duration, waveformBars, analyzer,
     pause, resume, seek, playNext, playPrevious,
   }                                                        = useAudio()
   const { shuffle, setShuffle, repeatMode, setRepeatMode } = useSettings()
   const toggleWindowScale                                  = useWindowScale()
 
-  const [ showLyrics, setShowLyrics ] = useState(false)
+  const [ mode, setMode ] = useState<PlayerMode>('default')
 
-  // Lyrics only make sense in the full-window player; the footer bar and the
-  // mini tiers have nowhere to put them, so the panel isn't in their DOM at
+  /** Clicking the active mode's button returns to the artwork. */
+  const toggleMode = (next: Exclude<PlayerMode, 'default'>) =>
+    setMode(current =>
+      current === next ? 'default' : next)
+
+  // These panels only make sense in the full-window player; the footer bar and
+  // the mini tiers have nowhere to put them, so they aren't in their DOM at
   // all rather than being hidden after the fact.
-  const lyricsOpen = showLyrics && expanded
+  const activeMode = expanded ? mode : 'default'
 
   // Shares the cache entry `PlayerArt` above already warmed for this track.
   const currentArt = useArtwork(currentTrack?.id, 'full')
@@ -188,7 +294,7 @@ export function Player ({ expanded = false }: PlayerProps) {
   return <article
     className='player-view'
     data-empty={ currentTrack ? undefined : '' }
-    data-lyrics={ lyricsOpen ? '' : undefined }
+    data-mode={ activeMode === 'default' ? undefined : activeMode }
     aria-label={ playerAriaLabel(currentTrack) }>
     {currentArt &&
         <div className='album-art-bg' aria-hidden='true'>
@@ -210,51 +316,20 @@ export function Player ({ expanded = false }: PlayerProps) {
 
     <div className='player-content'>
       <PlayerArtwork track={ currentTrack } onToggle={ toggleWindowScale } />
-
-      {/* The inner span on the title is the marquee track: it sizes to the
-            text so CSS can compare it against the title box and scroll only
-            the overflow. See `.track-title` in layout.css. */}
-      <hgroup className='player-info'>
-        <h2 className='track-title'>
-          <span>{currentTrack?.title ?? 'Nothing playing'}</span>
-        </h2>
-
-        <p className='track-artist'>{currentTrack?.artist}</p>
-        <p className='track-album'>{currentTrack?.album}</p>
-      </hgroup>
+      <PlayerInfo track={ currentTrack } />
 
       {/* A menu of controls, like `.playback-controls` below — same shape so
           the two read alike and neither is a bare <div>. Only the overlay has
           anywhere to put it. */}
       {expanded &&
-        <menu className='player-actions' aria-label='Player'>
-          <li>
-            <IconButton
-              className='lyrics-toggle'
-              aria-pressed={ showLyrics }
-              label={ showLyrics ? 'Show playback controls' : 'Show lyrics' }
-              type='button'
-              disabled={ !currentTrack }
-              onClick={ () =>
-                setShowLyrics(current =>
-                  !current) }>
-              <Icon name='lyrics' />
-            </IconButton>
-          </li>
-
-          <li>
-            <IconButton
-              className='player-close'
-              label='Close player'
-              type='button'
-              onClick={ closeOverlay }>
-              <Icon name='close' />
-            </IconButton>
-          </li>
-        </menu>
+        <PlayerActions
+          mode={ activeMode }
+          hasTrack={ Boolean(currentTrack) }
+          onMode={ toggleMode }
+          onClose={ closeOverlay } />
       }
 
-      {lyricsOpen && <PlayerLyrics lyrics={ currentTrack?.lyrics } />}
+      <PlayerPanel mode={ activeMode } lyrics={ currentTrack?.lyrics } analyzer={ analyzer } />
 
       <section className='progress-section' aria-label='Playback position'>
         <WaveformProgress

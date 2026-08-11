@@ -453,13 +453,64 @@ track, because the engine keeps no play history.
 
 The lyrics panel replaces the progress bar and transport, and only in the
 now-playing overlay — the footer bar and the mini tiers have nowhere to put a
-column of text, so `.player-actions` (lyrics toggle + close) is not rendered at
-all unless `expanded`, rather than being controls that do nothing. Lyrics come from the file's
+column of text, so `.player-actions` (the mode buttons + close) is not rendered
+at all unless `expanded`, rather than being controls that do nothing. See
+"Now playing: what fills the middle" below. Lyrics come from the file's
 tags (`common.lyrics`, synced frames flattened); there is no fetching.
 
 The footer bar has **no volume slider** — the system volume and the full player
 both already own that, and the width is better spent on the progress bar. The
 `.player-volume` element still renders; the bar-mode rules hide it.
+
+## Now playing: what fills the middle
+
+`Player` has three modes — `default` (artwork), `lyrics`, `visualizer` — and
+one at a time, not two independent toggles. Lyrics and the spectrum claim the
+same space, so a boolean each would let the user ask for both and leave the
+answer to selector order. `data-mode` on `.player-view` is what the tier CSS
+reads; `default` writes no attribute.
+
+The mode buttons live in `.player-actions` and exist only in the overlay
+(`expanded`), alongside the close button.
+
+### The frequency matrix
+
+`FrequencyMatrix` is an FFT wireframe: frequency across, time receding, and
+the dominant partials named. Four things keep it cheap enough to run at 60 fps
+next to playback:
+
+- **Static geometry is precomputed.** X and each row's baseline depend only on
+  grid indices, so only Y moves per frame.
+- **Two paths, not sixty-four.** Every frequency line is one subpath of one
+  `<path>` and every time line of another, so a frame is two `setAttribute`
+  calls. The age fade is a vertical gradient rather than per-row opacity —
+  rows recede downward, so position *is* age.
+- **Nothing is allocated in the loop.** The history is one flat
+  `Float32Array` rotated by index, not an array of rows that shifts.
+- **Labels tick on their own clock** (`LABEL_INTERVAL_MS`), not per frame.
+  They are the only part that uses React state; the mesh is written through
+  refs, so React renders it once and never again.
+
+It paints once synchronously on mount as well as from the loop, because
+`requestAnimationFrame` is suspended while a window is hidden or occluded —
+without that the panel opens as an empty box and stays that way until the
+window comes forward.
+
+**The frequency axis is logarithmic** (`MIN_HZ`–`MAX_HZ`), because pitch is:
+on a linear axis everything from E2 to C7 lands in the leftmost tenth of the
+mesh and the rest is inaudible air. `axisPosition()` is shared by the band
+edges and the label placement, or a label would drift off the peak it names.
+
+`utils/pitch.ts` does the naming and is pure, so it is tested against ground
+truth (A4 *is* 440 Hz). `findPeaks` fits a parabola through each peak and its
+neighbours: a bin is ~10.8 Hz wide at `fftSize` 4096, which is worth more than
+a semitone down low, so reading the bin index straight off would quantise the
+note. That fftSize is why it can name a pitch at all — the analyser used to be
+256, whose bins are ~172 Hz apart, most of an octave in the low register.
+
+Chips that would overlap are stacked into lanes (`assignLanes`): even on a log
+axis a close voicing puts its partials within a few percent of each other, so
+position alone cannot separate them.
 
 ## Motion
 

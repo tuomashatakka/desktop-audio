@@ -136,8 +136,21 @@ export function LibrarySidebar () {
         one destination left, and this is where the rest of the library's
         navigation already lives. */}
     <footer className='sidebar-footer'>
+      {/* Placeholder for the DSP processing view. `disabled` is the whole
+          point: it reserves the slot and announces the feature without
+          pretending to be a control that does something. */}
       <button
-        className='settings-toggle'
+        className='sidebar-action'
+        type='button'
+        disabled
+        title='DSP processing — coming soon'>
+        <Icon name='dsp' />
+        <span className='name'>DSP Processing</span>
+        <small className='badge'>Soon</small>
+      </button>
+
+      <button
+        className='sidebar-action settings-toggle'
         type='button'
         onClick={ () =>
           openOverlay('settings') }>

@@ -198,7 +198,7 @@
   padding: var(--sp-2);
   border-top: 1px solid var(--border);
 
-  .settings-toggle {
+  .sidebar-action {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
@@ -212,7 +212,20 @@
       color var(--duration-fast) var(--ease),
       background-color var(--duration-fast) var(--ease);
 
-    &:hover { color: var(--text); background: var(--bg-hover); }
+    &:hover:not(:disabled) { color: var(--text); background: var(--bg-hover); }
+
+    /* Reserved, not offered — `disabled` already blocks it, this reads it. */
+    &:disabled { opacity: 0.45; cursor: default; }
+
+    .name { flex: 1; }
+
+    .badge {
+      padding: 0 var(--sp-1);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      background: var(--bg-input);
+      font-size: var(--text-xs);
+    }
   }
 }
 
@@ -400,7 +413,13 @@ body::before {
   background: var(--bg);
   container: player / size;
 
-  &[data-lyrics] :is(.progress-section, .playback-controls) { display: none; }
+  /*
+   * Lyrics take the transport's place; the spectrum takes the artwork's and
+   * the progress bar's but keeps the transport, because a visualizer you
+   * cannot pause is a screensaver.
+   */
+  &[data-mode='lyrics'] :is(.progress-section, .playback-controls) { display: none; }
+  &[data-mode='visualizer'] :is(.player-art, .progress-section) { display: none; }
 }
 
 .album-art-bg {
@@ -574,6 +593,93 @@ body::before {
   }
 
   .lyrics-toggle[aria-pressed='true'] { color: var(--accent); }
+}
+
+/*
+ * The FFT wireframe matrix: frequency across, time receding, dominant
+ * partials named.
+ *
+ * Nothing animates here — the mesh's two paths are mutated per frame from a
+ * rAF loop (see `FrequencyMatrix`). This is only how it is painted, and the
+ * age fade is a gradient rather than a per-row opacity so the whole mesh is
+ * two nodes.
+ */
+.frequency-matrix {
+  position: relative;
+  display: grid;
+  flex: 1;
+  place-items: center;
+  width: min(100%, 920px);
+  min-height: 0;
+  color: var(--accent);
+  animation: surface-in var(--duration) var(--ease-emphasis);
+
+  > svg {
+    width: 100%;
+    height: 100%;
+    max-height: 46cqh;
+    overflow: visible;
+  }
+
+  .matrix-line-x {
+    fill: none;
+    stroke: url('#matrix-age');
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* The time lines only tie the slices together, so they sit further back. */
+  .matrix-line-z {
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 1;
+    opacity: 0.14;
+  }
+}
+
+/*
+ * The peak readout floats over the mesh at the ridge it names. It is a
+ * positioned layer rather than SVG text so the labels keep the UI font and
+ * never inherit the mesh's scaling.
+ */
+.matrix-peaks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.matrix-peak {
+  position: absolute;
+  display: grid;
+  gap: 1px;
+  justify-items: center;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  /* Each lane lifts the chip a full row clear of the one below it. */
+  translate: -50% calc(-100% - var(--sp-2) - var(--lane, 0) * 2.4rem);
+  backdrop-filter: blur(4px);
+  transition:
+    left var(--duration-fast) var(--ease),
+    top var(--duration-fast) var(--ease);
+
+  dt {
+    color: var(--accent);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  dd {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
 }
 
 .player-lyrics {

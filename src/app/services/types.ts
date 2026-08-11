@@ -22,6 +22,7 @@ export type IconName =
   'density-compact' |
   'density-normal' |
   'density-relaxed' |
+  'dsp' |
   'edit' |
   'grid-lg' |
   'grid-sm' |
@@ -39,6 +40,7 @@ export type IconName =
   'search' |
   'settings' |
   'shuffle' |
+  'spectrum' |
   'star' |
   'waveform'
 

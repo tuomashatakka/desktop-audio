@@ -129,7 +129,36 @@ describe('Player', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show lyrics' }))
 
     expect(screen.getByRole('region', { name: 'Lyrics' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Show playback controls' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show album art' })).toBeInTheDocument()
+  })
+
+  it('shows the frequency spectrum, and only one panel at a time', () => {
+    render(<Player expanded />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show frequency spectrum' }))
+    expect(screen.getByRole('region', { name: 'Frequency spectrum' })).toBeInTheDocument()
+
+    // Lyrics and the spectrum claim the same space, so asking for one has to
+    // put the other away rather than stacking them.
+    fireEvent.click(screen.getByRole('button', { name: 'Show lyrics' }))
+    expect(screen.getByRole('region', { name: 'Lyrics' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Frequency spectrum' })).toBeNull()
+  })
+
+  it('returns to the artwork when the active mode is clicked again', () => {
+    render(<Player expanded />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show frequency spectrum' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show album art' }))
+
+    expect(screen.queryByRole('region', { name: 'Frequency spectrum' })).toBeNull()
+  })
+
+  it('offers neither panel in the footer bar, which has nowhere to put them', () => {
+    render(<Player />)
+
+    expect(screen.queryByRole('button', { name: 'Show frequency spectrum' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Show lyrics' })).toBeNull()
   })
 
   it('keeps the same tree in its empty state and disables playback actions', () => {
