@@ -44,34 +44,46 @@ interface Appearance {
   readonly accent:    string
 }
 
-/** See module docstring. */
+function applyFont (root: HTMLElement, uiFont: UiFont): void {
+  root.style.setProperty('--font', UI_FONT_STACKS[uiFont] ?? UI_FONT_STACKS.montserrat)
+  root.style.setProperty('--font-display', UI_DISPLAY_STACKS[uiFont] ?? UI_DISPLAY_STACKS.montserrat)
+}
+
+function applyScale (root: HTMLElement, fontScale: number): void {
+  // Every `--text-*` token is in rem, so moving the root size moves the whole
+  // type scale and nothing else — spacing and chrome stay put.
+  root.style.fontSize = `${(BASE_FONT_PX * fontScale).toFixed(2)}px`
+}
+
+function applyAccent (root: HTMLElement, theme: string, accent: string): void {
+  // A custom theme owns its own accent; overriding it here would make the
+  // colour pickers in Settings silently ineffective.
+  if (theme === 'custom') {
+    root.style.removeProperty('--accent-hover')
+    root.style.removeProperty('--accent-contrast')
+    return
+  }
+
+  root.style.setProperty('--accent', accent)
+  root.style.setProperty('--accent-hover', `color-mix(in srgb, ${accent} 75%, #fff)`)
+  root.style.setProperty('--accent-contrast', luminance(accent) > 0.6 ? '#0a0a0e' : '#f4f4f8')
+}
+
+/**
+ * See module docstring.
+ *
+ * One effect, not three. All three writes target the same element and are
+ * idempotent, so splitting them by dependency bought nothing but two extra
+ * subscriptions to the same commit — and the order they run in is the ordering
+ * guarantee this hook exists to provide.
+ */
 export function useAppearance ({ theme, uiFont, fontScale, accent }: Appearance) {
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Writes to `document.documentElement`, which no render can reach: these custom properties feed `@layer tokens`, which nothing renders.
   useEffect(() => {
     const root = document.documentElement
 
-    root.style.setProperty('--font', UI_FONT_STACKS[uiFont] ?? UI_FONT_STACKS.montserrat)
-    root.style.setProperty('--font-display', UI_DISPLAY_STACKS[uiFont] ?? UI_DISPLAY_STACKS.montserrat)
-  }, [ uiFont ])
-
-  useEffect(() => {
-    // Every `--text-*` token is in rem, so moving the root size moves the
-    // whole type scale and nothing else — spacing and chrome stay put.
-    document.documentElement.style.fontSize = `${(BASE_FONT_PX * fontScale).toFixed(2)}px`
-  }, [ fontScale ])
-
-  useEffect(() => {
-    const root = document.documentElement
-
-    // A custom theme owns its own accent; overriding it here would make the
-    // colour pickers in Settings silently ineffective.
-    if (theme === 'custom') {
-      root.style.removeProperty('--accent-hover')
-      root.style.removeProperty('--accent-contrast')
-      return
-    }
-
-    root.style.setProperty('--accent', accent)
-    root.style.setProperty('--accent-hover', `color-mix(in srgb, ${accent} 75%, #fff)`)
-    root.style.setProperty('--accent-contrast', luminance(accent) > 0.6 ? '#0a0a0e' : '#f4f4f8')
-  }, [ theme, accent ])
+    applyFont(root, uiFont)
+    applyScale(root, fontScale)
+    applyAccent(root, theme, accent)
+  }, [ theme, uiFont, fontScale, accent ])
 }

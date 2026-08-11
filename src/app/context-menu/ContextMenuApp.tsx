@@ -19,6 +19,7 @@ declare global {
 export function ContextMenuApp () {
   const [ items, setItems ] = useState<readonly SerializableMenuItem[]>([])
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Subscribes to the context-menu IPC channel.
   useEffect(() => {
     const api = window.contextMenuAPI
     if (!api)
@@ -47,6 +48,7 @@ export function ContextMenuApp () {
   const handleClose = () =>
     window.contextMenuAPI?.closeContextMenu()
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Binds a `keydown` listener on `document`.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape')

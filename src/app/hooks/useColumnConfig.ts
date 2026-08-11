@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 
 export type ColumnKey =
@@ -95,9 +95,21 @@ export interface ColumnConfigApi {
 export function useColumnConfig (): ColumnConfigApi {
   const [ columns, setColumns ] = useState<readonly ColumnConfig[]>(loadConfig)
 
-  useEffect(() => {
-    saveConfig(columns)
-  }, [ columns ])
+  /**
+   * Every mutation goes through here, so persisting is part of making the
+   * change rather than an effect watching for one.
+   *
+   * It takes the next columns outright instead of an updater because the write
+   * has to happen outside the state updater — React may run an updater more
+   * than once, and a discarded render would otherwise still have persisted a
+   * layout that never applied. The mutations below therefore close over
+   * `columns`, which is safe: they run from discrete DOM events, and React
+   * re-renders between two of those.
+   */
+  const commit = useCallback((next: readonly ColumnConfig[]) => {
+    saveConfig(next)
+    setColumns(next)
+  }, [])
 
   const visible = columns.filter(c =>
     c.visible)
@@ -105,38 +117,34 @@ export function useColumnConfig (): ColumnConfigApi {
     c.width).join(' ')
 
   const toggleColumn = useCallback((key: ColumnKey) => {
-    setColumns(cols =>
-      cols.map(c =>
-        c.key === key && !c.fixed
-          ? { ...c, visible: !c.visible }
-          : c))
-  }, [])
+    commit(columns.map(c =>
+      c.key === key && !c.fixed
+        ? { ...c, visible: !c.visible }
+        : c))
+  }, [ columns, commit ])
 
   const resizeColumn = useCallback((key: ColumnKey, width: string) => {
-    setColumns(cols =>
-      cols.map(c =>
-        c.key === key ? { ...c, width } : c))
-  }, [])
+    commit(columns.map(c =>
+      c.key === key ? { ...c, width } : c))
+  }, [ columns, commit ])
 
   const reorderColumn = useCallback((fromKey: ColumnKey, toKey: ColumnKey) => {
-    setColumns(cols => {
-      const fromIdx = cols.findIndex(c =>
-        c.key === fromKey)
-      const toIdx = cols.findIndex(c =>
-        c.key === toKey)
-      if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx)
-        return cols
+    const fromIdx = columns.findIndex(c =>
+      c.key === fromKey)
+    const toIdx = columns.findIndex(c =>
+      c.key === toKey)
+    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx)
+      return
 
-      const next      = [ ...cols ]
-      const [ moved ] = next.splice(fromIdx, 1)
-      next.splice(toIdx, 0, moved)
-      return next
-    })
-  }, [])
+    const next      = [ ...columns ]
+    const [ moved ] = next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, moved)
+    commit(next)
+  }, [ columns, commit ])
 
   const resetColumns = useCallback(() => {
-    setColumns(DEFAULT_COLUMNS)
-  }, [])
+    commit(DEFAULT_COLUMNS)
+  }, [ commit ])
 
   return { columns, visible, gridTemplate, toggleColumn, resizeColumn, reorderColumn, resetColumns }
 }

@@ -3,6 +3,7 @@ import type { CustomTheme } from '../contexts/SettingsContext'
 
 
 export function useThemeApply (theme: string, customTheme: CustomTheme | null) {
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Writes the theme custom properties onto the document root.
   useEffect(() => {
     const root = document.documentElement
 

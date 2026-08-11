@@ -15,6 +15,7 @@ function AppContent () {
   useAmbientPalette()
   useAppearance({ theme, uiFont, fontScale, accent })
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Writes `data-theme` onto the document root, which no render reaches.
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [ theme ])

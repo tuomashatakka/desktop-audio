@@ -579,6 +579,7 @@ export function TrackTable ({
     ({ '--track-grid': gridTemplate }) as React.CSSProperties,
                         [ gridTemplate ])
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Reconciles the focused row with a track change originating outside this component; the fallback deliberately preserves the user's own focus when it can.
   useEffect(() => {
     const currentIndex = currentTrack
       ? sorted.findIndex(track =>
@@ -722,6 +723,7 @@ export function TrackTable ({
 
   // Keep the playing track in view (flat list only — grouped views aren't
   // virtualized, so the virtualizer has no offsets to scroll to).
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Calls `virtualizer.scrollToIndex`, an imperative scroll no render can express.
   useEffect(() => {
     if (!currentTrack || !flat || showSkeleton)
       return

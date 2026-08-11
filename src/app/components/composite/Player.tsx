@@ -207,8 +207,8 @@ function PlayerActions ({ mode, hasTrack, onMode, onClose }: PlayerActionsProps)
   return <menu className='player-actions' aria-label='Player'>
     <li>
       <IconButton
-        aria-pressed={ showing('visualizer') }
         className='visualizer-toggle'
+        aria-pressed={ showing('visualizer') }
         label={ showing('visualizer') ? 'Show album art' : 'Show frequency spectrum' }
         type='button'
         disabled={ !hasTrack }
@@ -220,8 +220,8 @@ function PlayerActions ({ mode, hasTrack, onMode, onClose }: PlayerActionsProps)
 
     <li>
       <IconButton
-        aria-pressed={ showing('lyrics') }
         className='lyrics-toggle'
+        aria-pressed={ showing('lyrics') }
         label={ showing('lyrics') ? 'Show album art' : 'Show lyrics' }
         type='button'
         disabled={ !hasTrack }

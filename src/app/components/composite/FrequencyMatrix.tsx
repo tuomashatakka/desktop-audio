@@ -191,6 +191,7 @@ export function FrequencyMatrix ({ analyzer, active }: FrequencyMatrixProps) {
 
   const geometry = useMemo(buildGeometry, [])
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Owns a `requestAnimationFrame` loop for the lifetime of the mount. The mesh is written through refs precisely so React renders it once and never again.
   useEffect(() => {
     if (!active)
       return

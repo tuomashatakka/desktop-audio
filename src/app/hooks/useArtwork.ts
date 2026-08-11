@@ -35,6 +35,7 @@ export function useArtwork (
   const [ art, setArt ] = useState<string | undefined>(() =>
     trackId ? resolved.get(keyOf(trackId, size)) ?? undefined : undefined)
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Fetches artwork asynchronously and guards the state write, because a row can unmount mid-flight.
   useEffect(() => {
     if (!trackId || !data)
       return

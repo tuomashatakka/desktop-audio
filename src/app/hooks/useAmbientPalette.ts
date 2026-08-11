@@ -157,6 +157,7 @@ export function useAmbientPalette (): void {
   const art      = useArtwork(currentTrack?.id, 'thumb')
   const fallback = currentTrack?.coverColor
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Samples the artwork on a canvas and writes `--ambient-*` onto the document root.
   useEffect(() => {
     const root = document.documentElement
 

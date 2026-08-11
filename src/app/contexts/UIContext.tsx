@@ -126,6 +126,17 @@ function readSetting (key: string): string | null {
   }
 }
 
+/** The write half of {@link readSetting}, throwing for the same reasons. */
+function writeSetting (key: string, value: string): void {
+  try {
+    if (typeof localStorage !== 'undefined')
+      localStorage.setItem(key, value)
+  }
+  catch {
+    // A preference we could not persist is not worth losing the window over.
+  }
+}
+
 function loadDensity (): Density {
   const stored = readSetting(DENSITY_KEY) as Density | null
   return stored !== null && DENSITIES.includes(stored) ? stored : 'normal'
@@ -209,12 +220,19 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       ({ ...s, editingTrackId: id, overlay: id ? 'tag-editor' : s.overlay }))
   }, [])
 
+  // These two persist in the setter rather than in an effect watching the
+  // state: the value is known here, and writing it here is what makes the
+  // write an event rather than a consequence. `setSidebarWidth` below cannot
+  // do the same — it derives the stored value inside the updater, and an
+  // updater may run twice.
   const setDensity = useCallback((d: Density) => {
+    writeSetting(DENSITY_KEY, d)
     setState(s =>
       ({ ...s, density: d }))
   }, [])
 
   const setGrouping = useCallback((g: Grouping) => {
+    writeSetting(GROUPING_KEY, g)
     setState(s =>
       ({ ...s, grouping: g }))
   }, [])
@@ -229,17 +247,9 @@ export function UIProvider ({ children, value }: UIProviderProps) {
     })
   }, [])
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- The stored width is derived inside the state updater, which may run twice; persisting from the committed value is the only pure place to do it.
   useEffect(() => {
-    localStorage.setItem(DENSITY_KEY, state.density)
-  }, [ state.density ])
-
-  useEffect(() => {
-    localStorage.setItem(GROUPING_KEY, state.grouping)
-  }, [ state.grouping ])
-
-  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Persist UI preference changes to browser storage.
-  useEffect(() => {
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(state.sidebarWidth))
+    writeSetting(SIDEBAR_WIDTH_KEY, String(state.sidebarWidth))
   }, [ state.sidebarWidth ])
 
   // `value` is the test-injection escape hatch; otherwise memoise, so

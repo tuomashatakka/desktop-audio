@@ -3,7 +3,7 @@ import { useArtwork } from '../../hooks/useArtwork'
 import type { ArtworkSize } from '../../data/DataSource'
 
 
-/** Always square, always cropped — see `.album-art` in views.css. */
+/** Square and cropped by `.album-art` (views.css); the caller's class sizes it. */
 interface AlbumArtProps {
   readonly trackId?:   string
   readonly color?:     string

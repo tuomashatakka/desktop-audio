@@ -124,6 +124,7 @@ export function LibraryView () {
     )
   }, [ host, theme ])
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Subscribes to the host's context-menu action channel.
   useEffect(() =>
     host.onContextMenuAction((index: number) => {
       const track = contextTrackRef.current

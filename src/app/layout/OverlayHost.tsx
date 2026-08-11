@@ -21,12 +21,14 @@ export function OverlayHost () {
   const { overlay, closeOverlay } = useUI()
 
   return <>
+    {/* No `closeButton` here, unlike the two sheets below: the player carries
+        its own, grouped with the mode buttons in `.player-actions`. Passing it
+        here as well is what rendered two. */}
     <Overlay
       className='player-overlay'
       open={ overlay === 'player' }
       label='Now playing'
       variant='full'
-      closeButton
       onClose={ closeOverlay }>
       {overlay === 'player' && <Player expanded />}
     </Overlay>

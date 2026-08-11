@@ -110,6 +110,10 @@
     --overlay-blur: 8px;
     --shell-wash: rgb(255 255 255 / 6%);
 
+    /* The contrast floor over cover art in the player. See `.album-art-bg`. */
+    --art-scrim-strong: rgb(0 0 0 / 45%);
+    --art-scrim-soft: rgb(0 0 0 / 15%);
+
     /* type */
     --font-display: "Sofia Pro", "Montserrat", system-ui, sans-serif;
     --font: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -202,6 +206,8 @@
     --shadow-card: 0 12px 40px rgb(0 0 0 / 12%);
     --wf-unplayed: rgb(0 0 0 / 13%);
     --shell-wash: rgb(0 0 0 / 4%);
+    --art-scrim-strong: rgb(255 255 255 / 72%);
+    --art-scrim-soft: rgb(255 255 255 / 40%);
   }
 
   /*

@@ -17,8 +17,9 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect, us
 import type { Track } from './LibraryContext'
 import { useOptionalSettings } from './SettingsContext'
 import type { RepeatMode } from './SettingsContext'
-import { useHost, useData } from '../data'
+import { useData } from '../data'
 import { useArtwork } from '../hooks/useArtwork'
+import { useNativeMediaControls } from '../hooks/useNativeMediaControls'
 import { noop } from '../utils/noop'
 import { listenAll } from '../utils/events'
 
@@ -170,6 +171,7 @@ function useMediaSessionRefs (currentTrack: Track | null) {
   const currentArt = useArtwork(currentTrack?.id, 'full')
 
   // MediaSession: set up metadata & handlers when track changes
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Writes `navigator.mediaSession.metadata`, an object the browser owns.
   useEffect(() => {
     if (!navigator.mediaSession || !currentTrack)
       return
@@ -243,7 +245,6 @@ export function AudioProvider ({ children }: AudioProviderProps) {
   const audioContextRef           = useRef<globalThis.AudioContext | null>(null)
   const sourceRef                 = useRef<MediaElementAudioSourceNode | null>(null)
   const [ analyzer, setAnalyzer ] = useState<AnalyserNode | null>(null)
-  const host                      = useHost()
   const data                      = useData()
 
   const {
@@ -256,6 +257,7 @@ export function AudioProvider ({ children }: AudioProviderProps) {
   const queueRef      = useRef<readonly Track[]>([])
   const queueIndexRef = useRef(-1)
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Creates the `<audio>` element and binds its media listeners once, so the `ended` handler is registered a single time and reads the queue through a ref.
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current        = new Audio()
@@ -308,11 +310,13 @@ export function AudioProvider ({ children }: AudioProviderProps) {
       listeners.dispose()
   }, [])
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Pushes volume onto the media element, which React does not own.
   useEffect(() => {
     if (audioRef.current)
       audioRef.current.volume = state.volume
   }, [ state.volume ])
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Unmount teardown: revokes the blob URL and clears the media-session action handlers.
   useEffect(() =>
     () => {
       const audio = audioRef.current
@@ -328,48 +332,10 @@ export function AudioProvider ({ children }: AudioProviderProps) {
       }
     }, [])
 
-  // Push current playback state to OS native media controls (MPRIS on Linux)
-  const mediaStateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const nowPlayingArt         = useArtwork(state.currentTrack?.id, 'full')
-  useEffect(() => {
-    if (!state.currentTrack)
-      return
-
-    if (mediaStateDebounceRef.current)
-      clearTimeout(mediaStateDebounceRef.current)
-
-    mediaStateDebounceRef.current = setTimeout(() => {
-      if (!state.currentTrack)
-        return
-      host.updateMediaState({
-        title:     state.currentTrack.title,
-        artist:    state.currentTrack.artist,
-        album:     state.currentTrack.album,
-        albumArt:  nowPlayingArt,
-        isPlaying: state.isPlaying,
-        position:  state.currentTime,
-        duration:  state.duration,
-      })
-    }, 500)
-
-    return () => {
-      if (mediaStateDebounceRef.current)
-        clearTimeout(mediaStateDebounceRef.current)
-    }
-  }, [ state.currentTrack, state.isPlaying, state.currentTime, state.duration, host, nowPlayingArt ])
-
-  // Handle seek events forwarded from MPRIS (delta in microseconds)
-  useEffect(() =>
-    host.onMediaSeek((delta: number) => {
-      const audio = audioRef.current
-      if (!audio)
-        return
-
-      const newTime     = Math.max(0, audio.currentTime + delta / 1e6)
-      audio.currentTime = newTime
-      setState(s =>
-        ({ ...s, currentTime: newTime }))
-    }), [ host ])
+  // Mirror playback onto the OS media controls, and take their seeks back.
+  useNativeMediaControls(state, audioRef, time =>
+    setState(s =>
+      ({ ...s, currentTime: time })))
 
   const setupAnalyzer = useCallback(() => {
     if (!audioRef.current)
@@ -598,6 +564,7 @@ export function AudioProvider ({ children }: AudioProviderProps) {
   playPreviousRef.current = playPrevious
 
   // Register global ensureReady for first-pointer-event handler
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Registers the module-global `ensureReady` and clears it on unmount.
   useEffect(() => {
     setGlobalEnsureReady(ensureReady)
     return () => {

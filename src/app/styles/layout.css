@@ -152,9 +152,18 @@
   li { height: 100%; }
 }
 
+/*
+ * These are raw `<button>`s rather than `IconButton`s, so they never pick up
+ * `.button`'s `place-items: center`. `svg.icon` is `display: block`, and a
+ * block child of a bare button sits at the inline start of its content box —
+ * 17px left of centre in a 46px button. `.menu-toggle` in views.css already
+ * centres itself this way; these three were missing it.
+ */
 .titlebar-btn {
+  display: grid;
   width: var(--titlebar-btn-w);
   height: 100%;
+  place-items: center;
   color: var(--text-dim);
   font-size: var(--text-sm);
   transition:
@@ -439,6 +448,27 @@ body::before {
 
     [data-theme='light'] & { filter: blur(var(--art-blur)) brightness(1.1) saturate(1.05); }
   }
+
+  /*
+   * A contrast floor for the chrome on top. The light theme *brightens* the
+   * cover rather than dimming it, so the backdrop's luminance is the
+   * artwork's: a dark cover left `--text` (#111) on a dark field. The scrim
+   * pushes it back toward the theme's own surface.
+   *
+   * Symmetric because chrome sits at both edges — the mode buttons at the
+   * top, progress and transport at the bottom — while the middle is the
+   * artwork or whichever panel the mode selected.
+   */
+  &::after {
+    position: absolute;
+    inset: 0;
+    content: '';
+    background: linear-gradient(
+      var(--art-scrim-strong),
+      var(--art-scrim-soft) 45%,
+      var(--art-scrim-strong)
+    );
+  }
 }
 
 .player-content {
@@ -536,14 +566,16 @@ body::before {
       box-shadow var(--duration-fast) var(--ease);
   }
 
+  /* One step brighter than shuffle/repeat: transport outranks the modes. */
   :is(.prev, .next) > button {
     border-color: transparent;
+    color: var(--text-dim);
     transition:
       color var(--duration-fast) var(--ease),
       background-color var(--duration-fast) var(--ease),
       border-color var(--duration-fast) var(--ease);
 
-    &:hover:not(:disabled) { border-color: var(--border-hover); }
+    &:hover:not(:disabled) { border-color: var(--border-hover); color: var(--text); }
   }
 
   /* Shuffle/repeat read as off until they're on — colour is the whole signal. */
@@ -585,14 +617,14 @@ body::before {
     gap: var(--sp-2);
   }
 
-  :is(.lyrics-toggle, .player-close) {
+  :is(.visualizer-toggle, .lyrics-toggle, .player-close) {
     color: var(--text-muted);
     transition: color var(--duration-fast) var(--ease);
 
     &:hover:not(:disabled) { color: var(--text); }
   }
 
-  .lyrics-toggle[aria-pressed='true'] { color: var(--accent); }
+  :is(.visualizer-toggle, .lyrics-toggle)[aria-pressed='true'] { color: var(--accent); }
 }
 
 /*

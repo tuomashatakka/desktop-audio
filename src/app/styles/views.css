@@ -117,13 +117,25 @@
 .titlebar-search { display: flex; align-items: center; }
 
 .search-input {
+  /*
+   * The height is pinned rather than left to the input's own padding. Sized
+   * by its content the field came out 39px tall inside the 40px titlebar, so
+   * the 2px `--focus-ring` had nowhere to paint but outside the bar. Pinning
+   * it also makes the collapsed state a real circle: that only holds while
+   * the height matches the collapsed width, so both read the same token.
+   */
+  --search-h: var(--sp-8);
+
   position: relative;
   width: clamp(8rem, 18vw, 250px);
-  margin-block: var(--sp-2);
+  height: var(--search-h);
+  margin-block: var(--sp-1);
   margin-inline: var(--sp-3);
   transition: width var(--duration) var(--ease-emphasis);
 
   > input {
+    height: 100%;
+    padding-block: 0;
     padding-left: var(--sp-8);
     border-color: transparent;
     background: transparent;
@@ -148,7 +160,7 @@
   }
 
   &:not(:focus-within):has(> input:placeholder-shown) {
-    width: var(--sp-8);
+    width: var(--search-h);
 
     > .icon { left: 50%; transform: translate(-50%, -50%); }
   }
@@ -209,6 +221,10 @@
   min-height: 0;
   overflow: auto;
   padding: var(--sp-3);
+
+  /* Grid items default to `min-width: auto`, so the cell would inherit the
+     card's refusal to shrink. See `.media-card` in components.css. */
+  > li { min-width: 0; }
 
   &[data-size='lg'] { --card: 200px; }
 }

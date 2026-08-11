@@ -53,6 +53,7 @@ export function useHeightTier (): HeightTier {
   const [ tier, setTier ] = useState<HeightTier>(() =>
     tierFor(window.innerHeight))
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Binds a `resize` listener on `window`.
   useEffect(() => {
     const handler = () =>
       setTier(tierFor(window.innerHeight))

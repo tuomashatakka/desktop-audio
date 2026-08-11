@@ -98,12 +98,14 @@ export function useKeyboardShortcuts () {
     actions[action]()
   }, [ actions, bindings ])
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Binds a `keydown` listener on `window`.
   useEffect(() => {
     const keydown = listen(window, 'keydown', handleKeyDown as EventListener)
     return () =>
       keydown.dispose()
   }, [ handleKeyDown ])
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Subscribes to the host's media-key channels.
   useEffect(() => {
     const mediaKeys = collectUnsubscribes(
       host.onMediaPlayPause(() => {

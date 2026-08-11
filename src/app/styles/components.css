@@ -490,6 +490,14 @@
   .media-card {
     position: relative;
     display: grid;
+    /*
+     * The column has to be allowed to collapse. Left as the implicit `auto`
+     * track it sizes to the largest min-content contribution of its items,
+     * and `.card-open` is `nowrap` — so a long title set the card's width,
+     * the cover followed it at `width: 100%`, and the tile overflowed its
+     * cell and painted over its neighbours.
+     */
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-1);
     padding: var(--sp-2);
     border-radius: var(--radius-lg);
@@ -498,13 +506,15 @@
     &:hover { background: var(--bg-hover); }
     &:hover .card-play { opacity: 1; translate: 0 0; }
 
+    /*
+     * Square, cropped and the placeholder tint all come from `.album-art`
+     * (views.css), which sits in a *later* layer than this one and so wins
+     * every property both declare. Only what is card-specific lives here.
+     */
     .card-cover {
       width: 100%;
       height: auto;
-      aspect-ratio: 1;
       border-radius: var(--radius);
-      background: var(--bg-input);
-      object-fit: cover;
       box-shadow: var(--shadow-sm);
     }
 

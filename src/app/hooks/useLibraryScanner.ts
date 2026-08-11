@@ -107,9 +107,10 @@ export function useLibraryScanner () {
     setIsInitialLoading(false)
   }, [])
 
-  useEffect(() => {
-    libraryPathsRef.current = libraryPaths
-  }, [ libraryPaths ])
+  // The latest-value mirror the subscription below reads. Assigned here rather
+  // than from an effect: it is only ever read from a callback, never during
+  // render, so all it has to be is current by the time one of them runs.
+  libraryPathsRef.current = libraryPaths
 
   const publishScheduled = useRef(false)
 
@@ -170,6 +171,7 @@ export function useLibraryScanner () {
 
   // Subscribe to scan and hydrate events once — persistent for lifetime of
   // component.
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Subscribes to the library event stream. Nothing here returns a library — a scan and a hydrate both arrive only as events.
   useEffect(() => {
     log.info('⏻ subscribing to library events')
 
@@ -243,6 +245,7 @@ export function useLibraryScanner () {
   // running instead of waiting on one big array. A first run with an empty
   // DB simply yields `hydrate-done` with nothing, and `isInitialLoading`
   // stays up for the auto-rescan below (or the empty-state card preempts it).
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Replays the module-level cache on mount and fires the one-time hydrate.
   useEffect(() => {
     if (trackMap.current.size > 0) {
       publish()
@@ -266,6 +269,7 @@ export function useLibraryScanner () {
   }, [ libraryPaths, setLoading, data ])
 
   // Background rescan — once per distinct set of roots, not once per mount.
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Starts a scan when the configured library paths actually change.
   useEffect(() => {
     const key = [ ...libraryPaths ].sort()
       .join(' ')

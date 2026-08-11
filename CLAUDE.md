@@ -21,10 +21,35 @@ longer sits where its relative paths assume. Only `package.json` and
 `package.json`'s `config.forge` field is what points electron-forge at its
 relocated config.
 
-Linting is `@tuomashatakka/eslint-config` applied whole. The 36 remaining
-`react-strict/prefer-no-use-effect` warnings are known and deliberate —
-rewriting those effects is a separate refactor, not part of adopting the
-config.
+Linting is `@tuomashatakka/eslint-config` applied whole, and `bun run lint` is
+**clean — zero errors, zero warnings**. Keep it that way.
+
+`react-strict/prefer-no-use-effect` cannot be satisfied by extraction: moving an
+effect into a custom hook in a separate module — which is what the rule's own
+message suggests — simply relocates the warning. It is satisfied only by
+removing the effect. So the effects that could genuinely go, went:
+
+- Persistence happens in the setter that makes the change, not in an effect
+  watching the state afterwards (`UIContext`, `SettingsContext`,
+  `useColumnConfig`). The write is deliberately *outside* the state updater,
+  which React may run more than once and whose result a discarded render never
+  commits. `setSidebarWidth` is the exception and keeps its effect, because it
+  derives the stored value inside its updater.
+- Retiring that effect in `SettingsContext` also retired its `initialized`
+  flag, which existed only to stop hydration echoing straight back to storage.
+- `useAppearance` is one effect, not three: all three writes hit the same
+  element, are idempotent, and their order *is* the guarantee the hook exists
+  to give.
+- A latest-value ref mirror is assigned directly rather than from an effect —
+  it is only read from callbacks, so it just has to be current by the time one
+  runs.
+
+The 27 that remain each carry an `eslint-disable-next-line` naming what the
+effect reaches that a render cannot: a DOM or IPC subscription, an imperative
+element method (`showModal`, `showPopover`, `scrollToIndex`), a write to
+`document.documentElement`, a `requestAnimationFrame` loop, or a module global
+needing teardown. **A bare `useEffect` now fails the lint** — which is the
+point: write the justification, or find the form that doesn't need one.
 
 ## Dependency security
 
@@ -86,9 +111,21 @@ button over the footer player.
 
 The search field is `<search>` (`role="search"` natively) wrapping the input.
 It collapses to its own glyph with no state at all: `:not(:focus-within):has(>
-input:placeholder-shown)` shrinks the pill to `--sp-8` and re-centres the icon
-at `left: 50%`. It stays transparent until hovered or focused, so it reads as
-chrome rather than as a field sitting in the titlebar.
+input:placeholder-shown)` shrinks the pill to `--search-h` and re-centres the
+icon at `left: 50%`. It stays transparent until hovered or focused, so it reads
+as chrome rather than as a field sitting in the titlebar.
+
+**Its height is pinned to `--search-h`, and both the collapsed width and the
+height read that one token.** Sized by its own padding the input came out 39px
+inside the 40px titlebar, so the 2px `--focus-ring` had nowhere to paint but
+outside the bar — and the "collapsed circle" was a 32×39 ellipse. Pinning fixes
+both at once.
+
+The window buttons are raw `<button class="titlebar-btn">`, not `IconButton`s,
+so they get none of `.button`'s layout. They need their own
+`display: grid; place-items: center`: `svg.icon` is `display: block`, and a
+block child of a bare button sits at the inline start of its content box, 17px
+left of centre in a 46px button. `.menu-toggle` had this right already.
 
 **The player is rendered twice from one component, and where it sits is the
 whole layout switch.** The footer bar's copy is inside `.app-shell`, so the
@@ -338,6 +375,19 @@ renders.
   `.card-open::after { inset: 0 }` spreads its hit area over the card. A
   `<button>` takes only *phrasing* content, so `<button><h3>…</h3></button>`
   would be invalid; the play button is a *sibling*, never a descendant.
+- **A card is itself a grid, and its column must be allowed to collapse:**
+  `.media-card { grid-template-columns: minmax(0, 1fr) }`. Left as the implicit
+  `auto` track it sizes to the largest min-content contribution of its items,
+  and `.card-open` is `white-space: nowrap` — so one absurdly long album title
+  set the card's width, `.card-cover { width: 100% }` painted an image three
+  tracks wide, the `<li>` (`min-width: auto` by default, hence the
+  `> li { min-width: 0 }`) refused to shrink back into its cell, and the row
+  grew to match. The tell was that the offending card's title was the only one
+  on screen *not* ellipsised.
+- `.card-cover` carries only what is card-specific. Square, cropped and the
+  placeholder tint come from `.album-art`, which sits in `@layer views` — later
+  than `@layer components`, so it wins every property both declare regardless
+  of specificity. Re-declaring them here looks like it works and doesn't.
 - `utils/grouping.ts` (`bucketKey`, `groupLabel`, `buildGroups`) is shared by
   `TrackTable`, `LibraryGrid` and `LibraryView`'s scope filter. It used to be
   module-private inside `TrackTable`.
@@ -400,6 +450,23 @@ and writes `--ambient-1/2/3` (dark → light) to the root element.
   tracks; unregistered custom properties can't be transitioned.
 - `mix-blend-mode` flips per theme: `screen` on dark (glow), `multiply` at
   lower strength on light (`screen` would blow a light surface out to white).
+
+### The player's own backdrop needs a contrast floor
+
+`.album-art-bg` is a separate thing: the blurred cover filling the now-playing
+overlay behind `.player-content`. Its filter flips per theme — `brightness(0.2)`
+on dark, but **`brightness(1.1) saturate(1.05)` on light**, which brightens the
+art rather than dimming it. So on light the backdrop's luminance is the
+*artwork's*, and a dark cover left `--text` (#111) on a dark field.
+
+`.album-art-bg::after` is the fix: a symmetric `linear-gradient` from
+`--art-scrim-strong` through `--art-scrim-soft` and back, black on dark and
+white on light, pushing the backdrop toward the theme's own surface. Symmetric
+because chrome sits at both edges — `.player-actions` at the top, progress and
+transport at the bottom — while the middle is the artwork or the active panel.
+It lives inside `.album-art-bg` (`z-index: 0`) so it lands over the art and
+under everything at `--z-player` with no new stacking rules, and it inherits the
+`display: none` the small-window tier already applies.
 
 ## Player tiers
 
@@ -472,6 +539,20 @@ reads; `default` writes no attribute.
 
 The mode buttons live in `.player-actions` and exist only in the overlay
 (`expanded`), alongside the close button.
+
+**That close button is the overlay's only one.** `OverlayHost` therefore does
+*not* pass `Overlay`'s `closeButton` for the player, unlike the two sheets —
+doing both rendered two `✕`es side by side. Settings and the tag editor have no
+close of their own and still take the prop.
+
+Every control in `.player-actions` and `.playback-controls` needs an **explicit
+`color`**. `Icon` is always `stroke='currentColor'` and `IconButton` only emits
+`.button.icon`, whose sole colour declaration is `color: inherit` — so a control
+that names no colour falls through to `body { color: var(--text) }`. Dark theme
+hides the mistake (`--text` #f4f4f8 against `--text-muted` #8888a0); light theme
+snaps it to #111. That is how the spectrum button and the prev/next arrows ended
+up near-black on light. The tiers are deliberate: play/pause `--accent-contrast`
+on accent, prev/next `--text-dim`, the modes and close `--text-muted`.
 
 ### The frequency matrix
 

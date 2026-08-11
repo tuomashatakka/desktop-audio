@@ -7,7 +7,7 @@
  * data host (localStorage in the browser, IPC + disk in Electron).
  */
 import type { ReactNode } from 'react'
-import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useHost } from '../data'
 
 
@@ -181,11 +181,42 @@ const SettingsContext = createContext<SettingsContextValue | null>(null)
 type SettingsProviderProps = { readonly children: ReactNode }
 
 export function SettingsProvider ({ children }: SettingsProviderProps) {
-  const [ settings, setSettings ]       = useState<Settings>(defaultSettings)
-  const [ initialized, setInitialized ] = useState(false)
-  const host                            = useHost()
+  const [ settings, setSettings ] = useState<Settings>(defaultSettings)
+  const host                      = useHost()
+
+  /**
+   * A mirror of `settings` for {@link update} to read.
+   *
+   * It cannot read the state variable: every mutation below is a `useCallback`
+   * with an empty dependency list, so closing over `settings` would make each
+   * one persist whatever happened to be current when it was created.
+   */
+  const settingsRef = useRef(settings)
+
+  /** Replace settings without writing them straight back out again. */
+  const hydrate = useCallback((next: Settings) => {
+    settingsRef.current = next
+    setSettings(next)
+  }, [])
+
+  /**
+   * Every mutation goes through here, so persisting is part of making the
+   * change rather than an effect watching for one. That also retires the
+   * `initialized` flag, which existed only to stop the old effect echoing
+   * freshly-loaded settings back to storage.
+   *
+   * The write happens outside the state updater, which React may run more than
+   * once and whose result a discarded render would never commit.
+   */
+  const update = useCallback((change: (current: Settings) => Settings) => {
+    const next          = change(settingsRef.current)
+    settingsRef.current = next
+    persistSettings(next)
+    setSettings(next)
+  }, [])
 
   /** Hydrate settings on mount and resolve the default music dir if needed. */
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Awaits the stored settings and the host's music directory on mount; an async read has no render-phase equivalent.
   useEffect(() => {
     const init = async () => {
       const loaded = await loadSettings()
@@ -195,32 +226,18 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
       if (loaded.libraryPaths.length === 1 && loaded.libraryPaths[0] === 'Music') {
         const musicDir = await host.getMusicDir()
         if (musicDir) {
-          setSettings(s =>
-            ({ ...s, ...loaded, libraryPaths: [ musicDir ]}))
-          setInitialized(true)
+          hydrate({ ...settingsRef.current, ...loaded, libraryPaths: [ musicDir ]})
           return
         }
       }
 
-      setSettings(loaded)
-      setInitialized(true)
+      hydrate(loaded)
     }
     init()
-  }, [ host ])
-
-  useEffect(() => {
-    if (!initialized)
-      return
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
-    }
-    catch {
-      // Ignore storage errors
-    }
-  }, [ settings, initialized ])
+  }, [ host, hydrate ])
 
   const addLibraryPath = useCallback((path: string) => {
-    setSettings(s => {
+    update(s => {
       if (s.libraryPaths.includes(path))
         return s
       return { ...s, libraryPaths: [ ...s.libraryPaths, path ]}
@@ -228,7 +245,7 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
   }, [])
 
   const removeLibraryPath = useCallback((path: string) => {
-    setSettings(s =>
+    update(s =>
       ({
         ...s,
         libraryPaths: s.libraryPaths.filter(p =>
@@ -237,12 +254,12 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
   }, [])
 
   const setTheme = useCallback((theme: Theme) => {
-    setSettings(s =>
+    update(s =>
       ({ ...s, theme }))
   }, [])
 
   const setCustomTheme = useCallback((customTheme: CustomTheme | null) => {
-    setSettings(s =>
+    update(s =>
       ({ ...s, customTheme }))
   }, [])
 
@@ -250,52 +267,52 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
     settings.customTheme || { ...DEFAULT_CUSTOM_THEME, name: 'My Custom Theme' }, [ settings.customTheme ])
 
   const importTheme = useCallback((theme: CustomTheme) => {
-    setSettings(s =>
+    update(s =>
       ({ ...s, customTheme: theme, theme: 'custom' }))
   }, [])
 
   const setDefaultDensity = useCallback((defaultDensity: 'compact' | 'normal' | 'relaxed') => {
-    setSettings(s =>
+    update(s =>
       ({ ...s, defaultDensity }))
   }, [])
 
   const setVolume = useCallback((volume: number) => {
-    setSettings(s =>
+    update(s =>
       ({ ...s, volume: Math.max(0, Math.min(1, volume)) }))
   }, [])
 
   const setRepeatMode = useCallback((mode: RepeatMode) => {
-    setSettings(s =>
+    update(s =>
       ({ ...s, repeatMode: mode }))
   }, [])
 
   const setShuffle = useCallback((shuffle: boolean) => {
-    setSettings(s =>
+    update(s =>
       ({ ...s, shuffle }))
   }, [])
 
   const setUiFont = useCallback((uiFont: UiFont) => {
-    setSettings(s =>
+    update(s =>
       ({ ...s, uiFont }))
   }, [])
 
   const setFontScale = useCallback((scale: number) => {
-    setSettings(s =>
+    update(s =>
       ({ ...s, fontScale: Math.max(MIN_FONT_SCALE, Math.min(MAX_FONT_SCALE, scale)) }))
   }, [])
 
   const setAccent = useCallback((theme: 'dark' | 'light', color: string) => {
-    setSettings(s =>
+    update(s =>
       theme === 'light' ? { ...s, accentLight: color } : { ...s, accentDark: color })
   }, [])
 
   const setCompactSize = useCallback((compactSize: WindowSize) => {
-    setSettings(s =>
+    update(s =>
       ({ ...s, compactSize }))
   }, [])
 
   const setExpandedSize = useCallback((expandedSize: WindowSize) => {
-    setSettings(s =>
+    update(s =>
       ({ ...s, expandedSize }))
   }, [])
 
@@ -340,6 +357,16 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
   return <SettingsContext.Provider value={ value }>
     {children}
   </SettingsContext.Provider>
+}
+
+/** The write half of {@link loadSettings}. */
+function persistSettings (settings: Settings): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+  }
+  catch {
+    // A preference we could not store is not worth failing the click over.
+  }
 }
 
 async function loadSettings (): Promise<Settings> {

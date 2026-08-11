@@ -46,6 +46,7 @@ export function Overlay ({
 }: OverlayProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Calls `showModal()`/`close()` on the native `<dialog>`. The top layer, the focus trap and `::backdrop` exist only when the element method is called; the `open` attribute gives a non-modal dialog instead.
   useEffect(() => {
     const dialog = dialogRef.current
     if (!dialog)
@@ -63,8 +64,8 @@ export function Overlay ({
       className={ `overlay-dialog ${className}`.trim() }
       aria-label={ labelledBy ? undefined : label }
       aria-labelledby={ labelledBy }
-      closedby='any'
       data-variant={ variant }
+      closedby='any'
       onClose={ () => {
         if (open)
           onClose()

@@ -49,6 +49,18 @@ describe('OverlayHost', () => {
     expect(dialog).toHaveAttribute('closedby', 'any')
   })
 
+  /*
+   * The player owns its close button, grouped with the mode buttons in
+   * `.player-actions`. Passing `closeButton` here as well rendered two.
+   */
+  it('leaves the player overlay without a close button of its own', () => {
+    mocks.ui.overlay = 'player'
+    render(<OverlayHost />)
+
+    expect(document.querySelectorAll('.player-overlay .overlay-close')).toHaveLength(0)
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
+  })
+
   it('shows one overlay at a time', () => {
     mocks.ui.overlay = 'settings'
     render(<OverlayHost />)

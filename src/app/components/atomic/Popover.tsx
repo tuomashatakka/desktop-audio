@@ -41,6 +41,7 @@ export function Popover ({ open, anchor = null, point = null, onClose, children,
     }
   }, [ anchor, anchorName ])
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Calls `showPopover()`/`hidePopover()` on the native popover; there is no declarative form of either.
   useEffect(() => {
     const panel = panelRef.current
     if (!panel)
@@ -53,6 +54,7 @@ export function Popover ({ open, anchor = null, point = null, onClose, children,
       panel.hidePopover()
   }, [ open, anchor, point ])
 
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Subscribes to the element's `toggle` event, which is how a light dismiss reaches `onClose`.
   useEffect(() => {
     const panel = panelRef.current
     if (!panel)

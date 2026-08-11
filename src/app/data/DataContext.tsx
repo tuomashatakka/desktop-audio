@@ -8,6 +8,7 @@ const DataContext = createContext<DataSource | null>(null)
 type DataProviderProps = { value: DataSource; children: React.ReactNode }
 
 export function DataProvider ({ value, children }: DataProviderProps) {
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Sets the module-global `Model.dataSource` for the provider's lifetime and clears it afterwards; assigning it during render would leak from a discarded one.
   useEffect(() => {
     // Set the global Model.dataSource for persistence
     Model.dataSource = value
