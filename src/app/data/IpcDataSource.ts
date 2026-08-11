@@ -43,6 +43,20 @@ export class IpcDataSource implements DataSource {
     this._ipc?.loadLibrary()
   }
 
+  /** See {@link DataSource.forgetRoots}. Deletes the rows on the writer thread. */
+  async forgetRoots (roots: readonly string[]): Promise<void> {
+    if (roots.length === 0)
+      return
+    await this._ipc?.forgetRoots([ ...roots ])
+  }
+
+  /** See {@link DataSource.forgetTracks}. */
+  async forgetTracks (trackIds: readonly string[]): Promise<void> {
+    if (trackIds.length === 0)
+      return
+    await this._ipc?.forgetTracks([ ...trackIds ])
+  }
+
   /**
    * Relays scan and hydrate events. The four channel unsubscribes are gathered
    * into one {@link DisposableCollection}, so the caller drops all of them

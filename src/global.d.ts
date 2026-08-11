@@ -11,6 +11,12 @@ interface ElectronAPI {
   onLibraryHydrateDone:  (cb: () => void) => () => void
   onLibraryError:        (cb: (message: string) => void) => () => void
 
+  /** Discard every persisted track under `roots` — a removed library folder. */
+  forgetRoots: (roots: string[]) => Promise<unknown>
+
+  /** Discard specific tracks — rows stranded by a root removed long ago. */
+  forgetTracks: (trackIds: string[]) => Promise<unknown>
+
   /** Album art, fetched per track — list rows never carry it. */
   getArtwork: (trackId: string, size?: 'thumb' | 'full') => Promise<string | null>
 

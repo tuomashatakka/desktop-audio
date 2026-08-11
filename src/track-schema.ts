@@ -69,6 +69,35 @@ export const ARTWORK_COLUMN = 'album_art'
 export const LIST_COLUMN_NAMES = TRACK_COLUMN_NAMES.filter(name =>
   name !== ARTWORK_COLUMN)
 
+/** A `WHERE` fragment and the parameters it binds. See {@link rootScopeClause}. */
+export interface RootScope {
+  sql:    string
+  params: string[]
+}
+
+/**
+ * `WHERE` fragment matching every row that lives under one of `roots`.
+ *
+ * A root matches itself or anything beneath it, hence the `path = ?` alongside
+ * the prefix `LIKE`. The separator in the pattern is what keeps `/Music/Live`
+ * from also claiming `/Music/Live Sets`.
+ *
+ * Empty `roots` yields `0`, not an empty string: a scope clause that vanishes
+ * turns `DELETE FROM tracks WHERE …` into an unconditional delete, and this
+ * function is used on exactly that statement.
+ */
+export function rootScopeClause (roots: readonly string[]): RootScope {
+  if (roots.length === 0)
+    return { sql: '0', params: []}
+
+  return {
+    sql: roots.map(() =>
+      '(path = ? OR path LIKE ? || \'/%\')').join(' OR '),
+    params: roots.flatMap(root =>
+      [ root, root ]),
+  }
+}
+
 /** `album_art` → `albumArt`. */
 export function toCamel (column: string): string {
   return column.replace(/_([a-z])/g, (_, c: string) =>

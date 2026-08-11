@@ -1,6 +1,7 @@
 import { Disposable } from 'disposable-events'
 import type { DataSource, DataEvent, DataListener, LibraryRoot, AudioMetadata, TrackDTO } from './DataSource'
 import { idbGet, idbSet, idbDelete, idbGetAll } from './idb'
+import { isUnderRoots } from '../utils/roots'
 
 
 const AUDIO_EXTENSIONS = new Set([ '.mp3', '.flac', '.ogg', '.wav', '.m4a', '.opus' ])
@@ -306,6 +307,31 @@ export class WebFsDataSource implements DataSource {
       .catch((err: unknown) => {
         this.emit({ type: 'error', message: String(err) })
       })
+  }
+
+  /**
+   * See {@link DataSource.forgetRoots}. The IndexedDB counterpart of the
+   * writer thread's `DELETE`, matching on the same prefix rule.
+   */
+  async forgetRoots (roots: readonly string[]): Promise<void> {
+    if (roots.length === 0)
+      return
+
+    const entries = await idbGetAll('tracks')
+    const doomed  = entries
+      .map((entry: unknown) =>
+        (entry as { value: TrackDTO }).value)
+      .filter(track =>
+        isUnderRoots(track.path, roots))
+
+    await Promise.all(doomed.map(track =>
+      idbDelete('tracks', track.id)))
+  }
+
+  /** See {@link DataSource.forgetTracks}. */
+  async forgetTracks (trackIds: readonly string[]): Promise<void> {
+    await Promise.all(trackIds.map(id =>
+      idbDelete('tracks', id)))
   }
 
   subscribe (l: DataListener): Disposable {

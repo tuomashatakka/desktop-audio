@@ -57,6 +57,19 @@ export function makeMockDataSource(overrides: Partial<DataSource> = {}): DataSou
         mockTracks.splice(index, 1)
       }
     }),
+    readArtwork: vi.fn().mockResolvedValue(null),
+    // Discarding a removed library root, and the reconciliation for rows a
+    // past removal stranded. Both drop from the same backing array here.
+    forgetRoots: vi.fn().mockImplementation(async (roots: readonly string[]) => {
+      for (let i = mockTracks.length - 1; i >= 0; i--)
+        if (roots.some(root => mockTracks[i].path === root || mockTracks[i].path.startsWith(`${root}/`)))
+          mockTracks.splice(i, 1)
+    }),
+    forgetTracks: vi.fn().mockImplementation(async (trackIds: readonly string[]) => {
+      for (let i = mockTracks.length - 1; i >= 0; i--)
+        if (trackIds.includes(mockTracks[i].id))
+          mockTracks.splice(i, 1)
+    }),
     // Helper methods for tests
     _getListeners: () => listeners,
     _getMockTracks: () => mockTracks,

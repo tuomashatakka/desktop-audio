@@ -183,6 +183,44 @@ and everything reaches it as a **stream of events** — nothing returns a librar
 - `isLoading` therefore means "a scan is running", not "there's nothing to
   show". Skeletons are for an empty list only, and the first hydrate batch is
   enough to retire the initial spinner.
+- The hydrate waits for `SettingsContext.ready`. Settings load asynchronously,
+  and both the folder tree and the reconciliation below are built from
+  `libraryPaths` — starting first meant doing them against the defaults.
+
+### Removing a library root
+
+Removing a folder in Settings deletes its tracks. Nothing else could: the
+scanner's prune only reaches inside the roots it was *handed to scan*, so a
+de-registered root's rows survived every later scan and re-hydrated on every
+launch; and when the last root went, the rescan did not run at all, so even
+the in-memory cache kept them.
+
+`removeLibraryPath` stays a pure array filter — settings has no business
+knowing about the library. The reaction lives in `useLibraryScanner`'s roots
+effect, which now keeps `lastRoots` rather than a joined key, because what a
+root *disappearing* means is not derivable from a key comparison. It drops the
+cached tracks and calls `data.forgetRoots(removed)`.
+
+**Every delete is phrased as "forget these", never "keep only those".**
+`forgetRoots` takes the roots that were removed, and `rootScopeClause` (in
+`track-schema.ts`, shared with the scanner's own prune) returns `0` — not an
+empty string — for an empty list. The inverse phrasing reads *current*
+settings, which hydrate asynchronously, so losing that race would delete the
+whole library. `lastRoots` is `null` until the effect has run once for the same
+reason: the hydrate arrives as a change from the defaults, and must never read
+as the user deleting every folder they had.
+
+Rows stranded by removals from *before* this existed are only discoverable
+once the DB has been read back, so `reconcileToRoots` runs on `hydrate-done`
+and hands their ids to `forgetTracks` — named ids again, so the worst a bug
+there can do is name too few. `json_each` keeps that one statement and one
+bound parameter; an `IN` list of six thousand ids would exceed SQLite's
+expression-depth limit.
+
+`isUnderRoot` (`app/utils/roots.ts`) is the renderer's half of the same rule
+and has to agree with the SQL, or a removal empties the database without
+emptying the screen. Both match the root itself or a `/`-separated descendant
+— the separator is what stops `/music/live` swallowing `/music/live sets`.
 
 ## Workers
 
@@ -210,6 +248,19 @@ a request that can end without one strands the renderer's spinner forever.
 it. Without that, a listener attached for one request sees every other
 request's replies — fine while only one is ever in flight, wrong the moment the
 track list asks for forty thumbnails during a hydrate.
+
+**That id is routed, not filtered.** `getWorker` returns a `WorkerHandle` —
+the worker plus a `pending` map of `id → { onMessage, onError }` — and
+registers exactly one `message` listener that dispatches on the echoed id.
+Requests `pending.set(id, …)` on the way in and `delete` on the way out. Each
+helper used to `worker.on(...)` / `off(...)` its own pair instead, which is
+correct for one request and wrong under concurrency: the worker is shared and
+cached for the process lifetime, so forty simultaneous artwork lookups stacked
+eighty listeners on it before the first reply detached any, and Node's default
+cap is ten (`MaxListenersExceededWarning`). The count is a constant 3 per
+worker now, whatever the traffic. `error` and `exit` fail every pending entry,
+so a worker that dies can no longer strand promises and spinners — the same
+hole the `done`-on-spawn-failure guard closes from the other side.
 
 ## Subscriptions
 
@@ -296,8 +347,13 @@ means **a window that fails to load is not a broken window, it is no window at
 all** while the process stays alive. Everything here exists because that failure
 mode is invisible:
 
-- `show: false` + `ready-to-show`, so nothing is shown until there is something
-  to paint.
+- `show: false`, so nothing is shown until there is something to paint — but
+  **three independent triggers reveal it**, not just `ready-to-show`:
+  `ready-to-show`, `did-finish-load`, and a `SHOW_FALLBACK_MS` (4 s) timer.
+  `ready-to-show` is not a guarantee on a frameless transparent window, and it
+  was the only trigger; when it did not arrive the result was a live, healthy
+  process behind a window nobody could see. `show(via)` is idempotent and logs
+  which trigger won, so the next occurrence is diagnosable rather than silent.
 - `did-fail-load` logs and retries the dev-server URL (20 × 250 ms), then loads
   an inline error page **and shows it**. `render-process-gone` and
   `unresponsive` log loudly. Before these, every one of those states looked
@@ -316,6 +372,21 @@ popover, `window-all-closed` quits on every platform, and
 `requestSingleInstanceLock()` makes a surviving orphan fail the next run loudly
 instead of colliding silently. `UIContext`'s `localStorage` reads are wrapped
 because that collision surfaced as a throw inside a `useState` initialiser.
+
+**Losing that lock has to be a dead end, and it was not.** The failure branch
+called `app.quit()` with no `return` after it, so the loser fell straight
+through and registered `ready` and every IPC handler anyway — and `app.quit()`
+is asynchronous *and* issued pre-`ready`, so what happened next was a race. It
+is `app.exit(0)` now, and `app.on('ready')` is registered only
+`if (gotInstanceLock)`. `second-instance` correspondingly has to *reveal* a
+window rather than only `focus()` one: it runs on a process the user can no
+longer see, so it `show()`s, `focus()`es, `app.focus({ steal: true })`s, and
+creates a window if the surviving instance has none. Returning early on a null
+`mainWindow` meant a second launch produced nothing on either process.
+
+`process.on('SIGINT' | 'SIGTERM' | 'SIGHUP')` → `app.quit()` attacks the same
+bug from the other end: a `Ctrl-C`'d dev session was what detached the orphan
+that the *next* launch then collided with.
 
 ## Track table layout
 

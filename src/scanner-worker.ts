@@ -12,7 +12,7 @@ import { readdir, stat } from 'node:fs/promises'
 import Database from 'better-sqlite3'
 import {
   migrate, upsertSql, TRACK_COLUMN_NAMES, MTIME_COLUMN,
-  LIST_COLUMN_NAMES, ARTWORK_COLUMN,
+  LIST_COLUMN_NAMES, ARTWORK_COLUMN, rootScopeClause,
 } from './track-schema'
 
 
@@ -347,15 +347,16 @@ async function scanDirs (dirPaths: string[], id: number): Promise<void> {
   }
   flush()
 
-  // Prune stale rows: delete paths under scanned dirs that no longer exist on disk
+  // Prune stale rows: paths under the scanned dirs that no longer exist on
+  // disk. Scoped to `dirPaths`, so a root the user has *removed* is never
+  // reached here — those rows are discarded on removal instead, over
+  // `library:forget-roots`.
   const seenJson = JSON.stringify([ ...seenPaths ])
-  let pruned = 0
-  for (const dirPath of dirPaths) {
-    const result = db.prepare(
-      'DELETE FROM tracks WHERE (path = ? OR path LIKE ? || \'/%\') AND path NOT IN (SELECT value FROM json_each(?))'
-    ).run(dirPath, dirPath, seenJson)
-    pruned += result.changes
-  }
+  const scope    = rootScopeClause(dirPaths)
+  const pruned   = db.prepare(
+    `DELETE FROM tracks WHERE (${scope.sql}) ` +
+    'AND path NOT IN (SELECT value FROM json_each(?))'
+  ).run(...scope.params, seenJson).changes
 
   const elapsed = Date.now() - t0
   log.info(

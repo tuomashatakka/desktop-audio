@@ -35,7 +35,12 @@ if (!gotInstanceLock) {
     '◬ [main] another desktop-audio instance already owns this profile — exiting. ' +
     'Leftover process? `pkill -f "desktop-audio.*Electron"`'
   )
-  app.quit()
+  // `app.quit()` only *requests* a shutdown, asynchronously, and this runs
+  // before the app has ever reached `ready`. With no `return` after it the
+  // loser fell straight through, registered `ready` and every IPC handler, and
+  // then raced its own teardown — which is one of the ways a launch ended with
+  // no window at all. `exit` is immediate and unambiguous.
+  app.exit(0)
 }
 
 /** Frameless windows paint their own background; the shell supplies the rest. */
@@ -59,6 +64,13 @@ const POPOVER_WINDOW_HEIGHT = 160
  */
 const DEV_LOAD_RETRIES     = 20
 const DEV_LOAD_RETRY_DELAY = 250
+
+/**
+ * Backstop for revealing the window when no load event ever says it is ready.
+ * Long enough that it never beats a healthy startup, short enough that a user
+ * does not conclude the app is broken.
+ */
+const SHOW_FALLBACK_MS = 4000
 
 /** Chromium's "load was cancelled by us", not a failure worth retrying. */
 const ERR_ABORTED = -3
@@ -125,8 +137,35 @@ const createWindow = () => {
     )
   }
 
+  /**
+   * Revealing the window is idempotent and has three independent triggers,
+   * because `ready-to-show` is not a guarantee. On a `frame: false` +
+   * `transparent` window it can simply never arrive, and the result — a live,
+   * healthy process behind a window nobody can see — is indistinguishable from
+   * the app failing to start. Whichever trigger arrives first wins; the timer
+   * is the backstop for none of them arriving. The log line names the winner,
+   * so the next occurrence is diagnosable instead of silent.
+   */
+  let shown = false
+
+  // A declaration, so the timer below can be a `const` that `show` still
+  // reaches: it is only ever read once `show` is actually called.
+  function show (via: string) {
+    if (shown || win.isDestroyed())
+      return
+    shown = true
+    clearTimeout(showFallback)
+    log.info(`▣ main window shown via ${via}`)
+    win.show()
+  }
+
+  const showFallback = setTimeout(() =>
+    show('fallback timer'), SHOW_FALLBACK_MS)
+
   win.once('ready-to-show', () =>
-    win.show())
+    show('ready-to-show'))
+  win.webContents.once('did-finish-load', () =>
+    show('did-finish-load'))
 
   let attempts = 0
 
@@ -150,7 +189,7 @@ const createWindow = () => {
       `${errorCode} ${errorDescription}\n${validatedURL}\n\n` +
       `Is the Vite dev server listening on that exact host and port?`
     ))
-    win.show()
+    show('error page')
   })
 
   // A dead renderer looks identical to a window that never opened, so say so.
@@ -163,6 +202,7 @@ const createWindow = () => {
   void load()
 
   win.on('closed', () => {
+    clearTimeout(showFallback)
     mainWindow = null
     // The popover is a `show: false` helper that is only ever hidden, never
     // closed — leaving it alive kept the window count above zero forever, so
@@ -205,23 +245,39 @@ const createPopoverWindow = () => {
   })
 }
 
-app.on('ready', () => {
-  createWindow()
-  createPopoverWindow()
-  if (mainWindow)
-    mediaControls.init(mainWindow)
-})
+// Guarded on the lock: an instance that lost it is on its way out, and a
+// half-started loser registering handlers over a profile it does not own is
+// exactly the race that left a launch with nothing to look at.
+if (gotInstanceLock)
+  app.on('ready', () => {
+    createWindow()
+    createPopoverWindow()
+    if (mainWindow)
+      mediaControls.init(mainWindow)
+  })
 
 app.on('will-quit', () =>
   mediaControls.teardown())
 
-/** A second launch surfaces the instance that already owns the profile. */
+/**
+ * A second launch surfaces the instance that already owns the profile.
+ *
+ * It has to actually *reveal* a window, not just focus one: this runs on a
+ * process the user can no longer see, whose window may be hidden, minimised, or
+ * — if it was closed while the process lingered — absent entirely. Focusing a
+ * window that was never shown is a no-op, and returning early on a null
+ * `mainWindow` left the second launch producing nothing on either process.
+ */
 app.on('second-instance', () => {
-  if (!mainWindow)
-    return
-  if (mainWindow.isMinimized())
-    mainWindow.restore()
-  mainWindow.focus()
+  if (!mainWindow || mainWindow.isDestroyed())
+    createWindow()
+  else {
+    if (mainWindow.isMinimized())
+      mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  }
+  app.focus({ steal: true })
 })
 
 /**
@@ -239,6 +295,21 @@ app.on('activate', () => {
     createPopoverWindow()
   }
 })
+
+/**
+ * Quit on the signals a dev session actually ends with.
+ *
+ * Forge's own SIGINT handler exits without killing its Electron child, so a
+ * `Ctrl-C` used to detach a live process that kept holding the profile's
+ * single-instance lock — and the *next* launch then lost that lock and had
+ * nowhere to go. Handling the signal here removes the precondition for the
+ * whole collision rather than coping with it afterwards.
+ */
+for (const signal of [ 'SIGINT', 'SIGTERM', 'SIGHUP' ] as const)
+  process.on(signal, () => {
+    log.info(`⏻ ${signal} — quitting`)
+    app.quit()
+  })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -336,7 +407,19 @@ type WorkerName = typeof WORKER_SCANNER | typeof WORKER_READER | typeof WORKER_W
  */
 let quitting = false
 
-const workers = new Map<WorkerName, Worker>()
+/** The callbacks of one in-flight request, keyed by the id the worker echoes. */
+interface PendingRequest {
+  onMessage: (msg: WorkerMessage) => void
+  onError:   (err: Error) => void
+}
+
+/** A worker plus the requests currently waiting on it. See {@link getWorker}. */
+interface WorkerHandle {
+  worker:  Worker
+  pending: Map<number, PendingRequest>
+}
+
+const workers = new Map<WorkerName, WorkerHandle>()
 
 /**
  * Lazily spawns each worker and keeps one instance per name. They all share
@@ -344,7 +427,7 @@ const workers = new Map<WorkerName, Worker>()
  * re-deriving it worker-side is what once had the writer writing to a file
  * nothing read back.
  */
-function getWorker (name: WorkerName): Worker {
+function getWorker (name: WorkerName): WorkerHandle {
   const existing = workers.get(name)
   if (existing)
     return existing
@@ -362,26 +445,57 @@ function getWorker (name: WorkerName): Worker {
       `does not declare build.lib.`
     )
 
-  const worker = new Worker(
+  const worker  = new Worker(
     entry,
     { workerData: { dbPath: libraryDbPath() }}
   )
+  const pending = new Map<number, PendingRequest>()
 
-  worker.on('error', err =>
-    console.error(`[${name}]`, err))
+  /**
+   * One router for the whole worker, rather than a listener pair per request.
+   *
+   * Every helper below used to `worker.on('message'|'error', …)` on its way in
+   * and `off` again when *its own* reply arrived. That is correct for one
+   * request at a time and wrong under concurrency: the worker is shared and
+   * cached for the process lifetime, so forty simultaneous artwork lookups —
+   * exactly what a freshly hydrated track list produces — stacked eighty
+   * listeners on it before the first reply detached any, past Node's default
+   * cap of ten. Routing on the echoed `id` instead keeps the count at a
+   * constant three no matter how much traffic is in flight.
+   */
+  worker.on('message', (msg: WorkerMessage) =>
+    pending.get(msg.id)?.onMessage(msg))
+
+  // A worker that dies takes every request waiting on it down too. Without
+  // this they never settle: promises hang forever and a streaming request
+  // never sends its terminal `done`, which is what strands the renderer's
+  // spinner permanently.
+  const failAll = (err: Error) => {
+    const waiting = [ ...pending.values() ]
+    pending.clear()
+    for (const request of waiting)
+      request.onError(err)
+  }
+
+  worker.on('error', err => {
+    console.error(`[${name}]`, err)
+    failAll(err)
+  })
   worker.on('exit', code => {
     if (code !== 0 && !quitting)
       console.error(`[${name}] exited with code`, code)
     workers.delete(name)
+    failAll(new Error(`worker '${name}' exited with code ${code}`))
   })
 
-  workers.set(name, worker)
-  return worker
+  const handle: WorkerHandle = { worker, pending }
+  workers.set(name, handle)
+  return handle
 }
 
 app.on('before-quit', () => {
   quitting = true
-  for (const worker of workers.values())
+  for (const { worker } of workers.values())
     void worker.terminate()
 })
 
@@ -419,9 +533,9 @@ function streamFromWorker (
       sender.send(channel, payload)
   }
 
-  let worker: Worker
+  let handle: WorkerHandle
   try {
-    worker = getWorker(name)
+    handle = getWorker(name)
   }
   catch (err) {
     log.error(String(err))
@@ -429,6 +543,8 @@ function streamFromWorker (
     send(channels.done)
     return
   }
+
+  const { worker, pending } = handle
 
   let batchCount = 0
   let totalSent  = 0
@@ -438,8 +554,7 @@ function streamFromWorker (
     if (settled)
       return
     settled = true
-    worker.off('message', onMessage)
-    worker.off('error', onError)
+    pending.delete(id)
 
     if (message) {
       log.warn(`⨂ ${name} error: ${message}`)
@@ -451,10 +566,9 @@ function streamFromWorker (
     send(channels.done)
   }
 
+  // No id check here any more: the router only ever hands this the replies to
+  // request `id`.
   function onMessage (msg: WorkerMessage) {
-    if (msg.id !== id)
-      return
-
     if (msg.type === 'batch') {
       const tracks = mapBatch(msg.tracks)
       batchCount++
@@ -471,8 +585,7 @@ function streamFromWorker (
     finish(String(err))
   }
 
-  worker.on('message', onMessage)
-  worker.on('error', onError)
+  pending.set(id, { onMessage, onError })
   worker.postMessage({ ...request, id })
 }
 
@@ -533,29 +646,23 @@ function cacheArtwork (key: string, value: string | null): string | null {
 
 /** One `artwork` round-trip to the reader thread, resolved by request id. */
 function requestArtwork (trackId: string): Promise<string | null> {
-  const worker = getWorker(WORKER_READER)
-  const id     = nextRequestId++
+  const { worker, pending } = getWorker(WORKER_READER)
+  const id                  = nextRequestId++
 
   return new Promise<string | null>((resolve, reject) => {
-    const onMessage = (msg: WorkerMessage) => {
-      if (msg.id !== id)
-        return
-      worker.off('message', onMessage)
-      worker.off('error', onError)
-      if (msg.type === 'error')
-        reject(new Error(msg.message))
-      else
-        resolve(msg.type === 'artwork' ? msg.art : null)
-    }
-
-    const onError = (err: Error) => {
-      worker.off('message', onMessage)
-      worker.off('error', onError)
-      reject(err)
-    }
-
-    worker.on('message', onMessage)
-    worker.on('error', onError)
+    pending.set(id, {
+      onMessage: msg => {
+        pending.delete(id)
+        if (msg.type === 'error')
+          reject(new Error(msg.message))
+        else
+          resolve(msg.type === 'artwork' ? msg.art : null)
+      },
+      onError: err => {
+        pending.delete(id)
+        reject(err)
+      },
+    })
     worker.postMessage({ type: 'artwork', trackId, id })
   })
 }
@@ -676,29 +783,23 @@ ipcMain.on('media:state-update', (_event, state: MediaState) =>
 
 /** Round-trips one write through the writer worker as a promise. */
 function requestWrite (message: Record<string, unknown>): Promise<void> {
-  const worker = getWorker(WORKER_WRITER)
-  const id     = nextRequestId++
+  const { worker, pending } = getWorker(WORKER_WRITER)
+  const id                  = nextRequestId++
 
   return new Promise<void>((resolve, reject) => {
-    const onMessage = (msg: WorkerMessage) => {
-      if (msg.id !== id)
-        return
-      worker.off('message', onMessage)
-      worker.off('error', onError)
-      if (msg.type === 'error')
-        reject(new Error(msg.message))
-      else
-        resolve()
-    }
-
-    const onError = (err: Error) => {
-      worker.off('message', onMessage)
-      worker.off('error', onError)
-      reject(err)
-    }
-
-    worker.on('message', onMessage)
-    worker.on('error', onError)
+    pending.set(id, {
+      onMessage: msg => {
+        pending.delete(id)
+        if (msg.type === 'error')
+          reject(new Error(msg.message))
+        else
+          resolve()
+      },
+      onError: err => {
+        pending.delete(id)
+        reject(err)
+      },
+    })
     worker.postMessage({ ...message, id })
   })
 }
@@ -710,3 +811,22 @@ ipcMain.handle('models:upsert', (_event, kind: string, payload: Record<string, u
 // message for reply correlation, and would otherwise overwrite this one.
 ipcMain.handle('models:delete', (_event, kind: string, trackId: string) =>
   requestWrite({ type: 'delete', kind, trackId }))
+
+/**
+ * Discard every persisted track under the given roots — a library folder the
+ * user removed in Settings. Nothing else can reach those rows: the scanner's
+ * prune only ever looks inside the roots it was asked to scan.
+ */
+ipcMain.handle('library:forget-roots', (_event, roots: string[]) => {
+  log.info(`⊖ library:forget-roots — ${roots.length} path(s): ${roots.join(', ')}`)
+  return requestWrite({ type: 'forget-roots', kind: 'track', roots })
+})
+
+/**
+ * Discard specific tracks — the reconciliation for rows stranded by a root
+ * that was removed before `library:forget-roots` existed.
+ */
+ipcMain.handle('library:forget-tracks', (_event, trackIds: string[]) => {
+  log.info(`⊖ library:forget-tracks — ${trackIds.length} track(s)`)
+  return requestWrite({ type: 'forget-tracks', kind: 'track', trackIds })
+})

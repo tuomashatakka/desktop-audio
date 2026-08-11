@@ -57,6 +57,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onLibraryError: (cb: (message: string) => void) =>
     subscribe('library:error', cb),
 
+  /** Discard every persisted track under `roots` — a removed library folder. */
+  forgetRoots: (roots: string[]) =>
+    ipcRenderer.invoke('library:forget-roots', roots),
+
+  /** Discard specific tracks — rows stranded by a root removed long ago. */
+  forgetTracks: (trackIds: string[]) =>
+    ipcRenderer.invoke('library:forget-tracks', trackIds),
+
   /** One track's album art. `size` is 'thumb' (64px) or 'full'. */
   getArtwork: (trackId: string, size?: 'thumb' | 'full') =>
     ipcRenderer.invoke('library:artwork', trackId, size),

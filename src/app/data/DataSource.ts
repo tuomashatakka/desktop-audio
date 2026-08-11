@@ -54,6 +54,27 @@ export interface DataSource {
   /** Fire-and-forget, like {@link DataSource.scan}: rows arrive as events. */
   readonly load: () => void
 
+  /**
+   * Discard every persisted track under `roots` — folders the user removed.
+   *
+   * Phrased as "forget these roots" rather than "keep only the configured
+   * ones" on purpose: the caller passes the roots it just saw *disappear*, so
+   * an empty list is a no-op. The inverse phrasing reads current settings,
+   * which hydrate asynchronously, and would wipe the library if it lost that
+   * race.
+   */
+  readonly forgetRoots: (roots: readonly string[]) => Promise<void>
+
+  /**
+   * Discard an explicit set of tracks.
+   *
+   * The reconciliation half of {@link DataSource.forgetRoots}, for rows left
+   * behind by a root removed before removal cleaned up after itself. Named ids
+   * rather than "everything outside the configured roots", so no hydration
+   * ordering can widen it.
+   */
+  readonly forgetTracks: (trackIds: readonly string[]) => Promise<void>
+
   /** Dispose the returned handle to unsubscribe — safe to call more than once. */
   readonly subscribe:    (l: DataListener) => Subscription
   readonly readBytes:    (trackId: string) => Promise<ArrayBuffer>

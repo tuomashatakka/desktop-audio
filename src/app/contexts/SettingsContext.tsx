@@ -120,6 +120,16 @@ interface SettingsContextValue extends Settings {
 
   /** The accent that applies to the theme currently in effect. */
   readonly accent: string
+
+  /**
+   * False until the stored settings have replaced the defaults.
+   *
+   * Anything that *deletes* on the strength of `libraryPaths` has to wait for
+   * this. Settings load asynchronously, so before it flips `libraryPaths` is
+   * whatever the defaults say — and acting on that would discard a library
+   * because a `localStorage` read had not landed yet.
+   */
+  readonly ready: boolean
 }
 
 const STORAGE_KEY = 'desktop-audio-settings'
@@ -182,7 +192,10 @@ type SettingsProviderProps = { readonly children: ReactNode }
 
 export function SettingsProvider ({ children }: SettingsProviderProps) {
   const [ settings, setSettings ] = useState<Settings>(defaultSettings)
-  const host                      = useHost()
+
+  /** See {@link SettingsContextValue.ready}. */
+  const [ ready, setReady ] = useState(false)
+  const host                = useHost()
 
   /**
    * A mirror of `settings` for {@link update} to read.
@@ -197,6 +210,7 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
   const hydrate = useCallback((next: Settings) => {
     settingsRef.current = next
     setSettings(next)
+    setReady(true)
   }, [])
 
   /**
@@ -320,6 +334,7 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
     ({
       ...settings,
       accent: settings.theme === 'light' ? settings.accentLight : settings.accentDark,
+      ready,
       addLibraryPath,
       removeLibraryPath,
       setTheme,
@@ -337,6 +352,7 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
       setAccent,
     }), [
     settings,
+    ready,
     addLibraryPath,
     removeLibraryPath,
     setTheme,

@@ -17,6 +17,7 @@ import type { TrackDTO } from '../services/types'
 import type { DataEvent } from '../data/DataSource'
 import { useData } from '../data'
 import { generateId } from '../utils/generateId'
+import { isUnderRoots, removedRoots } from '../utils/roots'
 
 
 const log = {
@@ -77,9 +78,9 @@ function buildFolderTree (rootPaths: string[], files: string[]): FolderEntry[] {
  */
 const trackCache = new Map<string, Track>()
 
-let hydrated                      = false
-let lastScannedKey: string | null = null
-let initialLoadResolved           = false
+let hydrated                            = false
+let lastRoots: readonly string[] | null = null
+let initialLoadResolved                 = false
 
 function byTitle (a: Track, b: Track): number {
   return a.title.localeCompare(b.title)
@@ -87,7 +88,7 @@ function byTitle (a: Track, b: Track): number {
 
 export function useLibraryScanner () {
   const { setFolders, setTracks, setLoading } = useLibrary()
-  const { libraryPaths }                      = useSettings()
+  const { libraryPaths, ready }               = useSettings()
   const { play }                              = useAudio()
   const data                                  = useData()
 
@@ -157,9 +158,12 @@ export function useLibraryScanner () {
   const publishFolders = useCallback(() => {
     const paths = [ ...trackMap.current.values() ].map(t =>
       t.path)
-    if (paths.length === 0)
-      return
-    setFolders(buildFolderTree(libraryPathsRef.current as string[], paths))
+    // An empty cache means an empty tree, not "leave the last one up". This
+    // used to return early, which left the sidebar showing branches of a
+    // folder the user had just removed.
+    setFolders(paths.length === 0
+      ? []
+      : buildFolderTree(libraryPathsRef.current as string[], paths))
   }, [ setFolders ])
 
   /** Merges a batch of DTOs into the cache; returns how many arrived. */
@@ -168,6 +172,47 @@ export function useLibraryScanner () {
       trackMap.current.set(t.id, Track.fromDTO(t))
     return tracks.length
   }, [])
+
+  /**
+   * Discard whatever the configured roots no longer cover.
+   *
+   * Removing a root now cleans up after itself, but rows stranded by removals
+   * that happened *before* that was true are only discoverable here, once the
+   * database has been read back. Named ids go to the writer rather than a
+   * "delete everything outside the roots" statement, so the worst a bug here
+   * can do is name too few.
+   *
+   * Safe only because `data.load()` waits for settings to hydrate — see the
+   * hydration effect below.
+   */
+  const reconcileToRoots = useCallback(() => {
+    const roots             = libraryPathsRef.current as string[]
+    const orphans: string[] = []
+
+    for (const [ id, track ] of trackMap.current)
+      if (!isUnderRoots(track.path, roots))
+        orphans.push(id)
+
+    if (orphans.length === 0)
+      return
+
+    // Configured roots that match *nothing* are not roots the user emptied,
+    // they are roots expressed in a different vocabulary than the paths. The
+    // browser data source is exactly that: its `libraryPaths` are generated
+    // root ids while its track paths start with the folder's label, so a
+    // literal reading here would discard the whole library. No roots at all is
+    // a different thing and stays a real answer — everything *is* an orphan.
+    if (roots.length > 0 && orphans.length === trackMap.current.size) {
+      log.info('⊖ every track sits outside the configured roots — treating that as a mismatch, not a removal')
+      return
+    }
+
+    log.info(`⊖ discarding ${orphans.length} track(s) outside the configured roots`)
+    for (const id of orphans)
+      trackMap.current.delete(id)
+
+    void data.forgetTracks(orphans)
+  }, [ data ])
 
   // Subscribe to scan and hydrate events once — persistent for lifetime of
   // component.
@@ -194,6 +239,7 @@ export function useLibraryScanner () {
       }
       else if (event.type === 'hydrate-done') {
         log.info(`▤ DB hydrated — ${trackMap.current.size} tracks · ◴ ${Date.now() - t0}ms`)
+        reconcileToRoots()
         publishNow()
         publishFolders()
         markInitialResolved()
@@ -236,7 +282,7 @@ export function useLibraryScanner () {
       log.info('⊖ unsubscribing from library events')
       subscription.dispose()
     }
-  }, [ data, mergeTracks, schedulePublish, publishNow, publishFolders, setLoading, markInitialResolved ])
+  }, [ data, mergeTracks, schedulePublish, publishNow, publishFolders, reconcileToRoots, setLoading, markInitialResolved ])
 
   // Cache hydration — replay what we already have, then ask for the DB once.
   //
@@ -252,12 +298,15 @@ export function useLibraryScanner () {
       publishFolders()
     }
 
-    if (hydrated)
+    // Gated on settings: the reconciliation below decides what to discard from
+    // `libraryPaths`, and the tree is built from it too. Hydrating first would
+    // mean doing both against the defaults.
+    if (hydrated || !ready)
       return
     hydrated = true
 
     data.load()
-  }, [ data, publish, publishFolders ])
+  }, [ data, ready, publish, publishFolders ])
 
   const scanLibrary = useCallback(() => {
     if (libraryPaths.length === 0)
@@ -268,16 +317,54 @@ export function useLibraryScanner () {
     data.scan([ ...libraryPaths ])
   }, [ libraryPaths, setLoading, data ])
 
+  /**
+   * Discard a removed root's tracks — from the cache now, from SQLite for good.
+   *
+   * Neither happened before. The scanner's prune only reaches inside the roots
+   * it was asked to scan, so a de-registered folder's rows outlived every later
+   * scan and came back on the next hydrate; and when the *last* root went the
+   * rescan did not run at all, so even the cache kept them.
+   */
+  const forget = useCallback((roots: readonly string[]) => {
+    log.info(`⊖ forgetting ${roots.length} removed root(s): ${roots.join(', ')}`)
+
+    for (const [ id, track ] of trackMap.current)
+      if (isUnderRoots(track.path, roots))
+        trackMap.current.delete(id)
+
+    publishNow()
+    publishFolders()
+    void data.forgetRoots(roots)
+  }, [ data, publishNow, publishFolders ])
+
   // Background rescan — once per distinct set of roots, not once per mount.
-  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Starts a scan when the configured library paths actually change.
+  //
+  // The previous roots are kept rather than a joined key, because what a root
+  // *disappearing* means is not derivable from a key comparison. Waiting for
+  // `ready` is what makes that safe *and* honest: this hook's effects run
+  // before its provider's, so without it the first pass saw the placeholder
+  // defaults — scanning a folder called `Music` that does not exist, and then
+  // reading the real settings arriving as if the user had removed it.
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Reacts to the configured library paths changing: forgets removed roots and starts a scan.
   useEffect(() => {
-    const key = [ ...libraryPaths ].sort()
-      .join(' ')
-    if (!key || key === lastScannedKey)
+    if (!ready)
       return
-    lastScannedKey = key
-    scanLibrary()
-  }, [ libraryPaths, scanLibrary ])
+
+    const roots = [ ...libraryPaths ].sort()
+    if (lastRoots && roots.join(' ') === lastRoots.join(' '))
+      return
+
+    const removed = removedRoots(lastRoots, roots)
+    lastRoots     = roots
+
+    if (removed.length > 0)
+      forget(removed)
+
+    // Nothing left to scan is a valid state, not a reason to skip the work
+    // above — `forget` has already emptied the list and the tree.
+    if (roots.length > 0)
+      scanLibrary()
+  }, [ libraryPaths, ready, scanLibrary, forget ])
 
   const addAndScan = useCallback(async () =>
     await data.addRoot() ?? null, [ data ])
