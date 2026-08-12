@@ -1,9 +1,14 @@
 /**
  * AudioContext — Web Audio playback engine wired into React.
  *
- * Drives a single `<audio>` element through an {@link AudioContext} graph
- * (gain → analyzer → destination), exposes transport controls, and decodes
- * waveform-bar amplitudes for visualizers.
+ * Drives a single `<audio>` element through an {@link AudioContext} graph —
+ * `source → DSP chain → analyzer → destination` — exposes transport controls,
+ * and decodes waveform-bar amplitudes for visualizers. Volume is not a node in
+ * that graph; it is set straight on the media element.
+ *
+ * The analyser sits *after* the DSP chain on purpose, so the spectrum panel
+ * shows what is coming out rather than what went in: move an EQ fader with the
+ * visualizer open and you watch it happen.
  *
  * Playback runs off a real queue held here. Callers hand a list *once*, when
  * they start playback (`playQueue(tracks, index)`), and next/previous walk it
@@ -17,6 +22,8 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect, us
 import type { Track } from './LibraryContext'
 import { useOptionalSettings } from './SettingsContext'
 import type { RepeatMode } from './SettingsContext'
+import { createDspChain, DEFAULT_DSP } from '../services/dspChain'
+import type { DspChain, DspSettings, DynamicsModule } from '../services/dspChain'
 import { useData } from '../data'
 import { useArtwork } from '../hooks/useArtwork'
 import { useNativeMediaControls } from '../hooks/useNativeMediaControls'
@@ -58,6 +65,16 @@ interface AudioContextValue extends AudioState {
   readonly playNext:     () => void
   readonly playPrevious: () => void
   readonly analyzer:     AnalyserNode | null
+
+  /**
+   * Gain reduction currently applied by one dynamics module, in dB (≤ 0).
+   *
+   * The chain itself is deliberately *not* exposed: nothing outside here should
+   * be able to call `apply` or `dispose` on it, and this is the only thing that
+   * has to be read back off the graph rather than out of settings. Reads
+   * through a ref, so it never goes stale and never needs a re-render.
+   */
+  readonly reductionOf: (module: DynamicsModule) => number
 
   /** Ensure audio context is ready (resumes if suspended). Call after user gesture. */
   readonly ensureReady: () => Promise<void>
@@ -221,6 +238,44 @@ function useMediaSessionRefs (currentTrack: Track | null) {
  */
 type AudioProviderProps = { readonly children: ReactNode }
 
+/**
+ * The tail of the audio graph: the analyser and the DSP chain that feeds it.
+ *
+ * They are built together in `setupAnalyzer`, so they are held together here —
+ * and splitting them out keeps `AudioProvider`'s own statement count under the
+ * lint cap, for the same reason {@link useMediaSessionRefs} exists.
+ */
+function useAudioGraph (settings: DspSettings | undefined) {
+  const dsp                       = settings ?? DEFAULT_DSP
+  const chain                     = useRef<DspChain | null>(null)
+  const analyzerRef               = useRef<AnalyserNode | null>(null)
+  const [ analyzer, setAnalyzer ] = useState<AnalyserNode | null>(null)
+
+  /**
+   * For the one caller that is not a render: `setupAnalyzer` needs the current
+   * settings to seed a chain it has just built, and taking them as a dependency
+   * would rebuild that callback on every knob tick. Assigned directly rather
+   * than from an effect — it is only read from callbacks, so it just has to be
+   * current by the time one runs.
+   */
+  const latest   = useRef(dsp)
+  latest.current = dsp
+
+  // `dsp` is a fresh object after every setter call, so this runs on each knob
+  // tick — `apply` diffs against what it last wrote for that reason. It no-ops
+  // until the first track builds the chain; `setupAnalyzer` seeds it itself.
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Pushes DSP parameters onto live Web Audio nodes, which React does not own.
+  useEffect(() => {
+    chain.current?.apply(dsp)
+  }, [ dsp ])
+
+  /** Read through the ref, so it is never stale and never forces a render. */
+  const reductionOf = useCallback((module: DynamicsModule) =>
+    chain.current?.reductionOf(module) ?? 0, [])
+
+  return { chain, latest, reductionOf, analyzerRef, analyzer, setAnalyzer }
+}
+
 export function AudioProvider ({ children }: AudioProviderProps) {
   const [ state, setState ] = useState<AudioState>({
     isPlaying:    false,
@@ -240,12 +295,16 @@ export function AudioProvider ({ children }: AudioProviderProps) {
   const repeatMode = settings?.repeatMode ?? 'none'
   const shuffle    = settings?.shuffle ?? false
 
-  const audioRef                  = useRef<HTMLAudioElement | null>(null)
-  const analyzerRef               = useRef<AnalyserNode | null>(null)
-  const audioContextRef           = useRef<globalThis.AudioContext | null>(null)
-  const sourceRef                 = useRef<MediaElementAudioSourceNode | null>(null)
-  const [ analyzer, setAnalyzer ] = useState<AnalyserNode | null>(null)
-  const data                      = useData()
+  const audioRef        = useRef<HTMLAudioElement | null>(null)
+  const audioContextRef = useRef<globalThis.AudioContext | null>(null)
+  const sourceRef       = useRef<MediaElementAudioSourceNode | null>(null)
+
+  const {
+    chain: dspRef, latest: dspSettingsRef, reductionOf,
+    analyzerRef, analyzer, setAnalyzer,
+  } = useAudioGraph(settings?.dsp)
+
+  const data = useData()
 
   const {
     pauseRef, resumeRef, seekRef, playNextRef, playPreviousRef, advanceRef,
@@ -316,12 +375,15 @@ export function AudioProvider ({ children }: AudioProviderProps) {
       audioRef.current.volume = state.volume
   }, [ state.volume ])
 
-  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Unmount teardown: revokes the blob URL and clears the media-session action handlers.
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Unmount teardown: revokes the blob URL, disconnects the DSP chain's nodes, and clears the media-session action handlers.
   useEffect(() =>
     () => {
       const audio = audioRef.current
       if (audio && audio.src.startsWith('blob:'))
         URL.revokeObjectURL(audio.src)
+
+      dspRef.current?.dispose()
+      dspRef.current = null
       if (navigator.mediaSession) {
         navigator.mediaSession.setActionHandler('play', null)
         navigator.mediaSession.setActionHandler('pause', null)
@@ -357,9 +419,22 @@ export function AudioProvider ({ children }: AudioProviderProps) {
       setAnalyzer(analyzerRef.current)
     }
 
+    // Built once per session, not per track: `loadTrack` calls through here
+    // every time, and sixteen filters plus two compressors are cheap to run but
+    // pointless to rebuild.
+    if (!dspRef.current) {
+      dspRef.current = createDspChain(ctx)
+      dspRef.current.apply(dspSettingsRef.current)
+      dspRef.current.output.connect(analyzerRef.current)
+    }
+
     if (!sourceRef.current && audioRef.current) {
       sourceRef.current = ctx.createMediaElementSource(audioRef.current)
-      sourceRef.current.connect(analyzerRef.current)
+
+      // Into the chain, not straight at the analyser: the chain's own spine is
+      // what routes around a bypassed module, so this connection is made once
+      // and never touched again.
+      sourceRef.current.connect(dspRef.current.input)
     }
 
     return analyzerRef.current
@@ -586,6 +661,7 @@ export function AudioProvider ({ children }: AudioProviderProps) {
       playNext,
       playPrevious,
       analyzer,
+      reductionOf,
       ensureReady,
     }), [
     state,
@@ -600,6 +676,7 @@ export function AudioProvider ({ children }: AudioProviderProps) {
     playNext,
     playPrevious,
     analyzer,
+    reductionOf,
     ensureReady,
   ])
 

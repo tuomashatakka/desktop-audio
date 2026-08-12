@@ -106,8 +106,10 @@ position, its selection, the sidebar — exactly where it was.
 With no routes left, the titlebar has no nav strip: it is sidebar toggle,
 wordmark, a context slot holding only `LibrarySearch`, and the window buttons.
 Settings moved to `.sidebar-footer`, next to the rest of the library's
-navigation. Now Playing opens from `.player-promote`, the invisible full-bar
-button over the footer player.
+navigation, alongside a DSP Processing entry that opens the player overlay
+straight onto its `dsp` mode. Now Playing opens from `.player-promote`, the
+invisible full-bar button over the footer player — which is `disabled` with no
+track, and is why the sidebar entry exists rather than being a duplicate door.
 
 The search field is `<search>` (`role="search"` natively) wrapping the input.
 It collapses to its own glyph with no state at all: `:not(:focus-within):has(>
@@ -602,14 +604,22 @@ both already own that, and the width is better spent on the progress bar. The
 
 ## Now playing: what fills the middle
 
-`Player` has three modes — `default` (artwork), `lyrics`, `visualizer` — and
-one at a time, not two independent toggles. Lyrics and the spectrum claim the
-same space, so a boolean each would let the user ask for both and leave the
-answer to selector order. `data-mode` on `.player-view` is what the tier CSS
-reads; `default` writes no attribute.
+`Player` has four modes — `default` (artwork), `lyrics`, `visualizer`, `dsp` —
+and one at a time, not a boolean each. They all claim the same space, so
+independent toggles would let the user ask for two at once and leave the answer
+to selector order. `data-mode` on `.player-view` is what the tier CSS reads;
+`default` writes no attribute.
+
+**`playerMode` lives in `UIContext`, not in `Player`.** It was local `useState`
+until the sidebar needed to open the overlay *onto* a mode — `.player-promote`
+is `disabled` with no track, so without that lift the DSP page was unreachable
+in silence, which is exactly when you might want to set up an EQ. It is
+session-only, like `overlay`: which panel you last had open is not a preference.
 
 The mode buttons live in `.player-actions` and exist only in the overlay
-(`expanded`), alongside the close button.
+(`expanded`), alongside the close button. The DSP one is deliberately **not**
+`disabled={!hasTrack}` like its two neighbours: lyrics need tags and the
+spectrum needs signal, but an EQ curve does not need anything playing.
 
 **That close button is the overlay's only one.** `OverlayHost` therefore does
 *not* pass `Overlay`'s `closeButton` for the player, unlike the two sheets —
@@ -663,6 +673,100 @@ note. That fftSize is why it can name a pitch at all — the analyser used to be
 Chips that would overlap are stacked into lanes (`assignLanes`): even on a log
 axis a close voicing puts its partials within a few percent of each other, so
 position alone cannot separate them.
+
+## The DSP chain
+
+`services/dspChain.ts` sits between the media source and the analyser:
+
+```
+<audio> → source → dsp.input → 16 biquads → compressor → limiter → dsp.output
+        → analyser → destination
+```
+
+**The analyser is downstream of the chain on purpose**, so the spectrum panel
+shows what is coming out rather than what went in — move an EQ fader with the
+visualizer open and you watch it happen. (`waveformBars` are decoded from the
+raw file and will *not* reflect DSP. That is correct; they describe the track.)
+
+**The graph is built once and never re-plumbed. Bypass is neutral parameters,
+not disconnection** — which is the opposite of what it looks like it should be:
+
+- A `peaking`/`lowshelf`/`highshelf` biquad at 0 dB is *exactly* unity: with
+  `A = 10^(0/40) = 1` the RBJ numerator equals the denominator. There is
+  nothing to gain by removing it.
+- A `DynamicsCompressorNode` at `ratio 1, threshold 0, knee 0` reduces by 0 dB
+  on every sample.
+- And Chromium's compressor carries an unconditional **~6 ms pre-delay whatever
+  its parameters are**. Splicing one in or out shifts the sample stream in
+  time, which is a click no gain ramp can hide — constant latency is inaudible,
+  *changing* latency is not. The two compressors therefore cost ~12 ms always,
+  and nothing here is lip-synced.
+
+Everything else follows from that:
+
+- **The UI is dB and milliseconds; the nodes want seconds.** `dspNodeValues()`
+  is the single place the ÷1000 happens, and the single place "off" becomes a
+  set of numbers. It is pure, so both are tested without an audio context.
+- **Every write is `setTargetAtTime`, never `.value =`** — direct assignment on
+  a live graph zippers audibly while a fader is being dragged. `apply()` diffs
+  against what it last wrote, because `dsp` is a fresh object after every setter
+  call and an undiffed apply would schedule 26 automation events per frame.
+- **The two shelves are cornered at the band edge, not at a centre.** A shelf's
+  `frequency` is the middle of its transition, so a lowshelf cornered at the
+  nominal 20 Hz only reaches full gain below ~15 Hz and its fader does nothing
+  you can hear. They sit at √(20 × 31.5) ≈ 25 Hz and √(12500 × 20000) ≈ 15.8 kHz.
+  `Q` is *not* set on them — the spec ignores it for shelving filters.
+- `BAND_Q` is 1.4, not the width-matched 2.15. A 16-fader EQ is a curve-drawing
+  tool: neighbours get moved together, and at 2.15 two adjacent +6 dB bands
+  leave a visible dip between them.
+- **The limiter is not a brickwall.** It is the same node with `ratio 20`,
+  `knee 0`, `attack 0.001` welded, so it has no true-peak detection and cannot
+  guarantee 0 dBFS. It is named for what it is for.
+- **Volume is applied to the `<audio>` element, upstream of the chain**, so the
+  thresholds move relative to the programme material when the user changes
+  volume. Fixing that means moving volume onto a `GainNode` after `output`.
+
+`normalizeDsp` exists because `SettingsContext.loadSettings` hydrates with a
+**shallow** merge: a stored `dsp` replaces the whole default subtree, so an old
+build or a hand-edited `localStorage` arrives with keys missing or an `eq.gains`
+of the wrong length — and a short array silently leaves the trailing bands
+unwritten. It runs on hydrate *and* inside `updateDsp`, so nothing can store a
+bad shape from either direction. It lives in `dspChain.ts`, next to the ranges
+it enforces, and `SettingsContext` imports one function and learns nothing about
+EQ bands — the `with*` combinators there are what the panel composes.
+
+`AudioContext` exposes `reductionOf(module)`, **not the chain**: nothing outside
+should be able to call `apply` or `dispose`, and gain reduction is the only
+thing that has to be read off the graph rather than out of settings. It reads
+through a ref, so it never goes stale and never forces a render.
+`useAudioGraph` holds the analyser and the chain together, since `setupAnalyzer`
+builds them together — and, like `useMediaSessionRefs`, it keeps
+`AudioProvider` under the `max-statements` cap.
+
+### DSP controls
+
+`ParamControl` is one component painted two ways (`Knob`, `Fader`) — a
+decorative `.param-shape` with a transparent native range over it, the same
+arrangement `WaveformProgress` uses for seeking. `--param-turn` (0–1) is the
+only thing JS contributes; the 270° dial sweep and the fader fill are CSS.
+
+- Both shapes are `writing-mode: vertical-rl`, so the drag gesture is
+  up-for-more. On a round dial a horizontal drag is the wrong model, and
+  clicking the left edge of one would jump it to minimum.
+- `aria-label` names the input rather than letting the wrapping `<label>` do it,
+  because the readout is inside that label — a content-derived name would come
+  out "Threshold −24 dB" and change on every drag. `aria-valuetext` carries the
+  unit so AT says "−4.5 dB" and not a bare "−4.5".
+- **The `<output>` is `aria-hidden`.** It is an implicit `role="status"` with
+  `aria-live="polite"`, and sixteen of them would announce on every tick of a
+  drag.
+- Gain-reduction `<meter>`s are driven by a per-meter `requestAnimationFrame`
+  loop writing through a ref. Through `useState` it would re-render the whole
+  panel sixty times a second to move one bar.
+
+Two lint traps found the hard way: `react-strict/jsx-prop-layout` **crashes**
+(`name[2].toUpperCase()` of `undefined`) on a JSX prop named exactly `on`, and
+on spread attributes it wants regular props placed *before* the spread.
 
 ## Motion
 

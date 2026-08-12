@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { useUI, useAudio, useSettings } from '../../contexts'
 import { FrequencyMatrix } from './FrequencyMatrix'
-import type { Track, RepeatMode } from '../../contexts'
+import { DspPanel } from './DspPanel'
+import type { Track, RepeatMode, PlayerMode } from '../../contexts'
 import { Icon, IconButton, Button } from '../atomic'
 import { WaveformProgress } from '../atomic/WaveformProgress'
 import { useWindowScale } from '../../hooks'
@@ -139,15 +139,6 @@ function PlayerLyrics ({ lyrics }: PlayerLyricsProps) {
   </section>
 }
 
-/**
- * What fills the middle of the now-playing screen.
- *
- * One mode at a time rather than two independent toggles: lyrics and the
- * spectrum both claim the same space, so a boolean each would let the user ask
- * for both and leave the answer to selector order.
- */
-type PlayerMode = 'default' | 'lyrics' | 'visualizer'
-
 type PlayerInfoProps = { readonly track: Track | null }
 
 /**
@@ -181,6 +172,9 @@ function PlayerPanel ({ mode, lyrics, analyzer }: PlayerPanelProps) {
 
   if (mode === 'visualizer')
     return <FrequencyMatrix analyzer={ analyzer } active />
+
+  if (mode === 'dsp')
+    return <DspPanel />
 
   return null
 }
@@ -231,6 +225,20 @@ function PlayerActions ({ mode, hasTrack, onMode, onClose }: PlayerActionsProps)
       </IconButton>
     </li>
 
+    {/* No `disabled` here, unlike the two above: the spectrum and lyrics need a
+        track to have anything to show, but an EQ curve is editable in silence. */}
+    <li>
+      <IconButton
+        className='dsp-toggle'
+        aria-pressed={ showing('dsp') }
+        label={ showing('dsp') ? 'Show album art' : 'Show audio processing' }
+        type='button'
+        onClick={ () =>
+          onMode('dsp') }>
+        <Icon name='dsp' />
+      </IconButton>
+    </li>
+
     <li>
       <IconButton className='player-close' label='Close player' type='button' onClick={ onClose }>
         <Icon name='close' />
@@ -268,7 +276,7 @@ type PlayerProps = {
  * that system.
  */
 export function Player ({ expanded = false }: PlayerProps) {
-  const { openOverlay, closeOverlay } = useUI()
+  const { openOverlay, closeOverlay, playerMode, setPlayerMode } = useUI()
   const {
     currentTrack, isPlaying, currentTime, duration, waveformBars, analyzer,
     pause, resume, seek, playNext, playPrevious,
@@ -276,17 +284,17 @@ export function Player ({ expanded = false }: PlayerProps) {
   const { shuffle, setShuffle, repeatMode, setRepeatMode } = useSettings()
   const toggleWindowScale                                  = useWindowScale()
 
-  const [ mode, setMode ] = useState<PlayerMode>('default')
-
-  /** Clicking the active mode's button returns to the artwork. */
+  /**
+   * Clicking the active mode's button returns to the artwork. The value lives
+   * in `UIContext` so the sidebar can open the overlay straight onto a mode.
+   */
   const toggleMode = (next: Exclude<PlayerMode, 'default'>) =>
-    setMode(current =>
-      current === next ? 'default' : next)
+    setPlayerMode(playerMode === next ? 'default' : next)
 
   // These panels only make sense in the full-window player; the footer bar and
   // the mini tiers have nowhere to put them, so they aren't in their DOM at
   // all rather than being hidden after the fact.
-  const activeMode = expanded ? mode : 'default'
+  const activeMode = expanded ? playerMode : 'default'
 
   // Shares the cache entry `PlayerArt` above already warmed for this track.
   const currentArt = useArtwork(currentTrack?.id, 'full')

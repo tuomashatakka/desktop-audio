@@ -79,6 +79,16 @@ afterEach(() => {
   localStorage.clear()
 })
 
+/**
+ * A fresh AudioParam per call, deliberately not a shared object: sixteen EQ
+ * filters sharing one `gain` would let a band test pass for the wrong reason.
+ */
+const audioParam = () => ({
+  value: 0,
+  setTargetAtTime: vi.fn(),
+  setValueAtTime: vi.fn(),
+})
+
 global.AudioContext = vi.fn().mockImplementation(() => ({
   createAnalyser: vi.fn().mockReturnValue({
     fftSize: 256,
@@ -91,6 +101,38 @@ global.AudioContext = vi.fn().mockImplementation(() => ({
     connect: vi.fn(),
     disconnect: vi.fn(),
   }),
+
+  // The DSP chain builds these in `setupAnalyzer`, so every test that loads a
+  // track reaches them whether or not it cares about DSP.
+  createGain: vi.fn(() => ({
+    gain: audioParam(),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  })),
+
+  createBiquadFilter: vi.fn(() => ({
+    type: 'peaking',
+    frequency: audioParam(),
+    Q: audioParam(),
+    gain: audioParam(),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  })),
+
+  createDynamicsCompressor: vi.fn(() => ({
+    threshold: audioParam(),
+    knee: audioParam(),
+    ratio: audioParam(),
+    attack: audioParam(),
+    release: audioParam(),
+    reduction: 0,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  })),
+
+  // `setTargetAtTime(v, ctx.currentTime, τ)` would otherwise pass `undefined`.
+  currentTime: 0,
+  sampleRate: 44100,
   destination: {},
   close: vi.fn().mockResolvedValue(undefined),
 })) as unknown as typeof AudioContext

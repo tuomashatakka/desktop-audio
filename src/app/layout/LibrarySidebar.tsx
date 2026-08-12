@@ -32,6 +32,7 @@ export function LibrarySidebar () {
     selectPlaylist,
     setSidebarWidth,
     openOverlay,
+    setPlayerMode,
   } = useUI()
 
   const folders = Array.from(registry.folders.values())
@@ -136,17 +137,20 @@ export function LibrarySidebar () {
         one destination left, and this is where the rest of the library's
         navigation already lives. */}
     <footer className='sidebar-footer'>
-      {/* Placeholder for the DSP processing view. `disabled` is the whole
-          point: it reserves the slot and announces the feature without
-          pretending to be a control that does something. */}
+      {/* The one door to the DSP page that does not require a track: the
+          player bar's own promote button is disabled when nothing is playing,
+          and an EQ curve is worth editing in silence. Setting the mode first
+          means the overlay opens straight onto it — both are plain setters, so
+          React batches them into one commit. */}
       <button
         className='sidebar-action'
         type='button'
-        disabled
-        title='DSP processing — coming soon'>
+        onClick={ () => {
+          setPlayerMode('dsp')
+          openOverlay('player')
+        } }>
         <Icon name='dsp' />
         <span className='name'>DSP Processing</span>
-        <small className='badge'>Soon</small>
       </button>
 
       <button

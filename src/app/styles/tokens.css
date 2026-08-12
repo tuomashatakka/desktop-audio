@@ -157,6 +157,11 @@
     --album-art-sm: 40px;
     --art-blur: 60px;
 
+    /* DSP controls — the fader travel and the knob dial are structural, not decorative */
+    --dsp-fader-h: 104px;
+    --dsp-knob-size: 52px;
+    --dsp-track-w: 4px;
+
     /* z-index scale, so a new layer is a token and not a guess */
     --z-raised: 1;
     --z-sticky: 2;

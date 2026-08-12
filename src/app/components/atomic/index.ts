@@ -16,6 +16,8 @@ export { SegmentedControl, type SegmentedOption } from './SegmentedControl'
 
 export { Rating, MAX_RATING } from './Rating'
 
+export { Knob, Fader } from './ParamControl'
+
 export { Overlay, type OverlayVariant } from './Overlay'
 
 export { Dialog } from './Dialog'

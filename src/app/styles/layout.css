@@ -423,12 +423,16 @@ body::before {
   container: player / size;
 
   /*
-   * Lyrics take the transport's place; the spectrum takes the artwork's and
-   * the progress bar's but keeps the transport, because a visualizer you
-   * cannot pause is a screensaver.
+   * Lyrics take the transport's place; the spectrum and the DSP page take the
+   * artwork's and the progress bar's but keep the transport, because a
+   * visualizer you cannot pause is a screensaver — and neither is a DSP page
+   * you have to close to hear what you just changed.
    */
   &[data-mode='lyrics'] :is(.progress-section, .playback-controls) { display: none; }
-  &[data-mode='visualizer'] :is(.player-art, .progress-section) { display: none; }
+  &:is([data-mode='visualizer'], [data-mode='dsp']) :is(.player-art, .progress-section) { display: none; }
+
+  /* This is the container, so its own padding cannot come from a container query. */
+  &[data-mode='dsp'] .player-content { padding-inline: var(--sp-4); }
 }
 
 .album-art-bg {
@@ -617,14 +621,14 @@ body::before {
     gap: var(--sp-2);
   }
 
-  :is(.visualizer-toggle, .lyrics-toggle, .player-close) {
+  :is(.visualizer-toggle, .lyrics-toggle, .dsp-toggle, .player-close) {
     color: var(--text-muted);
     transition: color var(--duration-fast) var(--ease);
 
     &:hover:not(:disabled) { color: var(--text); }
   }
 
-  :is(.visualizer-toggle, .lyrics-toggle)[aria-pressed='true'] { color: var(--accent); }
+  :is(.visualizer-toggle, .lyrics-toggle, .dsp-toggle)[aria-pressed='true'] { color: var(--accent); }
 }
 
 /*
@@ -731,6 +735,147 @@ body::before {
     line-height: 1.8;
     white-space: pre-wrap;
   }
+}
+
+/* ─── DSP panel ────────────────────────────────────────────────────────── */
+
+/*
+ * Lives here rather than in views.css because it is part of the player's tier
+ * system, alongside `.player-art` and `.progress-section` above.
+ *
+ * It scrolls internally: sixteen faders plus six knobs do not fit the `snug`
+ * height tier, and clipping them would hide the low bands rather than the
+ * decoration.
+ */
+.dsp-panel {
+  display: grid;
+  gap: var(--sp-3);
+  width: min(100%, 760px);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-1);
+  animation: surface-in var(--duration) var(--ease-emphasis);
+}
+
+.dsp-module {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-raised) 70%, transparent);
+}
+
+.dsp-module-header {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+
+  /* A `<legend>` is a float in disguise; laying it out as flex needs this. */
+  float: none;
+}
+
+.dsp-switch {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  /*
+   * A real checkbox, painted as a switch. Not `display: none` — it stays a
+   * focusable, keyboard-operable control, the same rule `SegmentedControl`'s
+   * radios follow.
+   */
+  input {
+    width: var(--sp-8);
+    height: var(--sp-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    appearance: none;
+    background: var(--bg-input);
+    cursor: pointer;
+    transition:
+      background var(--duration-fast) var(--ease),
+      border-color var(--duration-fast) var(--ease);
+  }
+
+  input::after {
+    display: block;
+    width: var(--sp-3);
+    height: var(--sp-3);
+    margin: 1px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    content: '';
+    transition:
+      translate var(--duration-fast) var(--ease-emphasis),
+      background var(--duration-fast) var(--ease);
+  }
+
+  input:checked {
+    border-color: var(--accent);
+    background: var(--accent-muted);
+  }
+
+  input:checked::after {
+    translate: var(--sp-4) 0;
+    background: var(--accent);
+  }
+
+  input:focus-visible { box-shadow: var(--focus-ring); }
+  &:has(input:checked) { color: var(--accent); }
+}
+
+.dsp-meter {
+  width: var(--sp-12);
+  height: var(--sp-1);
+  appearance: none;
+  background: var(--bg-input);
+
+  /* Chromium paints `<meter>` through these two, and neither inherits. */
+  &::-webkit-meter-bar {
+    border: 0;
+    background: var(--bg-input);
+  }
+
+  &::-webkit-meter-optimum-value { background: var(--accent); }
+}
+
+.dsp-bands {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+  gap: var(--sp-1);
+  align-items: end;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  /* Sixteen columns in a fixed width; each one has to be allowed to collapse. */
+  > li { min-width: 0; }
+}
+
+.dsp-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+.dsp-knobs {
+  display: flex;
+  gap: var(--sp-6);
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 /* ─── waveform ─────────────────────────────────────────────────────────── */

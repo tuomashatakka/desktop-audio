@@ -26,6 +26,17 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 export type OverlayName = 'player' | 'settings' | 'tag-editor'
 
 /**
+ * What fills the middle of the now-playing overlay. One at a time, not a
+ * boolean each: artwork, lyrics, the spectrum and the DSP page all claim the
+ * same space.
+ *
+ * It lives here rather than inside `Player` because the sidebar's DSP entry has
+ * to be able to open the overlay *on* a mode. Session-only, like `overlay` —
+ * which panel you last had open is not a preference.
+ */
+export type PlayerMode = 'default' | 'lyrics' | 'visualizer' | 'dsp'
+
+/**
  * How the track collection is laid out. The first three are row heights for
  * the list; the two `grid-*` values switch it to a card grid instead — see
  * {@link isGridDensity}.
@@ -63,6 +74,7 @@ export function isGridDensity (density: Density): density is GridDensity {
 /** Read-only snapshot of UI state. */
 interface UIState {
   readonly overlay:            OverlayName | null
+  readonly playerMode:         PlayerMode
   readonly sidebarOpen:        boolean
   readonly selectedFolderPath: string | null
   readonly selectedPlaylistId: string | null
@@ -77,6 +89,7 @@ interface UIState {
 interface UIContextValue extends UIState {
   readonly openOverlay:     (name: OverlayName) => void
   readonly closeOverlay:    () => void
+  readonly setPlayerMode:   (mode: PlayerMode) => void
   readonly toggleSidebar:   () => void
   readonly selectFolder:    (path: string | null) => void
   readonly selectPlaylist:  (id: string | null) => void
@@ -171,6 +184,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
   const [ state, setState ] = useState<UIState>(() =>
     ({
       overlay:        null,
+      playerMode:     'default',
       sidebarOpen:    false,
       ...NO_SCOPE,
       editingTrackId: null,
@@ -187,6 +201,11 @@ export function UIProvider ({ children, value }: UIProviderProps) {
   const closeOverlay = useCallback(() => {
     setState(s =>
       s.overlay === null ? s : { ...s, overlay: null })
+  }, [])
+
+  const setPlayerMode = useCallback((mode: PlayerMode) => {
+    setState(s =>
+      s.playerMode === mode ? s : { ...s, playerMode: mode })
   }, [])
 
   const toggleSidebar = useCallback(() => {
@@ -259,6 +278,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       ...state,
       openOverlay,
       closeOverlay,
+      setPlayerMode,
       toggleSidebar,
       selectFolder,
       selectPlaylist,
@@ -272,6 +292,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
     state,
     openOverlay,
     closeOverlay,
+    setPlayerMode,
     toggleSidebar,
     selectFolder,
     selectPlaylist,

@@ -125,6 +125,150 @@
     &:focus::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--accent-muted); }
   }
 
+  /*
+   * A labelled numeric parameter — one component, two shapes.
+   *
+   * The visible shape is a decorative span and the range input lies
+   * transparent over it, the same arrangement `.waveform-progress` uses for
+   * seeking. `--param-turn` (0–1, written by `ParamControl`) is the only thing
+   * JS contributes; the geometry stays in CSS.
+   *
+   * Both shapes put the input in vertical writing mode so the drag gesture is
+   * up-for-more. That is the conventional direction for a fader, and on a round
+   * dial a horizontal drag is simply the wrong model. `writing-mode` is the
+   * modern spelling — `appearance: slider-vertical` is the deprecated one, and
+   * this is Chromium 140, so no fallback is needed.
+   *
+   * Like `.slider` above, only `::-webkit-slider-thumb` is styled: Electron is
+   * Chromium, and a Firefox branch here would be dead code.
+   */
+  .param-control {
+    display: grid;
+    justify-items: center;
+    gap: var(--sp-1);
+    font-size: var(--text-xs);
+    cursor: pointer;
+
+    .param-label {
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .param-value {
+      color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    &:is(:hover, :focus-within) .param-value { color: var(--accent); }
+
+    /* A bypassed module still shows its curve; it just cannot be moved. */
+    &:has(.param-input:disabled) {
+      cursor: default;
+      opacity: 0.45;
+    }
+
+    .param-well {
+      position: relative;
+      display: grid;
+      place-items: center;
+    }
+
+    .param-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      opacity: 0;
+      appearance: none;
+      writing-mode: vertical-rl;
+      direction: rtl;
+      cursor: ns-resize;
+    }
+
+    /* The dial/track is not focusable, so the ring has to be drawn for it. */
+    &:has(.param-input:focus-visible) .param-shape { box-shadow: var(--focus-ring); }
+
+    &[data-shape='knob'] {
+      .param-well {
+        width: var(--dsp-knob-size);
+        height: var(--dsp-knob-size);
+      }
+
+      /*
+       * A 270° sweep starting at 7 o'clock, filled as far as `--param-turn`
+       * goes. The inner disc is a pseudo-element rather than a mask so the
+       * indicator can sit on top of it.
+       */
+      .param-shape {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: conic-gradient(
+          from 225deg,
+          var(--accent) 0 calc(var(--param-turn) * 270deg),
+          var(--bg-hover) 0 270deg,
+          transparent 0
+        );
+      }
+
+      .param-shape::before {
+        position: absolute;
+        inset: 22%;
+        border-radius: 50%;
+        background: var(--bg-raised);
+        content: '';
+      }
+
+      /* The indicator line, rotated around the dial's centre. */
+      .param-shape::after {
+        position: absolute;
+        top: 14%;
+        left: calc(50% - var(--dsp-track-w) / 2);
+        width: var(--dsp-track-w);
+        height: 36%;
+        background: var(--accent);
+        rotate: calc(-135deg + var(--param-turn) * 270deg);
+        transform-origin: 50% 100%;
+        content: '';
+      }
+    }
+
+    &[data-shape='fader'] {
+      .param-well {
+        width: var(--sp-4);
+        height: var(--dsp-fader-h);
+      }
+
+      .param-shape {
+        position: relative;
+        width: var(--dsp-track-w);
+        height: 100%;
+        border-radius: var(--radius-full);
+        background: linear-gradient(
+          to top,
+          var(--accent) 0 calc(var(--param-turn) * 100%),
+          var(--bg-hover) 0
+        );
+      }
+
+      /* The cap sits at the fader's position, drawn from the same 0–1 value. */
+      .param-shape::after {
+        position: absolute;
+        bottom: calc(var(--param-turn) * (100% - var(--sp-2)));
+        left: 50%;
+        width: var(--sp-4);
+        height: var(--sp-2);
+        border-radius: var(--radius-lg);
+        background: var(--accent);
+        translate: -50% 0;
+        content: '';
+      }
+    }
+  }
+
   .skeleton {
     border-radius: var(--radius);
     background: linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-input) 50%, var(--bg-hover) 75%);

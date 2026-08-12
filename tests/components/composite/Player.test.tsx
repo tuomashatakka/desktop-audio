@@ -1,6 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { Player } from '../../../src/app/components/composite/Player'
+import { DEFAULT_DSP } from '../../../src/app/services/dspChain'
+import type { PlayerMode } from '../../../src/app/contexts/UIContext'
 
 
 const openOverlay = vi.fn()
@@ -31,6 +34,8 @@ const audio = {
   setVolume,
   playNext: vi.fn(),
   playPrevious: vi.fn(),
+  analyzer: null,
+  reductionOf: () => 0,
 }
 
 const settings = {
@@ -38,10 +43,24 @@ const settings = {
   setShuffle: vi.fn(),
   repeatMode: 'none' as const,
   setRepeatMode: vi.fn(),
+  dsp: DEFAULT_DSP,
+  updateDsp: vi.fn(),
 }
 
-vi.mock('../../../src/app/contexts', () => ({
-  useUI: () => ({ openOverlay, closeOverlay }),
+/**
+ * Only the three hooks are replaced — the DSP constants and combinators the
+ * panel imports from the same barrel stay real, so this mock does not have to
+ * grow a stub every time one is added.
+ *
+ * `useUI` has to be *stateful*: `playerMode` moved out of `Player` and into
+ * `UIContext`, so a frozen object would leave every mode button a no-op.
+ */
+vi.mock('../../../src/app/contexts', async importOriginal => ({
+  ...await importOriginal<typeof import('../../../src/app/contexts')>(),
+  useUI: () => {
+    const [ playerMode, setPlayerMode ] = useState<PlayerMode>('default')
+    return { openOverlay, closeOverlay, playerMode, setPlayerMode }
+  },
   useAudio: () => audio,
   useSettings: () => settings,
 }))
@@ -143,6 +162,27 @@ describe('Player', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show lyrics' }))
     expect(screen.getByRole('region', { name: 'Lyrics' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Frequency spectrum' })).toBeNull()
+  })
+
+  it('shows the DSP page as a third panel, exclusive with the other two', () => {
+    render(<Player expanded />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show audio processing' }))
+    expect(screen.getByRole('region', { name: 'Audio processing' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show frequency spectrum' }))
+    expect(screen.queryByRole('region', { name: 'Audio processing' })).toBeNull()
+  })
+
+  it('leaves the DSP button live with no track, unlike the other two', () => {
+    audio.currentTrack = null
+    render(<Player expanded />)
+
+    // Lyrics need tags and the spectrum needs signal; an EQ curve is worth
+    // editing in silence.
+    expect(screen.getByRole('button', { name: 'Show lyrics' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Show frequency spectrum' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Show audio processing' })).toBeEnabled()
   })
 
   it('returns to the artwork when the active mode is clicked again', () => {

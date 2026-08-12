@@ -9,6 +9,8 @@
 import type { ReactNode } from 'react'
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useHost } from '../data'
+import { DEFAULT_DSP, normalizeDsp } from '../services/dspChain'
+import type { DspSettings } from '../services/dspChain'
 
 
 /** Playback repeat behavior at end of queue. */
@@ -98,6 +100,15 @@ interface Settings {
    */
   readonly accentDark:  string
   readonly accentLight: string
+
+  /**
+   * The processing chain's parameters, global rather than per track.
+   *
+   * Read by `AudioContext`, which pushes them onto the live Web Audio nodes.
+   * Hydration runs them through `normalizeDsp` — see `loadSettings` below for
+   * why that is not optional.
+   */
+  readonly dsp: DspSettings
 }
 
 /** Settings plus the action handlers exposed to consumers. */
@@ -117,6 +128,16 @@ interface SettingsContextValue extends Settings {
   readonly setUiFont:         (font: UiFont) => void
   readonly setFontScale:      (scale: number) => void
   readonly setAccent:         (theme: 'dark' | 'light', color: string) => void
+
+  /**
+   * One setter for the whole DSP slice, taking a function for the same reason
+   * `update` does: the panel's handlers would otherwise close over a
+   * render-old `dsp`, and two writes in one tick would drop one.
+   *
+   * The result is normalised on the way in, so a caller cannot store a gain
+   * array of the wrong length or a parameter outside its range.
+   */
+  readonly updateDsp: (change: (dsp: DspSettings) => DspSettings) => void
 
   /** The accent that applies to the theme currently in effect. */
   readonly accent: string
@@ -155,6 +176,7 @@ const defaultSettings: Settings = {
   fontScale:      1,
   accentDark:     DEFAULT_ACCENT_DARK,
   accentLight:    DEFAULT_ACCENT_LIGHT,
+  dsp:            DEFAULT_DSP,
 }
 
 const DEFAULT_CUSTOM_THEME: CustomTheme = {
@@ -320,6 +342,11 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
       theme === 'light' ? { ...s, accentLight: color } : { ...s, accentDark: color })
   }, [])
 
+  const updateDsp = useCallback((change: (dsp: DspSettings) => DspSettings) => {
+    update(s =>
+      ({ ...s, dsp: normalizeDsp(change(s.dsp)) }))
+  }, [])
+
   const setCompactSize = useCallback((compactSize: WindowSize) => {
     update(s =>
       ({ ...s, compactSize }))
@@ -350,6 +377,7 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
       setUiFont,
       setFontScale,
       setAccent,
+      updateDsp,
     }), [
     settings,
     ready,
@@ -368,6 +396,7 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
     setUiFont,
     setFontScale,
     setAccent,
+    updateDsp,
   ])
 
   return <SettingsContext.Provider value={ value }>
@@ -388,8 +417,16 @@ function persistSettings (settings: Settings): void {
 async function loadSettings (): Promise<Settings> {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored)
-      return { ...defaultSettings, ...JSON.parse(stored) }
+    if (stored) {
+      const parsed = JSON.parse(stored)
+
+      // The spread is *shallow*, so a stored `dsp` replaces the whole default
+      // subtree rather than merging into it — a build that predates a field, or
+      // a hand-edited value, would arrive with keys missing or an `eq.gains` of
+      // the wrong length, and a short array leaves the trailing bands silently
+      // unwritten. `normalizeDsp` is what closes that.
+      return { ...defaultSettings, ...parsed, dsp: normalizeDsp(parsed?.dsp) }
+    }
   }
   catch {
     // Ignore errors
