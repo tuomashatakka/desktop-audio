@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { findPeaks, formatHz, frequencyToPitch } from '../../utils/pitch'
 import type { Peak } from '../../utils/pitch'
-import { formatTime, isoDuration } from '../../utils/time'
 import type { TrackAnalysis, ChordSegment } from '../../services/types'
 import type { AnalysisStatus } from '../../hooks/useTrackAnalysis'
 
@@ -68,12 +67,14 @@ const PEAK_LIMIT = 3
 const LABEL_MIN_GAP = 110
 
 interface FrequencyMatrixProps {
-  readonly analyzer:     AnalyserNode | null
-  readonly active:       boolean
-  readonly analysis?:    TrackAnalysis | null
-  readonly status?:      AnalysisStatus
-  readonly error?:       string | null
-  readonly currentTime?: number
+  readonly analyzer:        AnalyserNode | null
+  readonly active:          boolean
+  readonly analysis?:       TrackAnalysis | null
+  readonly status?:         AnalysisStatus
+  readonly error?:          string | null
+  readonly currentTime?:    number
+  readonly showChordAnalysis?: boolean
+  readonly showKeyAnalysis?:   boolean
 }
 
 interface PeakLabel {
@@ -173,6 +174,8 @@ interface HarmonyDetailsProps {
   readonly status:      AnalysisStatus
   readonly error:       string | null
   readonly currentTime: number
+  readonly showChord:   boolean
+  readonly showKey:     boolean
 }
 
 function chordAt (chords: readonly ChordSegment[], time: number): number {
@@ -180,7 +183,59 @@ function chordAt (chords: readonly ChordSegment[], time: number): number {
     time >= chord.start && time < chord.end)
 }
 
-function HarmonyDetails ({ analysis, status, error, currentTime }: HarmonyDetailsProps) {
+interface ChordStripProps {
+  readonly chords:      readonly ChordSegment[]
+  readonly currentTime: number
+}
+
+function ChordStrip ({ chords, currentTime }: ChordStripProps) {
+  const index   = chordAt(chords, currentTime)
+  const current = index >= 0 ? chords[index] : undefined
+  const next1   = index >= 0
+    ? chords[index + 1]
+    : chords.find(c =>
+      c.start > currentTime)
+  const next2   = index >= 0 ? chords[index + 2] : undefined
+
+  return <div className='chord-strip' aria-live='polite' aria-atomic='true'>
+    <span className='chord-strip-item chord-strip-next' data-next='2'>
+      {next2?.label ?? ''}
+    </span>
+
+    <span className='chord-strip-item chord-strip-next' data-next='1'>
+      {next1?.label ?? ''}
+    </span>
+
+    <span className='chord-strip-item chord-strip-current'>
+      {current?.label ?? '\u2014'}
+    </span>
+  </div>
+}
+
+interface KeyTempoProps {
+  readonly analysis: TrackAnalysis
+}
+
+function KeyTempo ({ analysis }: KeyTempoProps) {
+  return <dl className='key-tempo-summary'>
+    <div>
+      <dt>Key</dt>
+      <dd>{analysis.key.label}</dd>
+    </div>
+
+    <div>
+      <dt>Tempo</dt>
+
+      <dd>
+        {analysis.tempo.bpm.toFixed(1)}
+        {' '}
+        <abbr title='beats per minute'>bpm</abbr>
+      </dd>
+    </div>
+  </dl>
+}
+
+function HarmonyDetails ({ analysis, status, error, currentTime, showChord, showKey }: HarmonyDetailsProps) {
   if (status === 'loading')
     return <p className='status-message harmony-status'>Resolving chords, key and tempo…</p>
 
@@ -192,60 +247,13 @@ function HarmonyDetails ({ analysis, status, error, currentTime }: HarmonyDetail
   if (!analysis)
     return <p className='status-message harmony-status'>Harmony analysis is unavailable</p>
 
-  const index   = chordAt(analysis.chords, currentTime)
-  const current = index >= 0 ? analysis.chords[index] : undefined
-  const next    = index >= 0
-    ? analysis.chords[index + 1]
-    : analysis.chords.find(chord =>
-      chord.start > currentTime)
-
   return <section className='harmony-details' aria-labelledby='harmony-details-heading'>
     <h4 id='harmony-details-heading' className='sr-only'>Resolved harmony</h4>
 
-    <dl className='harmony-summary'>
-      <div data-primary>
-        <dt>Current chord</dt>
-        <dd>{current?.label ?? '—'}</dd>
-      </div>
+    {showChord && analysis.chords.length > 0 &&
+      <ChordStrip chords={ analysis.chords } currentTime={ currentTime } />}
 
-      <div>
-        <dt>Next chord</dt>
-        <dd>{next?.label ?? '—'}</dd>
-      </div>
-
-      <div>
-        <dt>Main key</dt>
-        <dd>{analysis.key.label}</dd>
-      </div>
-
-      <div>
-        <dt>Tempo</dt>
-
-        <dd>
-          {analysis.tempo.bpm.toFixed(1)}
-          {' '}
-          <abbr title='beats per minute'>bpm</abbr>
-        </dd>
-      </div>
-    </dl>
-
-    <section className='chord-map' aria-labelledby='chord-map-heading'>
-      <h5 id='chord-map-heading'>All chords</h5>
-
-      {analysis.chords.length > 0
-        ? <ol>
-          {analysis.chords.map((chord, chordIndex) =>
-            <li
-              key={ `${chord.start}:${chord.label}` }
-              aria-current={ chordIndex === index ? 'true' : undefined }>
-              <strong>{chord.label}</strong>
-              <time dateTime={ isoDuration(chord.start) }>{formatTime(chord.start)}</time>
-            </li>
-          )}
-        </ol>
-        : <p className='status-message'>No stable chord regions were resolved</p>
-      }
-    </section>
+    {showKey && <KeyTempo analysis={ analysis } />}
   </section>
 }
 
@@ -276,6 +284,8 @@ export function FrequencyMatrix ({
   status = 'unavailable',
   error = null,
   currentTime = 0,
+  showChordAnalysis = false,
+  showKeyAnalysis = false,
 }: FrequencyMatrixProps) {
   const freqPathRef = useRef<SVGPathElement>(null)
   const timePathRef = useRef<SVGPathElement>(null)
@@ -424,7 +434,9 @@ export function FrequencyMatrix ({
       analysis={ analysis }
       status={ status }
       error={ error }
-      currentTime={ currentTime } />
+      currentTime={ currentTime }
+      showChord={ showChordAnalysis }
+      showKey={ showKeyAnalysis } />
 
     <section className='frequency-matrix' aria-label='Frequency spectrum'>
       <svg

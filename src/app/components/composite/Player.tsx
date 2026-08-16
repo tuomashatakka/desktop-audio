@@ -162,15 +162,17 @@ function PlayerInfo ({ track }: PlayerInfoProps) {
 }
 
 type PlayerPanelProps = {
-  readonly mode:        PlayerMode
-  readonly lyrics?:     string
-  readonly analyzer:    AnalyserNode | null
-  readonly analysis:    TrackAnalysisState
-  readonly currentTime: number
+  readonly mode:              PlayerMode
+  readonly lyrics?:           string
+  readonly analyzer:          AnalyserNode | null
+  readonly analysis:          TrackAnalysisState
+  readonly currentTime:       number
+  readonly showChordAnalysis: boolean
+  readonly showKeyAnalysis:   boolean
 }
 
 /** Whatever the chosen mode puts in the middle of the screen. */
-function PlayerPanel ({ mode, lyrics, analyzer, analysis, currentTime }: PlayerPanelProps) {
+function PlayerPanel ({ mode, lyrics, analyzer, analysis, currentTime, showChordAnalysis, showKeyAnalysis }: PlayerPanelProps) {
   if (mode === 'lyrics')
     return <PlayerLyrics lyrics={ lyrics } />
 
@@ -181,7 +183,9 @@ function PlayerPanel ({ mode, lyrics, analyzer, analysis, currentTime }: PlayerP
       analysis={ analysis.analysis }
       status={ analysis.status }
       error={ analysis.error }
-      currentTime={ currentTime } />
+      currentTime={ currentTime }
+      showChordAnalysis={ showChordAnalysis }
+      showKeyAnalysis={ showKeyAnalysis } />
 
   if (mode === 'dsp')
     return <DspPanel />
@@ -269,9 +273,10 @@ type PlayerProps = {
 
 function visibleBeatMarkers (
   expanded: boolean,
-  analysis: TrackAnalysisState
+  analysis: TrackAnalysisState,
+  showBeatMarkers: boolean
 ): readonly BeatMarker[] | undefined {
-  return expanded ? analysis.analysis?.beats : undefined
+  return expanded && showBeatMarkers ? analysis.analysis?.beats : undefined
 }
 
 /**
@@ -298,7 +303,8 @@ export function Player ({ expanded = false }: PlayerProps) {
     currentTrack, isPlaying, currentTime, duration, waveformBars, analyzer,
     pause, resume, seek, playNext, playPrevious,
   }                                                        = useAudio()
-  const { shuffle, setShuffle, repeatMode, setRepeatMode } = useSettings()
+  const { shuffle, setShuffle, repeatMode, setRepeatMode,
+    showBeatMarkers, showChordAnalysis, showKeyAnalysis } = useSettings()
   const analysis                                           = useTrackAnalysis(currentTrack?.id)
   const toggleWindowScale                                  = useWindowScale()
 
@@ -360,14 +366,16 @@ export function Player ({ expanded = false }: PlayerProps) {
         lyrics={ currentTrack?.lyrics }
         analyzer={ analyzer }
         analysis={ analysis }
-        currentTime={ currentTime } />
+        currentTime={ currentTime }
+        showChordAnalysis={ showChordAnalysis }
+        showKeyAnalysis={ showKeyAnalysis } />
 
       <section className='progress-section' aria-label='Playback position'>
         <WaveformProgress
           currentTime={ currentTime }
           duration={ duration }
           bars={ waveformBars }
-          markers={ visibleBeatMarkers(expanded, analysis) }
+          markers={ visibleBeatMarkers(expanded, analysis, showBeatMarkers) }
           onSeek={ seek } />
 
         <div className='time-row'>

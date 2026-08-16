@@ -24,6 +24,7 @@ const SETTINGS_SECTIONS = [
   { id: 'settings-library', label: 'Library' },
   { id: 'settings-appearance', label: 'Appearance' },
   { id: 'settings-playback', label: 'Playback' },
+  { id: 'settings-analysis', label: 'Analysis' },
   { id: 'settings-hotkeys', label: 'Hotkeys' },
   { id: 'settings-about', label: 'About' },
 ] as const
@@ -33,10 +34,12 @@ export function SettingsView () {
     libraryPaths, theme, customTheme, defaultDensity,
     volume, repeatMode, shuffle,
     uiFont, fontScale, accentDark, accentLight,
+    showBeatMarkers, showChordAnalysis, showKeyAnalysis,
     addLibraryPath, removeLibraryPath,
     setTheme, setCustomTheme, exportTheme, importTheme, setDefaultDensity,
     setVolume, setRepeatMode, setShuffle,
     setUiFont, setFontScale, setAccent,
+    setShowBeatMarkers, setShowChordAnalysis, setShowKeyAnalysis,
   }                                                   = useSettings()
   const data                                          = useData()
   const themeFileRef                                  = useRef<HTMLInputElement>(null)
@@ -406,6 +409,44 @@ export function SettingsView () {
               setShuffle(event.target.checked) } />
 
           <span>Shuffle</span>
+        </label>
+      </section>
+
+      <section id='settings-analysis' aria-labelledby='settings-analysis-heading'>
+        <h2 id='settings-analysis-heading'>Analysis</h2>
+
+        <p className='section-description'>
+          Musical analysis overlays shown in the visualizer and waveform.
+        </p>
+
+        <label className='field checkbox-field'>
+          <input
+            type='checkbox'
+            checked={ showBeatMarkers }
+            onChange={ event =>
+              setShowBeatMarkers(event.target.checked) } />
+
+          <span>Beat markers on waveform</span>
+        </label>
+
+        <label className='field checkbox-field'>
+          <input
+            type='checkbox'
+            checked={ showChordAnalysis }
+            onChange={ event =>
+              setShowChordAnalysis(event.target.checked) } />
+
+          <span>Chord analysis</span>
+        </label>
+
+        <label className='field checkbox-field'>
+          <input
+            type='checkbox'
+            checked={ showKeyAnalysis }
+            onChange={ event =>
+              setShowKeyAnalysis(event.target.checked) } />
+
+          <span>Key and tempo analysis</span>
         </label>
       </section>
 

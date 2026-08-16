@@ -109,6 +109,8 @@ describe('FrequencyMatrix', () => {
         active
         currentTime={ 6 }
         status='ready'
+        showChordAnalysis
+        showKeyAnalysis
         analysis={{
           version:  1,
           duration: 20,
@@ -124,12 +126,13 @@ describe('FrequencyMatrix', () => {
         }} />
     )
 
-    expect(container.querySelector('[data-primary] dd')).toHaveTextContent('F')
-    expect(screen.getByText('Next chord').nextElementSibling).toHaveTextContent('C')
-    expect(screen.getByText('Main key').nextElementSibling).toHaveTextContent('A minor')
-    expect(screen.getByText('Tempo').nextElementSibling).toHaveTextContent('120.0')
-    expect(container.querySelectorAll('.chord-map li')).toHaveLength(3)
-    expect(container.querySelector('.chord-map [aria-current="true"]')).toHaveTextContent('F')
+    // Current chord is prominent in the chord strip
+    expect(container.querySelector('.chord-strip-current')).toHaveTextContent('F')
+    // Next chord (data-next='1') is the chord after F, which is C
+    expect(container.querySelector('[data-next="1"]')).toHaveTextContent('C')
+    // Key and tempo are shown in the summary
+    expect(screen.getByText('A minor')).toBeInTheDocument()
+    expect(screen.getByText(/120\.0/)).toBeInTheDocument()
   })
 
   it('paints the mesh even before a frame is granted', () => {

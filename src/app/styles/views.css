@@ -558,6 +558,7 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
 .settings-view:has(#settings-library:target) .settings-nav a[href='#settings-library'],
 .settings-view:has(#settings-appearance:target) .settings-nav a[href='#settings-appearance'],
 .settings-view:has(#settings-playback:target) .settings-nav a[href='#settings-playback'],
+.settings-view:has(#settings-analysis:target) .settings-nav a[href='#settings-analysis'],
 .settings-view:has(#settings-hotkeys:target) .settings-nav a[href='#settings-hotkeys'],
 .settings-view:has(#settings-about:target) .settings-nav a[href='#settings-about'] {
   color: var(--text);

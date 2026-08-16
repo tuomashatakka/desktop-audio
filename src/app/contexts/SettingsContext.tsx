@@ -104,6 +104,15 @@ interface Settings {
    * why that is not optional.
    */
   readonly dsp: DspSettings
+
+  /** Show beat/downbeat markers on the waveform. */
+  readonly showBeatMarkers: boolean
+
+  /** Show chord analysis in the visualizer. */
+  readonly showChordAnalysis: boolean
+
+  /** Show key/scale analysis in the visualizer. */
+  readonly showKeyAnalysis: boolean
 }
 
 /** Settings plus the action handlers exposed to consumers. */
@@ -133,6 +142,10 @@ interface SettingsContextValue extends Settings {
    * array of the wrong length or a parameter outside its range.
    */
   readonly updateDsp: (change: (dsp: DspSettings) => DspSettings) => void
+
+  readonly setShowBeatMarkers:   (show: boolean) => void
+  readonly setShowChordAnalysis: (show: boolean) => void
+  readonly setShowKeyAnalysis:   (show: boolean) => void
 
   /** The accent that applies to the theme currently in effect. */
   readonly accent: string
@@ -172,6 +185,9 @@ const defaultSettings: Settings = {
   accentDark:     DEFAULT_ACCENT_DARK,
   accentLight:    DEFAULT_ACCENT_LIGHT,
   dsp:            DEFAULT_DSP,
+  showBeatMarkers:   false,
+  showChordAnalysis: false,
+  showKeyAnalysis:   false,
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
@@ -317,6 +333,21 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
       ({ ...s, dsp: normalizeDsp(change(s.dsp)) }))
   }, [])
 
+  const setShowBeatMarkers = useCallback((showBeatMarkers: boolean) => {
+    update(s =>
+      ({ ...s, showBeatMarkers }))
+  }, [])
+
+  const setShowChordAnalysis = useCallback((showChordAnalysis: boolean) => {
+    update(s =>
+      ({ ...s, showChordAnalysis }))
+  }, [])
+
+  const setShowKeyAnalysis = useCallback((showKeyAnalysis: boolean) => {
+    update(s =>
+      ({ ...s, showKeyAnalysis }))
+  }, [])
+
   const setCompactSize = useCallback((compactSize: WindowSize) => {
     update(s =>
       ({ ...s, compactSize }))
@@ -348,6 +379,9 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
       setFontScale,
       setAccent,
       updateDsp,
+      setShowBeatMarkers,
+      setShowChordAnalysis,
+      setShowKeyAnalysis,
     }), [
     settings,
     ready,
@@ -367,6 +401,9 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
     setFontScale,
     setAccent,
     updateDsp,
+    setShowBeatMarkers,
+    setShowChordAnalysis,
+    setShowKeyAnalysis,
   ])
 
   return <SettingsContext.Provider value={ value }>

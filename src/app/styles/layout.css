@@ -651,6 +651,11 @@ body::before {
   animation: surface-in var(--duration) var(--ease-emphasis);
 }
 
+/* When harmony details has no visible children, collapse the row entirely. */
+.frequency-resolver:has(.harmony-details:empty) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .frequency-matrix {
   position: relative;
   display: grid;
@@ -690,7 +695,7 @@ body::before {
  */
 .harmony-details {
   display: grid;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
   min-width: 0;
 }
 
@@ -699,9 +704,61 @@ body::before {
   min-height: 3rem;
 }
 
-.harmony-summary {
+/*
+ * Chord strip: the current chord is a large heading, with the next two
+ * chords visible but progressively dimmer and smaller, fading in/out
+ * as the playback position crosses chord boundaries.
+ */
+.chord-strip {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--sp-6);
+  min-width: 0;
+  padding: var(--sp-4) 0;
+}
+
+.chord-strip-item {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: var(--font-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    opacity var(--duration-slow) var(--ease),
+    font-size var(--duration-slow) var(--ease-emphasis),
+    color var(--duration-slow) var(--ease);
+}
+
+.chord-strip-current {
+  color: var(--accent);
+  font-size: var(--text-3xl);
+  opacity: 1;
+}
+
+.chord-strip-next {
+  color: var(--text-dim);
+  opacity: 0.35;
+}
+
+.chord-strip-next[data-next='1'] {
+  font-size: var(--text-xl);
+  opacity: 0.45;
+}
+
+.chord-strip-next[data-next='2'] {
+  font-size: var(--text-lg);
+  opacity: 0.25;
+}
+
+/*
+ * Key and tempo summary: a compact pair of labelled values using the
+ * app's standard definition-list pattern with the raised-surface card
+ * style.
+ */
+.key-tempo-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-2);
 
   > div {
@@ -729,57 +786,6 @@ body::before {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-
-  [data-primary] {
-    border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
-
-    dd { color: var(--accent); font-size: var(--text-lg); }
-  }
-}
-
-.chord-map {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--sp-3);
-  min-width: 0;
-
-  h5 {
-    color: var(--text-muted);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    white-space: nowrap;
-  }
-
-  ol {
-    display: flex;
-    gap: var(--sp-1);
-    min-width: 0;
-    overflow-x: auto;
-    overscroll-behavior-inline: contain;
-    scrollbar-width: thin;
-    scroll-snap-type: inline proximity;
-  }
-
-  li {
-    display: grid;
-    flex: 0 0 auto;
-    gap: 1px;
-    min-width: 5rem;
-    padding: var(--sp-1) var(--sp-2);
-    border-block-start: 2px solid var(--border);
-    background: color-mix(in srgb, var(--bg) 64%, transparent);
-    scroll-snap-align: center;
-  }
-
-  li[aria-current='true'] {
-    border-color: var(--accent);
-    background: var(--accent-muted);
-  }
-
-  strong { color: var(--text); font-size: var(--text-sm); }
-  time { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
 }
 
 .matrix-peaks {

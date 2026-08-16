@@ -61,6 +61,9 @@ const settings = {
   setRepeatMode: vi.fn(),
   dsp: DEFAULT_DSP,
   updateDsp: vi.fn(),
+  showBeatMarkers: true,
+  showChordAnalysis: true,
+  showKeyAnalysis: true,
 }
 
 /**
