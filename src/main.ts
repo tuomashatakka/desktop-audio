@@ -370,10 +370,8 @@ ipcMain.handle('file:metadata', async (_event, filePath: string) => {
   }
 })
 
-ipcMain.handle('file:read', async (_event, filePath: string) => {
-  const buffer = fs.readFileSync(filePath)
-  return buffer
-})
+ipcMain.handle('file:read', async (_event, filePath: string) =>
+  await fs.promises.readFile(filePath))
 
 // ─── Worker supervision ───────────────────────────────────────────────────────
 

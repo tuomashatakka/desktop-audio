@@ -376,8 +376,7 @@ function TagEditorForm ({ track, onClose, onSaved }: TagEditorFormProps) {
 
 export function TagEditorView () {
   const { closeOverlay, editingTrackId } = useUI()
-  const { registry, setTracks }          = useLibrary()
-  const tracks                           = registry.getAllTracks()
+  const { tracks, setTracks }            = useLibrary()
   const track                            = tracks.find(candidate =>
     candidate.id === editingTrackId) || tracks[0]
 
@@ -394,5 +393,5 @@ export function TagEditorView () {
     // The models were edited in place, so nothing downstream has changed
     // identity. Republishing them is what tells React to re-render the
     // library with the new titles.
-      setTracks(registry.getAllTracks()) } />
+      setTracks([ ...tracks ]) } />
 }

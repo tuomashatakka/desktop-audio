@@ -1,6 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { waitFor } from '@testing-library/react'
 import { WebFsDataSource } from '../../src/app/data/WebFsDataSource'
-import type { TrackDTO } from '../../src/app/data/DataSource'
+import type { DataEvent, TrackDTO } from '../../src/app/data/DataSource'
+import { idbGetAll } from '../../src/app/data/idb'
+
+vi.mock('../../src/app/data/idb', () => ({
+  idbGet:    vi.fn(),
+  idbSet:    vi.fn(),
+  idbDelete: vi.fn(),
+  idbGetAll: vi.fn(),
+}))
 
 // Mock IndexedDB
 function createMockIndexedDB() {
@@ -107,8 +116,38 @@ describe('WebFsDataSource', () => {
     // This test requires proper File System Access API mocking
   })
   
-  it.skip('load streams hydrate events', async () => {
-    // This test requires proper IndexedDB mocking
+  it('yields between streamed hydrate batches', async () => {
+    const tracks = Array.from({ length: 401 }, (_, index): TrackDTO =>
+      ({
+        id:         `track-${index}`,
+        title:      `Track ${index}`,
+        artist:     'Artist',
+        album:      'Album',
+        duration:   180,
+        format:     'mp3',
+        size:       1024,
+        coverColor: '#123456',
+        path:       `/music/track-${index}.mp3`,
+      }))
+    vi.mocked(idbGetAll).mockResolvedValue(tracks.map((value, index) =>
+      ({ key: String(index), value })))
+
+    const events: DataEvent[] = []
+    const ds                  = new WebFsDataSource()
+    ds.subscribe(event =>
+      events.push(event))
+
+    ds.load()
+    await Promise.resolve()
+
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ type: 'hydrate-batch', tracks: expect.arrayContaining([ tracks[0] ]) })
+
+    await waitFor(() =>
+      expect(events.at(-1)).toEqual({ type: 'hydrate-done', totalCount: tracks.length }))
+
+    expect(events.filter(event =>
+      event.type === 'hydrate-batch')).toHaveLength(3)
   })
 
   it.skip('listRoots returns an array', async () => {

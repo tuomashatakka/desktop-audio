@@ -10,7 +10,7 @@
  *    over the cached rows, and only on `done` are the ids that this scan
  *    didn't see pruned — so the cached list stays on screen throughout.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react'
 import { useLibrary, useSettings, useAudio } from '../contexts'
 import { Track, FolderEntry } from '../models'
 import type { TrackDTO } from '../services/types'
@@ -82,8 +82,9 @@ let hydrated                            = false
 let lastRoots: readonly string[] | null = null
 let initialLoadResolved                 = false
 
-function byTitle (a: Track, b: Track): number {
-  return a.title.localeCompare(b.title)
+interface ScheduledTask {
+  readonly kind: 'frame' | 'idle' | 'timeout'
+  readonly id:   number
 }
 
 export function useLibraryScanner () {
@@ -113,58 +114,112 @@ export function useLibraryScanner () {
   // render, so all it has to be is current by the time one of them runs.
   libraryPathsRef.current = libraryPaths
 
-  const publishScheduled = useRef(false)
-
-  const publish = useCallback(() => {
-    setTracks([ ...trackMap.current.values() ].sort(byTitle))
-  }, [ setTracks ])
+  const publishTask = useRef<ScheduledTask | null>(null)
 
   /**
-   * Publishing is O(n log n) *and* rebuilds the whole `ModelRegistry`, so
-   * doing it per batch cost 300 full-library sorts and reconciliations on a
-   * 6000-track scan.
+   * Commit one immutable snapshot as non-urgent work.
    *
+   * The table owns sorting already, so sorting the same 6000 rows here before
+   * every streamed commit only blocked the renderer twice. The array copy is
+   * linear and the React render is interruptible by clicks, typing and scroll.
+   */
+  const publish = useCallback(() => {
+    const tracks          = [ ...trackMap.current.values() ]
+    const resolvesInitial = !initialLoadResolved
+
+    if (resolvesInitial)
+      initialLoadResolved = true
+
+    startTransition(() => {
+      setTracks(tracks)
+      if (resolvesInitial)
+        setIsInitialLoading(false)
+    })
+  }, [ setTracks ])
+
+  const cancelScheduledPublish = useCallback(() => {
+    const task = publishTask.current
+    if (!task)
+      return
+
+    if (task.kind === 'frame')
+      cancelAnimationFrame(task.id)
+    else
+      clearTimeout(task.id)
+
+    publishTask.current = null
+  }, [])
+
+  /**
    * Coalescing has to be per *frame*, not per microtask: every batch arrives
    * as its own IPC event, so a microtask queue drains between them and would
    * collapse nothing. A frame is also the finest granularity anyone can see.
    */
   const schedulePublish = useCallback(() => {
-    if (publishScheduled.current)
+    if (publishTask.current)
       return
-    publishScheduled.current = true
 
     const run = () => {
-      publishScheduled.current = false
+      publishTask.current = null
       publish()
     }
 
-    if (typeof requestAnimationFrame === 'function')
-      requestAnimationFrame(run)
-    else
-      setTimeout(run, 16)
+    publishTask.current = typeof requestAnimationFrame === 'function'
+      ? { kind: 'frame', id: requestAnimationFrame(run) }
+      : { kind: 'timeout', id: setTimeout(run, 16) as unknown as number }
   }, [ publish ])
 
-  /** Publish now, cancelling any pending frame — for terminal events. */
+  /** Publish now and truly cancel the pending frame, avoiding a duplicate commit. */
   const publishNow = useCallback(() => {
-    publishScheduled.current = false
+    cancelScheduledPublish()
     publish()
-  }, [ publish ])
+  }, [ cancelScheduledPublish, publish ])
 
   /**
    * Rebuild the sidebar tree from whatever is in the cache. Called after
    * hydration too, not just on scan `done` — otherwise a cold start that
    * never rescans (unchanged roots) leaves the sidebar empty.
    */
-  const publishFolders = useCallback(() => {
-    const paths = [ ...trackMap.current.values() ].map(t =>
-      t.path)
-    // An empty cache means an empty tree, not "leave the last one up". This
-    // used to return early, which left the sidebar showing branches of a
-    // folder the user had just removed.
-    setFolders(paths.length === 0
-      ? []
-      : buildFolderTree(libraryPathsRef.current as string[], paths))
-  }, [ setFolders ])
+  const folderTask = useRef<ScheduledTask | null>(null)
+
+  const cancelScheduledFolders = useCallback(() => {
+    const task = folderTask.current
+    if (!task)
+      return
+
+    if (task.kind === 'idle')
+      cancelIdleCallback(task.id)
+    else
+      clearTimeout(task.id)
+
+    folderTask.current = null
+  }, [])
+
+  /**
+   * Folder derivation is terminal bookkeeping, not input-critical work. Build
+   * it in an idle task and commit it as a transition so a large path set never
+   * steals time from scrolling or playback controls.
+   */
+  const scheduleFolders = useCallback(() => {
+    cancelScheduledFolders()
+
+    const run = () => {
+      folderTask.current = null
+
+      const paths        = [ ...trackMap.current.values() ].map(track =>
+        track.path)
+      const folders       = paths.length === 0
+        ? []
+        : buildFolderTree(libraryPathsRef.current as string[], paths)
+
+      startTransition(() =>
+        setFolders(folders))
+    }
+
+    folderTask.current = typeof requestIdleCallback === 'function'
+      ? { kind: 'idle', id: requestIdleCallback(run, { timeout: 250 }) }
+      : { kind: 'timeout', id: setTimeout(run, 0) as unknown as number }
+  }, [ cancelScheduledFolders, setFolders ])
 
   /** Merges a batch of DTOs into the cache; returns how many arrived. */
   const mergeTracks = useCallback((tracks: readonly TrackDTO[]): number => {
@@ -234,14 +289,12 @@ export function useLibraryScanner () {
         mergeTracks(event.tracks as TrackDTO[])
         log.debug(`▤ hydrate batch #${hydrateCount} — ${event.tracks.length} tracks (map size: ${trackMap.current.size})`)
         schedulePublish()
-        // Rows are on screen; there is nothing left for a spinner to wait on.
-        markInitialResolved()
       }
       else if (event.type === 'hydrate-done') {
         log.info(`▤ DB hydrated — ${trackMap.current.size} tracks · ◴ ${Date.now() - t0}ms`)
         reconcileToRoots()
         publishNow()
-        publishFolders()
+        scheduleFolders()
         markInitialResolved()
       }
       else if (event.type === 'batch') {
@@ -253,7 +306,6 @@ export function useLibraryScanner () {
 
         log.debug(`⇘ batch #${batchCount} — ${event.tracks.length} tracks (map size: ${trackMap.current.size})`)
         schedulePublish()
-        setLoading(true)
       }
       else if (event.type === 'done') {
         // Prune rows the scan didn't rediscover — but only if it actually
@@ -266,7 +318,7 @@ export function useLibraryScanner () {
 
         log.info(`✓ scan done — ${trackMap.current.size} tracks · ◴ ${Date.now() - t0}ms`)
         publishNow()
-        publishFolders()
+        scheduleFolders()
         setLoading(false)
         markInitialResolved()
       }
@@ -281,8 +333,10 @@ export function useLibraryScanner () {
     return () => {
       log.info('⊖ unsubscribing from library events')
       subscription.dispose()
+      cancelScheduledPublish()
+      cancelScheduledFolders()
     }
-  }, [ data, mergeTracks, schedulePublish, publishNow, publishFolders, reconcileToRoots, setLoading, markInitialResolved ])
+  }, [ data, mergeTracks, schedulePublish, publishNow, scheduleFolders, reconcileToRoots, setLoading, markInitialResolved, cancelScheduledPublish, cancelScheduledFolders ])
 
   // Cache hydration — replay what we already have, then ask for the DB once.
   //
@@ -295,7 +349,7 @@ export function useLibraryScanner () {
   useEffect(() => {
     if (trackMap.current.size > 0) {
       publish()
-      publishFolders()
+      scheduleFolders()
     }
 
     // Gated on settings: the reconciliation below decides what to discard from
@@ -306,7 +360,7 @@ export function useLibraryScanner () {
     hydrated = true
 
     data.load()
-  }, [ data, ready, publish, publishFolders ])
+  }, [ data, ready, publish, scheduleFolders ])
 
   const scanLibrary = useCallback(() => {
     if (libraryPaths.length === 0)
@@ -333,9 +387,9 @@ export function useLibraryScanner () {
         trackMap.current.delete(id)
 
     publishNow()
-    publishFolders()
+    scheduleFolders()
     void data.forgetRoots(roots)
-  }, [ data, publishNow, publishFolders ])
+  }, [ data, publishNow, scheduleFolders ])
 
   // Background rescan — once per distinct set of roots, not once per mount.
   //

@@ -9,6 +9,11 @@ const AUDIO_EXTENSIONS = new Set([ '.mp3', '.flac', '.ogg', '.wav', '.m4a', '.op
 /** Rows per hydrate event; matches `READ_BATCH_SIZE` in `db-reader.ts`. */
 const HYDRATE_BATCH_SIZE = 200
 
+/** Give Chromium a render opportunity between cache batches. */
+const yieldToRenderer = async (): Promise<void> =>
+  await new Promise(resolve =>
+    setTimeout(resolve, 0))
+
 type TrackSource =
   | { readonly kind: 'handle'; readonly handle: FileSystemFileHandle } |
   { readonly kind: 'file'; readonly file: File }
@@ -289,24 +294,32 @@ export class WebFsDataSource implements DataSource {
 
   /**
    * Streams the IndexedDB cache back as hydrate events, mirroring the Electron
-   * host so `useLibraryScanner` has one code path for both. IndexedDB hands
-   * over everything at once, so the chunking here is purely so the renderer
-   * can paint before the whole set is merged.
+   * host so `useLibraryScanner` has one code path for both.
+   *
+   * IndexedDB hands over everything at once. Mapping and emitting every chunk
+   * in one promise callback still monopolises the renderer, so each batch is
+   * materialised on demand and yields before the next one.
    */
   load (): void {
-    void idbGetAll('tracks')
-      .then(entries => {
-        const tracks = entries.map((entry: unknown) =>
-          (entry as { value: TrackDTO }).value)
+    void (async () => {
+      const entries = await idbGetAll('tracks')
 
-        for (let i = 0; i < tracks.length; i += HYDRATE_BATCH_SIZE)
-          this.emit({ type: 'hydrate-batch', tracks: tracks.slice(i, i + HYDRATE_BATCH_SIZE) })
+      for (let i = 0; i < entries.length; i += HYDRATE_BATCH_SIZE) {
+        const tracks = entries
+          .slice(i, i + HYDRATE_BATCH_SIZE)
+          .map((entry: unknown) =>
+            (entry as { value: TrackDTO }).value)
 
-        this.emit({ type: 'hydrate-done', totalCount: tracks.length })
-      })
-      .catch((err: unknown) => {
-        this.emit({ type: 'error', message: String(err) })
-      })
+        this.emit({ type: 'hydrate-batch', tracks })
+
+        if (i + HYDRATE_BATCH_SIZE < entries.length)
+          await yieldToRenderer()
+      }
+
+      this.emit({ type: 'hydrate-done', totalCount: entries.length })
+    })().catch((err: unknown) => {
+      this.emit({ type: 'error', message: String(err) })
+    })
   }
 
   /**

@@ -23,7 +23,7 @@ const RESIZE_STEP = 10
 
 /** See module docstring. */
 export function LibrarySidebar () {
-  const { registry, playlists, toggleFolder, addPlaylist } = useLibrary()
+  const { folders, playlists, toggleFolder, addPlaylist } = useLibrary()
   const {
     selectedFolderPath,
     selectedPlaylistId,
@@ -34,8 +34,6 @@ export function LibrarySidebar () {
     openOverlay,
     setPlayerMode,
   } = useUI()
-
-  const folders = Array.from(registry.folders.values())
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()

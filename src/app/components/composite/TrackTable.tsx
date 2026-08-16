@@ -471,13 +471,6 @@ function TrackGroup ({
   </section>
 }
 
-/** A track's position in the globally sorted list; `fallback` when missing. */
-function indexOfTrack (sorted: readonly Track[], track: Track, fallback = 0): number {
-  const index = sorted.findIndex(candidate =>
-    candidate.id === track.id)
-  return index >= 0 ? index : fallback
-}
-
 /** See module docstring. */
 export function TrackTable ({
   tracks,
@@ -503,6 +496,17 @@ export function TrackTable ({
     resetColumns,
   }                                              = useColumnConfig()
   const { sorted, sortKey, sortDir, toggleSort } = useSortableTable(tracks)
+
+  /**
+   * Grouped rendering needs the global row number for every track. A map keeps
+   * that linear; repeatedly calling `findIndex` made one grouped render O(n²).
+   */
+  const sortedIndexById = useMemo(() => {
+    const indices = new Map<string, number>()
+    for (const [ index, track ] of sorted.entries())
+      indices.set(track.id, index)
+    return indices
+  }, [ sorted ])
 
   const [ menuPoint, setMenuPoint ]       = useState<PopoverPoint | null>(null)
   const [ focusedIndex, setFocusedIndex ] = useState(0)
@@ -561,10 +565,18 @@ export function TrackTable ({
       if (collapsedGroups.has(group.key))
         continue
       for (const track of group.tracks)
-        rows.push({ index: indexOfTrack(sorted, track), groupKey: group.key })
+        rows.push({ index: sortedIndexById.get(track.id) ?? 0, groupKey: group.key })
     }
     return rows
-  }, [ flat, sorted, groups, collapsedGroups ])
+  }, [ flat, sorted, groups, collapsedGroups, sortedIndexById ])
+
+  /** Render position and parent group for O(1) keyboard navigation lookups. */
+  const visibleRowByIndex = useMemo(() => {
+    const rows = new Map<number, { position: number; groupKey: string | null }>()
+    for (const [ position, row ] of visibleRows.entries())
+      rows.set(row.index, { position, groupKey: row.groupKey })
+    return rows
+  }, [ visibleRows ])
 
   const virtualizer = useVirtualizer({
     count:            showSkeleton ? SKELETON_ROW_COUNT : flat ? sorted.length : 0,
@@ -582,13 +594,12 @@ export function TrackTable ({
   // eslint-disable-next-line react-strict/prefer-no-use-effect -- Reconciles the focused row with a track change originating outside this component; the fallback deliberately preserves the user's own focus when it can.
   useEffect(() => {
     const currentIndex = currentTrack
-      ? sorted.findIndex(track =>
-        track.id === currentTrack.id)
+      ? sortedIndexById.get(currentTrack.id) ?? -1
       : -1
 
     setFocusedIndex(index =>
       currentIndex >= 0 ? currentIndex : Math.min(index, Math.max(0, sorted.length - 1)))
-  }, [ currentTrack?.id, sorted ])
+  }, [ currentTrack?.id, sorted.length, sortedIndexById ])
 
   /** Focus the row at `position` in the rendered order. */
   const focusRowAt = useCallback((position: number) => {
@@ -610,15 +621,13 @@ export function TrackTable ({
 
   /** Step `delta` rows through the rendered order from the row at `index`. */
   const moveRowFocus = useCallback((index: number, delta: number) => {
-    const position = visibleRows.findIndex(row =>
-      row.index === index)
+    const position = visibleRowByIndex.get(index)?.position ?? -1
     focusRowAt((position < 0 ? 0 : position) + delta)
-  }, [ visibleRows, focusRowAt ])
+  }, [ visibleRowByIndex, focusRowAt ])
 
   /** The group a rendered row belongs to; `null` in a flat list. */
   const groupKeyOf = useCallback((index: number) =>
-    visibleRows.find(row =>
-      row.index === index)?.groupKey ?? null, [ visibleRows ])
+    visibleRowByIndex.get(index)?.groupKey ?? null, [ visibleRowByIndex ])
 
   /** Collapse the row's group and move focus to its heading toggle. */
   const collapseGroupOf = useCallback((index: number) => {
@@ -728,15 +737,14 @@ export function TrackTable ({
     if (!currentTrack || !flat || showSkeleton)
       return
 
-    const index = sorted.findIndex(t =>
-      t.id === currentTrack.id)
+    const index = sortedIndexById.get(currentTrack.id) ?? -1
     if (index >= 0)
       virtualizer.scrollToIndex(index, { align: 'center' })
-  }, [ currentTrack?.id, flat, showSkeleton, sorted, virtualizer ])
+  }, [ currentTrack?.id, flat, showSkeleton, sortedIndexById, virtualizer ])
 
   /** Row index within the full sorted list, so numbering survives grouping. */
   const indexOf = useCallback((track: Track, fallback: number) =>
-    indexOfTrack(sorted, track, fallback), [ sorted ])
+    sortedIndexById.get(track.id) ?? fallback, [ sortedIndexById ])
 
   const bodyRowCount = showSkeleton ? SKELETON_ROW_COUNT : sorted.length
 

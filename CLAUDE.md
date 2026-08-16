@@ -162,6 +162,8 @@ playback, and starting a track inside an album left it on the next press.
 
 All IPC channels use `namespace:action` format: `library:scan`, `file:read`, `window:minimize`.
 Bridge methods `onLibraryBatch` / `onLibraryDone` return unsubscribe functions — use in `useEffect` cleanup.
+`file:read` uses `fs.promises.readFile`; an async IPC handler wrapped around
+`readFileSync` still blocks Electron's main process and is not asynchronous.
 
 ## Library loading
 
@@ -188,6 +190,19 @@ and everything reaches it as a **stream of events** — nothing returns a librar
 - The hydrate waits for `SettingsContext.ready`. Settings load asynchronously,
   and both the folder tree and the reconciliation below are built from
   `libraryPaths` — starting first meant doing them against the defaults.
+- `LibraryContext` stores track and folder snapshots independently. A streamed
+  track batch is therefore an O(1) state replacement; it does not rebuild an
+  unused `ModelRegistry` and all album/artist indexes on the renderer thread.
+  Scanner publications are React transitions, so input and scroll can interrupt
+  their renders. The table owns sorting — never sort the same snapshot in the
+  scanner hook first.
+- Folder-tree derivation is scheduled with `requestIdleCallback` (timer fallback)
+  and superseded when a newer terminal event arrives. A terminal publish cancels
+  its pending animation frame; merely clearing a boolean leaves the old frame
+  alive and causes a duplicate whole-library commit.
+- The browser data source must yield between IndexedDB hydrate batches. Slicing
+  200-row events inside one promise callback is still one renderer-blocking task,
+  however many events it emits.
 
 ### Removing a library root
 
@@ -444,6 +459,11 @@ renders.
   card labelled "3 tracks" open 5 — the same album, but library-wide. Picking a
   different folder still drops the drill-in, since the bucket may not exist
   under it.
+- `LibraryGrid` is one native `<ul>` whose direct `<li>` cards are virtualized
+  with TanStack Virtual lanes. Responsive lane count comes from `ResizeObserver`;
+  cards carry `aria-posinset` / `aria-setsize`, and only the viewport slice
+  mounts or requests artwork. On React 19 the virtualizer uses
+  `useFlushSync: false`, so scroll updates can batch naturally.
 - `MediaCard` uses the stretched-link pattern: the heading holds the button and
   `.card-open::after { inset: 0 }` spreads its hit area over the card. A
   `<button>` takes only *phrasing* content, so `<button><h3>…</h3></button>`
@@ -463,7 +483,9 @@ renders.
   of specificity. Re-declaring them here looks like it works and doesn't.
 - `utils/grouping.ts` (`bucketKey`, `groupLabel`, `buildGroups`) is shared by
   `TrackTable`, `LibraryGrid` and `LibraryView`'s scope filter. It used to be
-  module-private inside `TrackTable`.
+  module-private inside `TrackTable`. Grouped table rendering also keeps one
+  `track.id → sorted index` map; doing `findIndex` for every grouped row turns
+  a single render quadratic.
 
 ## One-of-N controls
 

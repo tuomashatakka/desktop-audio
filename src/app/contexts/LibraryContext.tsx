@@ -1,14 +1,15 @@
 /**
  * LibraryContext — owns the in-memory music library.
  *
- * Holds the {@link ModelRegistry} (folders, tracks, albums, artists),
- * playlists, the active search query, the selected track index in the
- * filtered list, and a loading flag while a scan is in progress. The
- * scanner pumps results into this context via `setFolders` / `setTracks`.
+ * Holds independent track and folder snapshots, playlists, the active search
+ * query, the selected track index in the filtered list, and a loading flag
+ * while a scan is in progress. Keeping tracks and folders separate makes a
+ * streamed batch an O(1) state replacement instead of rebuilding every album
+ * and artist index on the renderer thread.
  */
 import type { ReactNode } from 'react'
-import { createContext, useContext, useState, useCallback, useMemo } from 'react'
-import { ModelRegistry, Track, FolderEntry } from '../models'
+import { createContext, useContext, useState, useCallback, useDeferredValue, useMemo } from 'react'
+import { Track, FolderEntry } from '../models'
 import type { Playlist } from '../services/types'
 import { generateId } from '../utils/generateId'
 
@@ -26,7 +27,8 @@ export interface FolderNode {
 
 /** Read-only library state snapshot. */
 interface LibraryState {
-  readonly registry:           ModelRegistry
+  readonly tracks:             Track[]
+  readonly folders:            FolderEntry[]
   readonly playlists:          readonly Playlist[]
   readonly searchQuery:        string
   readonly selectedTrackIndex: number | null
@@ -80,7 +82,8 @@ type LibraryProviderProps = { readonly children: ReactNode }
 export function LibraryProvider ({ children }: LibraryProviderProps) {
   const [ state, setState ] = useState<LibraryState>(() =>
     ({
-      registry:           new ModelRegistry(),
+      tracks:             [],
+      folders:            [],
       playlists:          [],
       searchQuery:        '',
       selectedTrackIndex: null,
@@ -88,54 +91,35 @@ export function LibraryProvider ({ children }: LibraryProviderProps) {
     }))
 
   const setFolders = useCallback((folders: FolderEntry[]) => {
-    setState(s => {
-      const newRegistry = new ModelRegistry()
-      for (const track of s.registry.getAllTracks())
-        newRegistry.addTrack(track)
-      for (const folder of folders)
-        newRegistry.addFolder(folder)
-      return { ...s, registry: newRegistry }
-    })
+    setState(s =>
+      ({ ...s, folders }))
   }, [])
 
   const setTracks = useCallback((tracks: Track[]) => {
-    setState(s => {
-      const newRegistry = new ModelRegistry()
-      for (const track of tracks)
-        newRegistry.addTrack(track)
-      // Folders are set separately (only on scan `done`) and must survive a
-      // track-only update — otherwise replaying the cache on remount empties
-      // the sidebar tree and nothing ever puts it back.
-      for (const folder of s.registry.folders.values())
-        newRegistry.addFolder(folder)
-      return { ...s, registry: newRegistry }
-    })
+    setState(s =>
+      ({ ...s, tracks }))
   }, [])
 
   const setSearchQuery = useCallback((query: string) => {
     setState(s =>
-      ({ ...s, searchQuery: query }))
+      s.searchQuery === query ? s : { ...s, searchQuery: query })
   }, [])
 
   const selectTrack = useCallback((index: number | null) => {
     setState(s =>
-      ({ ...s, selectedTrackIndex: index }))
+      s.selectedTrackIndex === index ? s : { ...s, selectedTrackIndex: index })
   }, [])
 
   const toggleFolder = useCallback((path: string) => {
-    setState(s => {
-      const newRegistry = new ModelRegistry()
-      for (const track of s.registry.getAllTracks())
-        newRegistry.addTrack(track)
-      for (const folder of s.registry.folders.values())
-        newRegistry.addFolder(toggleFolderBranch(folder, path))
-      return { ...s, registry: newRegistry }
-    })
+    setState(s =>
+      ({ ...s,
+        folders: s.folders.map(folder =>
+          toggleFolderBranch(folder, path)) }))
   }, [])
 
   const setLoading = useCallback((loading: boolean) => {
     setState(s =>
-      ({ ...s, isLoading: loading }))
+      s.isLoading === loading ? s : { ...s, isLoading: loading })
   }, [])
 
   const addPlaylist = useCallback((name: string) => {
@@ -166,19 +150,23 @@ export function LibraryProvider ({ children }: LibraryProviderProps) {
       }))
   }, [])
 
-  const filteredTracks = useMemo(() => {
-    const tracks = state.registry.getAllTracks()
-    if (!state.searchQuery.trim())
-      return tracks
+  // Keep the controlled search field urgent while its full-library filter is
+  // rendered in the background. The deferred value is stable between keys, so
+  // the table's memoised sorting work can be reused while the user is typing.
+  const deferredSearchQuery = useDeferredValue(state.searchQuery)
 
-    const query = state.searchQuery.toLowerCase()
-    return tracks.filter(
+  const filteredTracks = useMemo(() => {
+    if (!deferredSearchQuery.trim())
+      return state.tracks
+
+    const query = deferredSearchQuery.toLowerCase()
+    return state.tracks.filter(
       track =>
         track.title.toLowerCase().includes(query) ||
         track.artist.toLowerCase().includes(query) ||
         track.album.toLowerCase().includes(query)
     )
-  }, [ state.registry, state.searchQuery ])
+  }, [ state.tracks, deferredSearchQuery ])
 
   // Memoised: a fresh object here re-renders every consumer on every render
   // of this provider, which for the track list means rebuilding the whole

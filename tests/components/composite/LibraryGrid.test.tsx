@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LibraryGrid } from '../../../src/app/components/composite/LibraryGrid'
 import type { Track } from '../../../src/app/contexts'
 
@@ -25,6 +25,15 @@ const TRACKS = [
 ]
 
 describe('LibraryGrid', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(800)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('renders one card per bucket, with the heading still a heading', () => {
     render(
       <LibraryGrid
@@ -104,6 +113,24 @@ describe('LibraryGrid', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'b' }))
     expect(onPlay).toHaveBeenCalledWith(TRACKS, 1)
+  })
+
+  it('mounts only the viewport slice of a large ungrouped library', () => {
+    const manyTracks = Array.from({ length: 1000 }, (_, index) =>
+      track({ id: `track-${index}` }))
+
+    render(
+      <LibraryGrid
+        tracks={ manyTracks }
+        grouping='none'
+        density='grid-sm'
+        onOpen={ vi.fn() }
+        onPlay={ vi.fn() } />
+    )
+
+    const rendered = screen.getAllByRole('article')
+    expect(rendered.length).toBeGreaterThan(0)
+    expect(rendered.length).toBeLessThan(manyTracks.length)
   })
 
   it('carries the card size as a data attribute rather than a second rule set', () => {

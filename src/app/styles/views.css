@@ -210,23 +210,33 @@
  * Card browsing. One custom property carries the size, so the two grid
  * densities differ by a single value rather than by a second rule set.
  */
-.library-grid {
+.library-grid-scroll {
   --card: 128px;
 
-  display: grid;
   flex: 1;
-  grid-template-columns: repeat(auto-fill, minmax(var(--card), 1fr));
-  gap: var(--sp-2);
-  align-content: start;
   min-height: 0;
-  overflow: auto;
   padding: var(--sp-3);
-
-  /* Grid items default to `min-width: auto`, so the cell would inherit the
-     card's refusal to shrink. See `.media-card` in components.css. */
-  > li { min-width: 0; }
+  overflow: auto;
+  column-gap: var(--sp-2);
 
   &[data-size='lg'] { --card: 200px; }
+}
+
+.library-grid {
+  position: relative;
+  min-height: 100%;
+
+  /*
+   * The virtualizer owns both axes. Keeping every visible card as a direct
+   * <li> preserves one native list instead of introducing row wrappers or
+   * nested lists solely for layout.
+   */
+  > li {
+    position: absolute;
+    top: 0;
+    left: 0;
+    min-width: 0;
+  }
 }
 
 /* ─── track table ──────────────────────────────────────────────────────── */
