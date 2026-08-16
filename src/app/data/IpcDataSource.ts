@@ -5,6 +5,7 @@ import type { DisposableCollection } from 'disposable-events'
 import type { DataSource, DataEvent, DataListener, AudioMetadata, TrackDTO, ArtworkSize } from './DataSource'
 import { collectUnsubscribes } from '../utils/events'
 import { noop } from '../utils/noop'
+import type { TrackAnalysis } from '../services/types'
 
 
 export class IpcDataSource implements DataSource {
@@ -104,6 +105,14 @@ export class IpcDataSource implements DataSource {
       throw new Error(`No path found for trackId: ${trackId}`)
     return (this._ipc?.getAudioMetadata(path) as Promise<AudioMetadata>) ??
       Promise.resolve({ duration: 0 })
+  }
+
+  async analyzeTrack (trackId: string): Promise<TrackAnalysis | null> {
+    const path = this.trackIdToPath.get(trackId)
+    if (!path)
+      throw new Error(`No path found for trackId: ${trackId}`)
+
+    return await this._ipc?.analyzeTrack?.(trackId, path) ?? null
   }
 
   /** Awaits the write, so a failed save is a rejected promise and not silence. */

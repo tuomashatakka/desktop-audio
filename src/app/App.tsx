@@ -3,16 +3,17 @@ import { UIProvider, SettingsProvider, LibraryProvider, AudioProvider, useSettin
 import { LibraryView } from './views/LibraryView'
 import { LibrarySearch } from './views/LibrarySearch'
 import { Player } from './components/composite/Player'
-import { useKeyboardShortcuts, useAmbientPalette, useAppearance } from './hooks'
+import { useKeyboardShortcuts, useAmbientPalette, useAppearance, useThemeApply } from './hooks'
 import { AppLayout, Titlebar, LibrarySidebar, OverlayHost } from './layout'
 
 
 function AppContent () {
-  const { theme, uiFont, fontScale, accent } = useSettings()
+  const { theme, customTheme, uiFont, fontScale, accent } = useSettings()
 
   // All hooks must be called unconditionally before any early return
   useKeyboardShortcuts()
   useAmbientPalette()
+  useThemeApply(theme, theme === 'custom' ? customTheme : null)
   useAppearance({ theme, uiFont, fontScale, accent })
 
   // eslint-disable-next-line react-strict/prefer-no-use-effect -- Writes `data-theme` onto the document root, which no render reaches.

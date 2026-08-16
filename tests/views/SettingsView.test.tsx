@@ -41,12 +41,16 @@ describe('SettingsView', () => {
   it('keeps the custom theme editor mounted while toggling its visibility', () => {
     renderWithProviders(<SettingsView />)
 
-    const editorHeading = screen.getByRole('heading', { name: 'Custom Theme Colors', hidden: true })
+    const editorHeading = screen.getByRole('heading', { name: 'Custom theme', hidden: true })
     const editor = editorHeading.parentElement
     expect(editor).toHaveAttribute('hidden')
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Theme' }), { target: { value: 'custom' } })
 
     expect(editor).not.toHaveAttribute('hidden')
+    expect(screen.getByLabelText(/main background/i)).toHaveAttribute('type', 'color')
+    expect(screen.getByRole('slider', { name: /border intensity/i })).toHaveValue('0.35')
+    expect(screen.getByRole('slider', { name: /hover intensity/i })).toHaveValue('0.45')
+    expect(screen.getByRole('slider', { name: /focus intensity/i })).toHaveValue('0.6')
   })
 })

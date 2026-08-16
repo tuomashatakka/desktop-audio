@@ -88,6 +88,53 @@ export type Track = {readonly [K in keyof TrackFields]: TrackFields[K] }
 
 export type TrackDTO = Track
 
+/** One fitted pulse on the analyzer's steady musical grid. */
+export interface BeatMarker {
+  readonly time:     number
+  readonly strength: number
+  readonly source:   'section' | 'beat' | 'transient'
+  readonly downbeat: boolean
+  readonly bar:      number
+  readonly beat:     number
+}
+
+/** A contiguous beat-synchronous chord region. */
+export interface ChordSegment {
+  readonly start:      number
+  readonly end:        number
+  readonly label:      string
+  readonly confidence: number
+  readonly notes:      readonly number[]
+}
+
+export interface TempoEstimate {
+  readonly bpm:        number
+  readonly confidence: number
+}
+
+export interface KeyEstimate {
+  readonly tonic:      string
+  readonly scale:      'major' | 'minor' | 'unknown'
+  readonly label:      string
+  readonly confidence: number
+}
+
+/** Compact result persisted by the background harmony analyzer. */
+export interface TrackAnalysis {
+  readonly version:  number
+  readonly duration: number
+  readonly tempo:    TempoEstimate
+  readonly key:      KeyEstimate
+  readonly beats:    readonly BeatMarker[]
+  readonly chords:   readonly ChordSegment[]
+  readonly engine?:  {
+    readonly audio?:           string
+    readonly theory?:          string
+    readonly analysisSeconds?: number
+  }
+  readonly warnings: readonly string[]
+}
+
 /**
  * The editable subset of {@link TrackFields}, in display order.
  *

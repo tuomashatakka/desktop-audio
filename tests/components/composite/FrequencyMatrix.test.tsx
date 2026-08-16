@@ -102,6 +102,36 @@ describe('FrequencyMatrix', () => {
     expect(readout.textContent).toContain('B2')
   })
 
+  it('shows current and next chords, key, tempo, and the complete chord map', () => {
+    const { container } = render(
+      <FrequencyMatrix
+        analyzer={ null }
+        active
+        currentTime={ 6 }
+        status='ready'
+        analysis={{
+          version:  1,
+          duration: 20,
+          tempo:    { bpm: 119.99, confidence: 0.9 },
+          key:      { tonic: 'A', scale: 'minor', label: 'A minor', confidence: 0.8 },
+          beats:    [],
+          chords:   [
+            { start: 0, end: 5, label: 'Am', confidence: 0.8, notes: [ 57, 60, 64 ]},
+            { start: 5, end: 10, label: 'F', confidence: 0.8, notes: [ 53, 57, 60 ]},
+            { start: 10, end: 20, label: 'C', confidence: 0.8, notes: [ 48, 52, 55 ]},
+          ],
+          warnings: [],
+        }} />
+    )
+
+    expect(container.querySelector('[data-primary] dd')).toHaveTextContent('F')
+    expect(screen.getByText('Next chord').nextElementSibling).toHaveTextContent('C')
+    expect(screen.getByText('Main key').nextElementSibling).toHaveTextContent('A minor')
+    expect(screen.getByText('Tempo').nextElementSibling).toHaveTextContent('120.0')
+    expect(container.querySelectorAll('.chord-map li')).toHaveLength(3)
+    expect(container.querySelector('.chord-map [aria-current="true"]')).toHaveTextContent('F')
+  })
+
   it('paints the mesh even before a frame is granted', () => {
     // requestAnimationFrame is suspended while a window is hidden or
     // occluded. The panel has to open showing a mesh, not an empty box.

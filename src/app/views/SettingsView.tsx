@@ -3,31 +3,22 @@ import type { ChangeEvent } from 'react'
 import { useSettings, UI_FONT_LABELS, MIN_FONT_SCALE, MAX_FONT_SCALE } from '../contexts'
 import type { RepeatMode, Theme, CustomTheme, UiFont } from '../contexts'
 import { useData } from '../data'
-import { useKeybindings, useThemeApply } from '../hooks'
+import { useKeybindings } from '../hooks'
 import { formatShortcut, shortcutFromEvent } from '../../keybindings'
 import { Button, Icon } from '../components/atomic'
 
 
 const THEME_COLORS = [
-  { key: '--bg', label: 'Background' },
-  { key: '--bg-raised', label: 'Raised Background' },
-  { key: '--bg-input', label: 'Input Background' },
-  { key: '--bg-hover', label: 'Hover Background' },
-  { key: '--accent', label: 'Accent' },
-  { key: '--accent-hover', label: 'Accent Hover' },
-  { key: '--accent-alt', label: 'Accent Alt' },
-  { key: '--text', label: 'Text' },
-  { key: '--text-dim', label: 'Dim Text' },
-  { key: '--text-muted', label: 'Muted Text' },
-  { key: '--border', label: 'Border' },
-  { key: '--border-hover', label: 'Border Hover' },
-  { key: '--success', label: 'Success' },
-  { key: '--warning', label: 'Warning' },
-  { key: '--danger', label: 'Danger' },
-  { key: '--info', label: 'Info' },
-  { key: '--wf-unplayed', label: 'Waveform Unplayed' },
-  { key: '--wf-played', label: 'Waveform Played' },
-]
+  { key: 'background', label: 'Main background' },
+  { key: 'foreground', label: 'Main foreground' },
+  { key: 'accent', label: 'Accent' },
+] as const
+
+const THEME_INTENSITIES = [
+  { key: 'borderIntensity', label: 'Border intensity' },
+  { key: 'hoverIntensity', label: 'Hover intensity' },
+  { key: 'focusIntensity', label: 'Focus intensity' },
+] as const
 
 const SETTINGS_SECTIONS = [
   { id: 'settings-library', label: 'Library' },
@@ -53,8 +44,6 @@ export function SettingsView () {
   const [ shortcutStatus, setShortcutStatus ]         = useState('Select a shortcut field, then press the new keys.')
   const isMac                                         = typeof navigator !== 'undefined' && (/mac/i).test(navigator.userAgent)
 
-  useThemeApply(theme, theme === 'custom' ? customTheme : null)
-
   const handleAddPath = async () => {
     try {
       const path = await data.addRoot()
@@ -66,14 +55,24 @@ export function SettingsView () {
     }
   }
 
-  const handleColorChange = (key: string, value: string) => {
+  const handleColorChange = (
+    key: typeof THEME_COLORS[number]['key'],
+    value: string
+  ) => {
     if (theme !== 'custom')
       setTheme('custom')
 
-    const updated       = exportTheme()
-    updated.colors[key] = value
-    setCustomTheme(updated)
-    document.documentElement.style.setProperty(key, value)
+    setCustomTheme({ ...exportTheme(), [key]: value })
+  }
+
+  const handleIntensityChange = (
+    key: typeof THEME_INTENSITIES[number]['key'],
+    value: number
+  ) => {
+    if (theme !== 'custom')
+      setTheme('custom')
+
+    setCustomTheme({ ...exportTheme(), [key]: value })
   }
 
   const handleExportTheme = () => {
@@ -95,7 +94,7 @@ export function SettingsView () {
 
     try {
       const imported = JSON.parse(await file.text()) as CustomTheme
-      if (imported.version === 1 && imported.colors)
+      if (imported && typeof imported === 'object')
         importTheme(imported)
     }
     catch {
@@ -131,7 +130,7 @@ export function SettingsView () {
       setShortcutStatus('That shortcut is already assigned.')
   }
 
-  const currentColors = theme === 'custom' && customTheme ? customTheme.colors : {}
+  const currentTheme = customTheme ?? exportTheme()
 
   return <div className='settings-view'>
     <nav className='settings-nav' aria-label='Settings sections'>
@@ -272,26 +271,63 @@ export function SettingsView () {
           </label>
         </fieldset>
 
-        <div className='theme-editor' hidden={ theme !== 'custom' }>
-          <h3>Custom Theme Colors</h3>
+        <section
+          className='theme-editor'
+          aria-labelledby='custom-theme-heading'
+          hidden={ theme !== 'custom' }>
+          <h3 id='custom-theme-heading'>Custom theme</h3>
 
-          <ul className='color-grid'>
+          <fieldset className='theme-control-group color-grid'>
+            <legend>Base colours</legend>
+
             {THEME_COLORS.map(({ key, label }) =>
-              <li key={ key } className='color-field'>
-                <label>
-                  <span>{label}</span>
+              <label key={ key } className='color-field'>
+                <span>{label}</span>
 
-                  <input
-                    type='color'
-                    value={ currentColors[key] || '#000000' }
-                    onChange={ event =>
-                      handleColorChange(key, event.target.value) } />
+                <input
+                  type='color'
+                  value={ currentTheme[key] }
+                  onChange={ event =>
+                    handleColorChange(key, event.target.value) } />
 
-                  <span className='color-value'>{currentColors[key] || ''}</span>
-                </label>
-              </li>
+                <span className='color-value'>{currentTheme[key]}</span>
+              </label>
             )}
-          </ul>
+          </fieldset>
+
+          <fieldset className='theme-control-group intensity-grid'>
+            <legend>Derived interaction palette</legend>
+
+            {THEME_INTENSITIES.map(({ key, label }) => {
+              const id = `custom-theme-${key}`
+              return <label key={ key } className='field theme-intensity' htmlFor={ id }>
+                <span>{label}</span>
+
+                <span className='volume-setting'>
+                  <input
+                    id={ id }
+                    className='slider'
+                    type='range'
+                    min={ 0 }
+                    max={ 1 }
+                    step={ 0.05 }
+                    value={ currentTheme[key] }
+                    onChange={ event =>
+                      handleIntensityChange(key, event.currentTarget.valueAsNumber) } />
+
+                  <output className='volume-value' htmlFor={ id }>
+                    {Math.round(currentTheme[key] * 100)}
+                    %
+                  </output>
+                </span>
+              </label>
+            })}
+          </fieldset>
+
+          <p className='section-description'>
+            Raised surfaces, muted text, borders, hover colours and focus rings
+            are calculated from these six controls.
+          </p>
 
           <menu className='theme-actions'>
             <li>
@@ -321,7 +357,7 @@ export function SettingsView () {
             accept='.json,application/json'
             hidden
             onChange={ handleThemeFile } />
-        </div>
+        </section>
       </section>
 
       <section id='settings-playback' aria-labelledby='settings-playback-heading'>

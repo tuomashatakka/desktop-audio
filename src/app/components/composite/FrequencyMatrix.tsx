@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { findPeaks, formatHz, frequencyToPitch } from '../../utils/pitch'
 import type { Peak } from '../../utils/pitch'
+import { formatTime, isoDuration } from '../../utils/time'
+import type { TrackAnalysis, ChordSegment } from '../../services/types'
+import type { AnalysisStatus } from '../../hooks/useTrackAnalysis'
 
 
 /** Frequency bands across the X axis. */
@@ -65,10 +68,12 @@ const PEAK_LIMIT = 3
 const LABEL_MIN_GAP = 110
 
 interface FrequencyMatrixProps {
-  readonly analyzer: AnalyserNode | null
-
-  /** Only run the animation loop while the panel is actually on screen. */
-  readonly active: boolean
+  readonly analyzer:     AnalyserNode | null
+  readonly active:       boolean
+  readonly analysis?:    TrackAnalysis | null
+  readonly status?:      AnalysisStatus
+  readonly error?:       string | null
+  readonly currentTime?: number
 }
 
 interface PeakLabel {
@@ -163,6 +168,87 @@ function buildGeometry (): Geometry {
   return { xs, baseY, scale }
 }
 
+interface HarmonyDetailsProps {
+  readonly analysis:    TrackAnalysis | null
+  readonly status:      AnalysisStatus
+  readonly error:       string | null
+  readonly currentTime: number
+}
+
+function chordAt (chords: readonly ChordSegment[], time: number): number {
+  return chords.findIndex(chord =>
+    time >= chord.start && time < chord.end)
+}
+
+function HarmonyDetails ({ analysis, status, error, currentTime }: HarmonyDetailsProps) {
+  if (status === 'loading')
+    return <p className='status-message harmony-status'>Resolving chords, key and tempo…</p>
+
+  if (status === 'error')
+    return <p className='status-message harmony-status' role='status'>
+      Harmony analysis failed: {error}
+    </p>
+
+  if (!analysis)
+    return <p className='status-message harmony-status'>Harmony analysis is unavailable</p>
+
+  const index   = chordAt(analysis.chords, currentTime)
+  const current = index >= 0 ? analysis.chords[index] : undefined
+  const next    = index >= 0
+    ? analysis.chords[index + 1]
+    : analysis.chords.find(chord =>
+      chord.start > currentTime)
+
+  return <section className='harmony-details' aria-labelledby='harmony-details-heading'>
+    <h4 id='harmony-details-heading' className='sr-only'>Resolved harmony</h4>
+
+    <dl className='harmony-summary'>
+      <div data-primary>
+        <dt>Current chord</dt>
+        <dd>{current?.label ?? '—'}</dd>
+      </div>
+
+      <div>
+        <dt>Next chord</dt>
+        <dd>{next?.label ?? '—'}</dd>
+      </div>
+
+      <div>
+        <dt>Main key</dt>
+        <dd>{analysis.key.label}</dd>
+      </div>
+
+      <div>
+        <dt>Tempo</dt>
+
+        <dd>
+          {analysis.tempo.bpm.toFixed(1)}
+          {' '}
+          <abbr title='beats per minute'>bpm</abbr>
+        </dd>
+      </div>
+    </dl>
+
+    <section className='chord-map' aria-labelledby='chord-map-heading'>
+      <h5 id='chord-map-heading'>All chords</h5>
+
+      {analysis.chords.length > 0
+        ? <ol>
+          {analysis.chords.map((chord, chordIndex) =>
+            <li
+              key={ `${chord.start}:${chord.label}` }
+              aria-current={ chordIndex === index ? 'true' : undefined }>
+              <strong>{chord.label}</strong>
+              <time dateTime={ isoDuration(chord.start) }>{formatTime(chord.start)}</time>
+            </li>
+          )}
+        </ol>
+        : <p className='status-message'>No stable chord regions were resolved</p>
+      }
+    </section>
+  </section>
+}
+
 /**
  * An FFT wireframe matrix: frequency across, time receding, with the dominant
  * partials named.
@@ -183,7 +269,14 @@ function buildGeometry (): Geometry {
  * through refs. Only the peak labels use state, and they tick at
  * {@link LABEL_INTERVAL_MS}, not per frame.
  */
-export function FrequencyMatrix ({ analyzer, active }: FrequencyMatrixProps) {
+export function FrequencyMatrix ({
+  analyzer,
+  active,
+  analysis = null,
+  status = 'unavailable',
+  error = null,
+  currentTime = 0,
+}: FrequencyMatrixProps) {
   const freqPathRef = useRef<SVGPathElement>(null)
   const timePathRef = useRef<SVGPathElement>(null)
 
@@ -324,46 +417,56 @@ export function FrequencyMatrix ({ analyzer, active }: FrequencyMatrixProps) {
     }
   }, [ analyzer, active, geometry ])
 
-  return <section className='frequency-matrix' aria-label='Frequency spectrum'>
-    <svg
-      viewBox={ `0 0 ${VIEW_W} ${VIEW_H}` }
-      preserveAspectRatio='xMidYMid meet'
-      focusable='false'>
-      <defs>
-        {/* Rows recede downward, so vertical position *is* age: the newest
-            row sits at the top and the oldest at the bottom. One gradient
-            replaces the per-row opacity the mesh would otherwise need. */}
-        <linearGradient id='matrix-age' x1='0' y1='0' x2='0' y2='1'>
-          <stop offset='0%' stopColor='currentColor' stopOpacity='1' />
-          <stop offset='55%' stopColor='currentColor' stopOpacity='0.55' />
-          <stop offset='100%' stopColor='currentColor' stopOpacity='0.08' />
-        </linearGradient>
-      </defs>
+  return <section className='frequency-resolver' aria-labelledby='frequency-resolver-heading'>
+    <h3 id='frequency-resolver-heading' className='sr-only'>Frequency and harmony</h3>
 
-      <path ref={ timePathRef } className='matrix-line-z' />
-      <path ref={ freqPathRef } className='matrix-line-x' />
-    </svg>
+    <HarmonyDetails
+      analysis={ analysis }
+      status={ status }
+      error={ error }
+      currentTime={ currentTime } />
 
-    {/*
-      * The readout is a description list because that is what it is: a term
-      * (the note) and its value (the frequency). Positioned over the ridge it
-      * names, and `aria-live` so the reading is available without sight of it.
-      */}
-    <dl className='matrix-peaks' aria-live='polite' aria-atomic='true'>
-      {peaks.map(peak =>
-        <div
-          key={ peak.id }
-          className='matrix-peak'
-          /* eslint-disable-next-line react-strict/no-style-prop -- Position is measured data, not a stylesheet's decision. */
-          style={{
-            'left':   `${(peak.x / VIEW_W * 100).toFixed(2)}%`,
-            'top':    `${(peak.y / VIEW_H * 100).toFixed(2)}%`,
-            '--lane': peak.lane,
-          } as CSSProperties}>
-          <dt>{peak.note}</dt>
-          <dd>{peak.hz}</dd>
-        </div>
-      )}
-    </dl>
+    <section className='frequency-matrix' aria-label='Frequency spectrum'>
+      <svg
+        viewBox={ `0 0 ${VIEW_W} ${VIEW_H}` }
+        preserveAspectRatio='xMidYMid meet'
+        focusable='false'>
+        <defs>
+          {/* Rows recede downward, so vertical position *is* age: the newest
+              row sits at the top and the oldest at the bottom. One gradient
+              replaces the per-row opacity the mesh would otherwise need. */}
+          <linearGradient id='matrix-age' x1='0' y1='0' x2='0' y2='1'>
+            <stop offset='0%' stopColor='currentColor' stopOpacity='1' />
+            <stop offset='55%' stopColor='currentColor' stopOpacity='0.55' />
+            <stop offset='100%' stopColor='currentColor' stopOpacity='0.08' />
+          </linearGradient>
+        </defs>
+
+        <path ref={ timePathRef } className='matrix-line-z' />
+        <path ref={ freqPathRef } className='matrix-line-x' />
+      </svg>
+
+      {/*
+        * The readout is a description list because that is what it is: a term
+        * (the note) and its value (the frequency). Positioned over the ridge it
+        * names, and `aria-live` so the reading is available without sight of it.
+        */}
+      <dl className='matrix-peaks' aria-live='polite' aria-atomic='true'>
+        {peaks.map(peak =>
+          <div
+            key={ peak.id }
+            className='matrix-peak'
+            /* eslint-disable-next-line react-strict/no-style-prop -- Position is measured data, not a stylesheet's decision. */
+            style={{
+              'left':   `${(peak.x / VIEW_W * 100).toFixed(2)}%`,
+              'top':    `${(peak.y / VIEW_H * 100).toFixed(2)}%`,
+              '--lane': peak.lane,
+            } as CSSProperties}>
+            <dt>{peak.note}</dt>
+            <dd>{peak.hz}</dd>
+          </div>
+        )}
+      </dl>
+    </section>
   </section>
 }

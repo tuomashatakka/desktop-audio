@@ -69,6 +69,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getArtwork: (trackId: string, size?: 'thumb' | 'full') =>
     ipcRenderer.invoke('library:artwork', trackId, size),
 
+  /** Background harmony resolution, cached in SQLite by source mtime. */
+  analyzeTrack: (trackId: string, path: string) =>
+    ipcRenderer.invoke('library:analysis', trackId, path),
+
   // Files
   selectDirectory: () =>
     ipcRenderer.invoke('file:select'),

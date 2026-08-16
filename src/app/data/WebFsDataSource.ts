@@ -409,6 +409,15 @@ export class WebFsDataSource implements DataSource {
     return track?.albumArt ?? null
   }
 
+  /**
+   * The browser build has no host-side Python process or SQLite cache.
+   * Keeping this explicit lets the shared player report analysis as unavailable
+   * without pretending a browser-tab calculation was persisted.
+   */
+  async analyzeTrack (): Promise<null> {
+    return null
+  }
+
   async upsertTrack (track: TrackDTO): Promise<void> {
     await idbSet('tracks', track.id, track)
   }

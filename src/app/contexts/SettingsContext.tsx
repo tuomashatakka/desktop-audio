@@ -11,6 +11,11 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo, u
 import { useHost } from '../data'
 import { DEFAULT_DSP, normalizeDsp } from '../services/dspChain'
 import type { DspSettings } from '../services/dspChain'
+import { DEFAULT_CUSTOM_THEME, normalizeCustomTheme } from '../utils/theme'
+import type { CustomTheme } from '../utils/theme'
+
+
+export type { CustomTheme } from '../utils/theme'
 
 
 /** Playback repeat behavior at end of queue. */
@@ -56,16 +61,6 @@ export const UI_FONT_LABELS: Record<UiFont, string> = {
 export const MIN_FONT_SCALE = 0.8
 
 export const MAX_FONT_SCALE = 1.4
-
-/**
- * User-defined CSS variable overrides applied at runtime when the
- * active theme is `custom`. Importable/exportable as JSON.
- */
-export interface CustomTheme {
-  version: 1,
-  name:    string,
-  colors:  Record<string, string>,
-}
 
 /**
  * Window content dimensions in CSS pixels, matching the renderer's
@@ -179,31 +174,6 @@ const defaultSettings: Settings = {
   dsp:            DEFAULT_DSP,
 }
 
-const DEFAULT_CUSTOM_THEME: CustomTheme = {
-  version: 1,
-  name:    'Custom Theme',
-  colors:  {
-    '--bg':           '#1a1a2e',
-    '--bg-raised':    '#16213e',
-    '--bg-input':     '#0f3460',
-    '--bg-hover':     '#1a1a3e',
-    '--accent':       '#e94560',
-    '--accent-hover': '#ff6b81',
-    '--accent-alt':   '#533483',
-    '--text':         '#eee',
-    '--text-dim':     '#ccc',
-    '--text-muted':   '#999',
-    '--border':       '#333',
-    '--border-hover': '#555',
-    '--success':      '#28a745',
-    '--warning':      '#ffc107',
-    '--danger':       '#dc3545',
-    '--info':         '#17a2b8',
-    '--wf-unplayed':  '#444',
-    '--wf-played':    '#e94560',
-  },
-}
-
 const SettingsContext = createContext<SettingsContextValue | null>(null)
 
 /**
@@ -296,7 +266,7 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
 
   const setCustomTheme = useCallback((customTheme: CustomTheme | null) => {
     update(s =>
-      ({ ...s, customTheme }))
+      ({ ...s, customTheme: customTheme ? normalizeCustomTheme(customTheme) : null }))
   }, [])
 
   const exportTheme = useCallback(() =>
@@ -304,7 +274,7 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
 
   const importTheme = useCallback((theme: CustomTheme) => {
     update(s =>
-      ({ ...s, customTheme: theme, theme: 'custom' }))
+      ({ ...s, customTheme: normalizeCustomTheme(theme), theme: 'custom' }))
   }, [])
 
   const setDefaultDensity = useCallback((defaultDensity: 'compact' | 'normal' | 'relaxed') => {
@@ -425,7 +395,14 @@ async function loadSettings (): Promise<Settings> {
       // a hand-edited value, would arrive with keys missing or an `eq.gains` of
       // the wrong length, and a short array leaves the trailing bands silently
       // unwritten. `normalizeDsp` is what closes that.
-      return { ...defaultSettings, ...parsed, dsp: normalizeDsp(parsed?.dsp) }
+      return {
+        ...defaultSettings,
+        ...parsed,
+        customTheme: parsed?.customTheme
+          ? normalizeCustomTheme(parsed.customTheme)
+          : null,
+        dsp: normalizeDsp(parsed?.dsp),
+      }
     }
   }
   catch {

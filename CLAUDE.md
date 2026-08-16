@@ -241,9 +241,9 @@ emptying the screen. Both match the root itself or a `/`-separated descendant
 
 ## Workers
 
-Three of them, all spawned by `main.ts` through one `getWorker(name)`
+Four of them, all spawned by `main.ts` through one `getWorker(name)`
 supervisor and all built from `config/vite/worker.config.ts`:
-`scanner-worker`, `db-reader`, `db-writer`.
+`scanner-worker`, `db-reader`, `db-writer`, `analysis-worker`.
 
 Getting a worker built takes **two** things, and the second one is not obvious:
 
@@ -251,7 +251,7 @@ Getting a worker built takes **two** things, and the second one is not obvious:
 2. `config/vite/worker.config.ts` must **not** declare `build.lib`. Forge's Vite
    plugin only injects the per-entry `entry` when the user config leaves
    `build.lib` undefined — declaring it opts out of the injection entirely.
-   Because all three workers share that one config file, pinning
+   Because all four workers share that one config file, pinning
    `entry: 'src/scanner-worker.ts'` there meant every worker build compiled the
    scanner and `db-reader.js` / `db-writer.js` were never emitted at all. That
    is why hydration returned nothing and every tag save failed silently, even
@@ -278,6 +278,12 @@ cap is ten (`MaxListenersExceededWarning`). The count is a constant 3 per
 worker now, whatever the traffic. `error` and `exit` fail every pending entry,
 so a worker that dies can no longer strand promises and spinners — the same
 hole the `done`-on-spawn-failure guard closes from the other side.
+
+`analysis-worker` is the asynchronous bridge to the sibling
+`audio-processing-tools` chord resolver. It serialises CPU-heavy jobs, checks a
+version + source-mtime SQLite cache, launches the Essentia/musicpy adapter
+without blocking Electron's main thread, and commits the compact beat/chord/key/
+tempo result before replying. See `docs/music-analysis.md`.
 
 ## Subscriptions
 
@@ -354,8 +360,12 @@ to reach `@layer tokens` which nothing renders:
   `--accent-hover` and a luminance-picked `--accent-contrast`. Skipped entirely
   when `theme === 'custom'` — that theme owns its own accent.
 
-It is mounted in `AppContent`, above `useThemeApply` in `SettingsView`, so it
-runs *after* it on any commit that changes both. Don't move it deeper.
+`useThemeApply` is also mounted in `AppContent`, immediately before
+`useAppearance`. A custom theme is a versioned recipe containing main
+background, foreground and accent colours plus border, hover and focus
+intensities; `resolveCustomTheme` derives every surface, muted text, border,
+waveform and focus token with `color-mix()`. Version-1 swatch exports are
+normalised on import and hydration.
 
 ## Window lifecycle & dev startup
 
@@ -772,9 +782,10 @@ decorative `.param-shape` with a transparent native range over it, the same
 arrangement `WaveformProgress` uses for seeking. `--param-turn` (0–1) is the
 only thing JS contributes; the 270° dial sweep and the fader fill are CSS.
 
-- Both shapes are `writing-mode: vertical-rl`, so the drag gesture is
-  up-for-more. On a round dial a horizontal drag is the wrong model, and
-  clicking the left edge of one would jump it to minimum.
+- The transparent range keeps native slider semantics, but pointer dragging is
+  vertical and relative: a full parameter sweep takes 360px instead of the
+  control's 52px visual diameter. Holding Shift, Command, or Control reduces
+  drag distance and arrow-key steps to one tenth for fine tuning.
 - `aria-label` names the input rather than letting the wrapping `<label>` do it,
   because the readout is inside that label — a content-derived name would come
   out "Threshold −24 dB" and change on every drag. `aria-valuetext` carries the

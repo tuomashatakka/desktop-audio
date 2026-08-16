@@ -58,11 +58,8 @@ function applyScale (root: HTMLElement, fontScale: number): void {
 function applyAccent (root: HTMLElement, theme: string, accent: string): void {
   // A custom theme owns its own accent; overriding it here would make the
   // colour pickers in Settings silently ineffective.
-  if (theme === 'custom') {
-    root.style.removeProperty('--accent-hover')
-    root.style.removeProperty('--accent-contrast')
+  if (theme === 'custom')
     return
-  }
 
   root.style.setProperty('--accent', accent)
   root.style.setProperty('--accent-hover', `color-mix(in srgb, ${accent} 75%, #fff)`)

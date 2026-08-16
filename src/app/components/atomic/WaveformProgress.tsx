@@ -1,4 +1,5 @@
 import { useId, useMemo } from 'react'
+import type { BeatMarker } from '../../services/types'
 
 
 interface WaveformProgressProps {
@@ -6,6 +7,7 @@ interface WaveformProgressProps {
   readonly duration:    number
   readonly onSeek:      (time: number) => void
   readonly bars?:       Float32Array | null
+  readonly markers?:    readonly BeatMarker[]
   readonly barCount?:   number
   readonly compact?:    boolean
 }
@@ -25,11 +27,31 @@ function waveformPath (bars: Float32Array): string {
   }).join('')
 }
 
+function markerPath (
+  markers: readonly BeatMarker[],
+  duration: number,
+  width: number,
+  downbeats: boolean
+): string {
+  if (duration <= 0)
+    return ''
+
+  return markers
+    .filter(marker =>
+      marker.downbeat === downbeats && marker.time >= 0 && marker.time <= duration)
+    .map(marker => {
+      const x = marker.time / duration * width
+      return `M${x.toFixed(3)} 0V1`
+    })
+    .join('')
+}
+
 export function WaveformProgress ({
   currentTime,
   duration,
   onSeek,
   bars: externalBars = null,
+  markers = [],
   barCount: barCountProp,
   compact = false,
 }: WaveformProgressProps) {
@@ -45,6 +67,10 @@ export function WaveformProgress ({
   const position     = Math.max(0, Math.min(safeDuration, currentTime))
   const progress     = safeDuration > 0 ? position / safeDuration : 0
   const playedWidth  = progress * barCount
+  const beatMarkers  = useMemo(() =>
+    markerPath(markers, safeDuration, barCount, false), [ markers, safeDuration, barCount ])
+  const downbeats = useMemo(() =>
+    markerPath(markers, safeDuration, barCount, true), [ markers, safeDuration, barCount ])
 
   return <div
     className={ `waveform-progress ${compact ? 'compact' : ''}` }
@@ -70,6 +96,8 @@ export function WaveformProgress ({
         href={ `#${waveformId}` }
         clipPath={ `url(#${clipId})` } />
 
+      <path className='waveform-beats' d={ beatMarkers } />
+      <path className='waveform-beats waveform-downbeats' d={ downbeats } />
       <line className='waveform-line waveform-unplayed' x1='0' x2={ barCount } y1='0.5' y2='0.5' />
       <line className='waveform-line waveform-played' x1='0' x2={ playedWidth } y1='0.5' y2='0.5' />
     </svg>

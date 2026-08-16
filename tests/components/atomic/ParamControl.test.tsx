@@ -41,6 +41,34 @@ describe('ParamControl', () => {
     expect(onChange).toHaveBeenCalledWith(-4.5)
   })
 
+  it('uses low-sensitivity vertical dragging and modifier-key precision', () => {
+    const onChange = vi.fn()
+    render(<Knob label='Gain' value={ 0 } min={ -12 } max={ 12 } step={ 0.5 } onChange={ onChange } />)
+
+    const slider = screen.getByRole('slider', { name: 'Gain' })
+    Object.assign(slider, {
+      setPointerCapture:     vi.fn(),
+      hasPointerCapture:     () => true,
+      releasePointerCapture: vi.fn(),
+    })
+
+    fireEvent.pointerDown(slider, { pointerId: 1, clientY: 100 })
+    fireEvent.pointerMove(slider, { pointerId: 1, clientY: 40 })
+    expect(onChange).toHaveBeenLastCalledWith(4)
+
+    fireEvent.pointerMove(slider, { pointerId: 1, clientY: 40, shiftKey: true })
+    expect(onChange).toHaveBeenLastCalledWith(0.4)
+  })
+
+  it('fine-tunes arrow keys while shift, command, or control is held', () => {
+    const onChange = vi.fn()
+    render(<Knob label='Ratio' value={ 4 } min={ 1 } max={ 20 } step={ 0.1 } onChange={ onChange } />)
+
+    const slider = screen.getByRole('slider', { name: 'Ratio' })
+    fireEvent.keyDown(slider, { key: 'ArrowUp', ctrlKey: true })
+    expect(onChange).toHaveBeenCalledWith(4.01)
+  })
+
   it('publishes its position to CSS as a 0–1 fraction', () => {
     const { container } = render(
       <Knob label='Ratio' value={ 5 } min={ 1 } max={ 21 } onChange={ vi.fn() } />

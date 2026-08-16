@@ -1,4 +1,4 @@
-import type { AudioMetadata, MediaState } from './app/services/types'
+import type { AudioMetadata, MediaState, TrackAnalysis } from './app/services/types'
 
 
 interface ElectronAPI {
@@ -19,6 +19,9 @@ interface ElectronAPI {
 
   /** Album art, fetched per track — list rows never carry it. */
   getArtwork: (trackId: string, size?: 'thumb' | 'full') => Promise<string | null>
+
+  /** Cached or newly resolved harmony analysis for one audio file. */
+  analyzeTrack: (trackId: string, path: string) => Promise<TrackAnalysis>
 
   // Files
   selectDirectory:  () => Promise<string | null>

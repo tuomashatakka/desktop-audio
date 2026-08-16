@@ -145,6 +145,7 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: path.join(projectRoot, 'assets', 'icon'),
+    extraResource: [ path.join(projectRoot, 'resources') ],
     ignore: ignorePackagedFile,
     ...macOsPackagerConfig,
   },
@@ -199,6 +200,11 @@ const config: ForgeConfig = {
         },
         {
           entry: 'src/db-writer.ts',
+          config: 'config/vite/worker.config.ts',
+          target: 'main',
+        },
+        {
+          entry: 'src/analysis-worker.ts',
           config: 'config/vite/worker.config.ts',
           target: 'main',
         },

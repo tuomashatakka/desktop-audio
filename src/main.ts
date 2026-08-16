@@ -14,7 +14,7 @@ import started from 'electron-squirrel-startup'
 import * as mm from 'music-metadata'
 import * as mediaControls from './media-controls'
 import { rowToListDto } from './track-schema'
-import type { MediaState, SerializableMenuItem } from './app/services/types'
+import type { MediaState, SerializableMenuItem, TrackAnalysis } from './app/services/types'
 
 
 if (started)
@@ -387,16 +387,22 @@ type WorkerMessage =
   { type: 'batch'; id: number; tracks: unknown[] } |
   { type: 'done'; id: number; totalCount: number } |
   { type: 'artwork'; id: number; art: string | null } |
+  { type: 'analysis'; id: number; analysis: TrackAnalysis; cached: boolean } |
   { type: 'error'; id: number; message: string }
 
 let nextRequestId = 0
 
 /** Worker entry points, spawned as `<name>.js` beside this file. */
-const WORKER_SCANNER = 'scanner-worker'
-const WORKER_READER  = 'db-reader'
-const WORKER_WRITER  = 'db-writer'
+const WORKER_SCANNER  = 'scanner-worker'
+const WORKER_READER   = 'db-reader'
+const WORKER_WRITER   = 'db-writer'
+const WORKER_ANALYSIS = 'analysis-worker'
 
-type WorkerName = typeof WORKER_SCANNER | typeof WORKER_READER | typeof WORKER_WRITER
+type WorkerName =
+  typeof WORKER_SCANNER |
+  typeof WORKER_READER |
+  typeof WORKER_WRITER |
+  typeof WORKER_ANALYSIS
 
 /**
  * `worker.terminate()` emits 'exit' with code 1, not 0 — a deliberate
@@ -418,6 +424,31 @@ interface WorkerHandle {
 }
 
 const workers = new Map<WorkerName, WorkerHandle>()
+
+/** Locate the explicitly integrated audio-processing-tools analyzer. */
+function analysisWorkerData (): Record<string, string> {
+  const siblingProject = path.resolve(app.getAppPath(), '..', 'audio-processing-tools')
+  const homeProject    = path.join(
+    app.getPath('home'), 'Documents', 'Projects', 'audio-processing-tools'
+  )
+  const projectRoot = fs.existsSync(path.join(siblingProject, 'analyzer'))
+    ? siblingProject
+    : homeProject
+
+  const pythonPath = process.platform === 'win32'
+    ? path.join(projectRoot, '.venv', 'Scripts', 'python.exe')
+    : path.join(projectRoot, '.venv', 'bin', 'python')
+
+  const resolverPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'resources', 'resolve-harmony.py')
+    : path.join(app.getAppPath(), 'resources', 'resolve-harmony.py')
+
+  return {
+    analyzerRoot: path.join(projectRoot, 'analyzer'),
+    pythonPath,
+    resolverPath,
+  }
+}
 
 /**
  * Lazily spawns each worker and keeps one instance per name. They all share
@@ -445,7 +476,12 @@ function getWorker (name: WorkerName): WorkerHandle {
 
   const worker  = new Worker(
     entry,
-    { workerData: { dbPath: libraryDbPath() }}
+    {
+      workerData: {
+        dbPath: libraryDbPath(),
+        ...name === WORKER_ANALYSIS ? analysisWorkerData() : {},
+      },
+    }
   )
   const pending = new Map<number, PendingRequest>()
 
@@ -687,6 +723,49 @@ ipcMain.handle('library:artwork', async (_event, trackId: string, size: ArtworkS
   catch (err) {
     log.warn(`⨂ artwork failed for ${trackId}: ${String(err)}`)
     return null
+  }
+})
+
+// ─── Musical analysis ─────────────────────────────────────────────────────────
+
+/**
+ * Resolve one current track away from the main and renderer threads.
+ *
+ * The analysis worker checks SQLite first, queues cache misses, invokes the
+ * audio-processing-tools Python pipeline, then commits the result before this
+ * promise settles.
+ */
+function requestAnalysis (trackId: string, trackPath: string): Promise<TrackAnalysis> {
+  const { worker, pending } = getWorker(WORKER_ANALYSIS)
+  const id                  = nextRequestId++
+
+  return new Promise<TrackAnalysis>((resolve, reject) => {
+    pending.set(id, {
+      onMessage: msg => {
+        pending.delete(id)
+        if (msg.type === 'error')
+          reject(new Error(msg.message))
+        else if (msg.type === 'analysis')
+          resolve(msg.analysis)
+        else
+          reject(new Error('analysis worker returned an unexpected response'))
+      },
+      onError: err => {
+        pending.delete(id)
+        reject(err)
+      },
+    })
+    worker.postMessage({ type: 'analyze', id, trackId, path: trackPath })
+  })
+}
+
+ipcMain.handle('library:analysis', async (_event, trackId: string, trackPath: string) => {
+  try {
+    return await requestAnalysis(trackId, trackPath)
+  }
+  catch (error) {
+    log.warn(`⨂ analysis failed for ${trackId}: ${String(error)}`)
+    throw error
   }
 })
 

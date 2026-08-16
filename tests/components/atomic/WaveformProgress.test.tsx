@@ -23,7 +23,8 @@ describe('WaveformProgress', () => {
     expect(svg).toHaveAttribute('viewBox', '0 0 3 1')
     expect(svg).toHaveAttribute('aria-hidden', 'true')
     expect(container.querySelector('.waveform-progress')).toHaveAttribute('data-loaded')
-    expect(container.querySelectorAll('path')).toHaveLength(1)
+    expect(container.querySelector('defs > path')).toHaveAttribute('d')
+    expect(container.querySelectorAll('.waveform-beats')).toHaveLength(2)
     expect(played).toHaveAttribute('x2', '0.75')
   })
 
@@ -39,6 +40,26 @@ describe('WaveformProgress', () => {
     expect(container.querySelector('.waveform-progress')).not.toHaveAttribute('data-loaded')
     expect(container.querySelector('path')).toHaveAttribute('d', '')
     expect(container.querySelector('line.waveform-unplayed')).toHaveAttribute('x2', '400')
+  })
+
+  it('draws ordinary beats and downbeats as separate compact paths', () => {
+    const { container } = render(
+      <WaveformProgress
+        currentTime={ 0 }
+        duration={ 100 }
+        barCount={ 100 }
+        markers={[
+          { time: 25, strength: 0.7, source: 'beat', downbeat: false, bar: 1, beat: 1 },
+          { time: 50, strength: 1, source: 'section', downbeat: true, bar: 2, beat: 0 },
+        ]}
+        onSeek={ noop }
+      />
+    )
+
+    expect(container.querySelector('.waveform-beats:not(.waveform-downbeats)'))
+      .toHaveAttribute('d', 'M25.000 0V1')
+    expect(container.querySelector('.waveform-downbeats'))
+      .toHaveAttribute('d', 'M50.000 0V1')
   })
 
   it('seeks continuously through the native control', () => {

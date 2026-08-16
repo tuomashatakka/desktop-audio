@@ -38,6 +38,22 @@ const audio = {
   reductionOf: () => 0,
 }
 
+const analysisState = {
+  analysis: {
+    version:  1,
+    duration: 225,
+    tempo:    { bpm: 120, confidence: 0.9 },
+    key:      { tonic: 'C', scale: 'major' as const, label: 'C major', confidence: 0.9 },
+    beats:    [
+      { time: 0, strength: 1, source: 'section' as const, downbeat: true, bar: 0, beat: 0 },
+    ],
+    chords:  [],
+    warnings: [],
+  },
+  status: 'ready' as const,
+  error:  null,
+}
+
 const settings = {
   shuffle: false,
   setShuffle: vi.fn(),
@@ -66,11 +82,13 @@ vi.mock('../../../src/app/contexts', async importOriginal => ({
 }))
 
 vi.mock('../../../src/app/hooks', () => ({
-  useWindowScale: () => toggleWindowScale,
+  useTrackAnalysis: () => analysisState,
+  useWindowScale:   () => toggleWindowScale,
 }))
 
 vi.mock('../../../src/app/components/atomic/WaveformProgress', () => ({
-  WaveformProgress: () => <div role='slider' aria-label='Seek' />,
+  WaveformProgress: ({ markers }: { markers?: readonly unknown[] }) =>
+    <div role='slider' aria-label='Seek' data-marker-count={ markers?.length ?? 0 } />,
 }))
 
 describe('Player', () => {
@@ -192,6 +210,15 @@ describe('Player', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show album art' }))
 
     expect(screen.queryByRole('region', { name: 'Frequency spectrum' })).toBeNull()
+  })
+
+  it('shows beat markers only in the full now-playing view', () => {
+    const { unmount } = render(<Player />)
+    expect(screen.getByRole('slider', { name: 'Seek' })).toHaveAttribute('data-marker-count', '0')
+    unmount()
+
+    render(<Player expanded />)
+    expect(screen.getByRole('slider', { name: 'Seek' })).toHaveAttribute('data-marker-count', '1')
   })
 
   it('offers neither panel in the footer bar, which has nowhere to put them', () => {

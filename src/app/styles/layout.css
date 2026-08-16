@@ -441,6 +441,7 @@ body::before {
   z-index: 0;
   overflow: hidden;
   contain: paint;
+  animation: player-background-in var(--duration-slow) var(--ease-emphasis) both;
 
   img {
     width: 100%;
@@ -640,15 +641,23 @@ body::before {
  * age fade is a gradient rather than a per-row opacity so the whole mesh is
  * two nodes.
  */
+.frequency-resolver {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1;
+  gap: var(--sp-3);
+  width: min(100%, 1000px);
+  min-height: 0;
+  animation: surface-in var(--duration) var(--ease-emphasis);
+}
+
 .frequency-matrix {
   position: relative;
   display: grid;
-  flex: 1;
-  place-items: center;
-  width: min(100%, 920px);
+  width: 100%;
   min-height: 0;
   color: var(--accent);
-  animation: surface-in var(--duration) var(--ease-emphasis);
+  place-items: center;
 
   > svg {
     width: 100%;
@@ -679,6 +688,100 @@ body::before {
  * positioned layer rather than SVG text so the labels keep the UI font and
  * never inherit the mesh's scaling.
  */
+.harmony-details {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.harmony-status {
+  align-self: start;
+  min-height: 3rem;
+}
+
+.harmony-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-2);
+
+  > div {
+    display: grid;
+    gap: var(--sp-0-5);
+    min-width: 0;
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg-raised) 72%, transparent);
+  }
+
+  dt {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  dd {
+    overflow: hidden;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  [data-primary] {
+    border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+
+    dd { color: var(--accent); font-size: var(--text-lg); }
+  }
+}
+
+.chord-map {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+
+  h5 {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+
+  ol {
+    display: flex;
+    gap: var(--sp-1);
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    scroll-snap-type: inline proximity;
+  }
+
+  li {
+    display: grid;
+    flex: 0 0 auto;
+    gap: 1px;
+    min-width: 5rem;
+    padding: var(--sp-1) var(--sp-2);
+    border-block-start: 2px solid var(--border);
+    background: color-mix(in srgb, var(--bg) 64%, transparent);
+    scroll-snap-align: center;
+  }
+
+  li[aria-current='true'] {
+    border-color: var(--accent);
+    background: var(--accent-muted);
+  }
+
+  strong { color: var(--text); font-size: var(--text-sm); }
+  time { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
+}
+
 .matrix-peaks {
   position: absolute;
   inset: 0;
@@ -924,6 +1027,18 @@ body::before {
 }
 
 /* Hairline fallbacks have no fill; their stroke stays pinned to device pixels. */
+.waveform-beats {
+  fill: none;
+  stroke: color-mix(in srgb, var(--text) 40%, transparent);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+.waveform-downbeats {
+  stroke: var(--accent);
+  stroke-width: 1.5px;
+}
+
 .waveform-line.waveform-unplayed { stroke: var(--wf-unplayed); }
 .waveform-line.waveform-played { stroke: var(--wf-played); }
 .waveform-line { display: block; vector-effect: non-scaling-stroke; stroke-width: 1px; }
@@ -943,6 +1058,11 @@ body::before {
 @keyframes waveform-rise {
   from { transform: scaleY(0.02); }
   to { transform: scaleY(1); }
+}
+
+@keyframes player-background-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ─── player width tiers ───────────────────────────────────────────────── */
@@ -1248,6 +1368,7 @@ body::before {
   :root { transition: none; }
 
   .player-info .track-title > span,
+  .album-art-bg,
   .waveform-progress[data-loaded] .waveform-shape { animation: none; }
 
   .app-shell:is([data-height-tier='compact'], [data-height-tier='mini']) .track-title { text-overflow: ellipsis; }

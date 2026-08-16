@@ -4,9 +4,11 @@ import { DspPanel } from './DspPanel'
 import type { Track, RepeatMode, PlayerMode } from '../../contexts'
 import { Icon, IconButton, Button } from '../atomic'
 import { WaveformProgress } from '../atomic/WaveformProgress'
-import { useWindowScale } from '../../hooks'
+import { useTrackAnalysis, useWindowScale } from '../../hooks'
+import type { TrackAnalysisState } from '../../hooks'
 import { useArtwork } from '../../hooks/useArtwork'
 import { formatTime, isoDuration } from '../../utils/time'
+import type { BeatMarker } from '../../services/types'
 
 
 /** Cycle order for the repeat button: off → whole queue → single track. */
@@ -160,18 +162,26 @@ function PlayerInfo ({ track }: PlayerInfoProps) {
 }
 
 type PlayerPanelProps = {
-  readonly mode:     PlayerMode
-  readonly lyrics?:  string
-  readonly analyzer: AnalyserNode | null
+  readonly mode:        PlayerMode
+  readonly lyrics?:     string
+  readonly analyzer:    AnalyserNode | null
+  readonly analysis:    TrackAnalysisState
+  readonly currentTime: number
 }
 
 /** Whatever the chosen mode puts in the middle of the screen. */
-function PlayerPanel ({ mode, lyrics, analyzer }: PlayerPanelProps) {
+function PlayerPanel ({ mode, lyrics, analyzer, analysis, currentTime }: PlayerPanelProps) {
   if (mode === 'lyrics')
     return <PlayerLyrics lyrics={ lyrics } />
 
   if (mode === 'visualizer')
-    return <FrequencyMatrix analyzer={ analyzer } active />
+    return <FrequencyMatrix
+      analyzer={ analyzer }
+      active
+      analysis={ analysis.analysis }
+      status={ analysis.status }
+      error={ analysis.error }
+      currentTime={ currentTime } />
 
   if (mode === 'dsp')
     return <DspPanel />
@@ -257,6 +267,13 @@ type PlayerProps = {
   readonly expanded?: boolean
 }
 
+function visibleBeatMarkers (
+  expanded: boolean,
+  analysis: TrackAnalysisState
+): readonly BeatMarker[] | undefined {
+  return expanded ? analysis.analysis?.beats : undefined
+}
+
 /**
  * The one and only player — rendered twice, from one component.
  *
@@ -282,6 +299,7 @@ export function Player ({ expanded = false }: PlayerProps) {
     pause, resume, seek, playNext, playPrevious,
   }                                                        = useAudio()
   const { shuffle, setShuffle, repeatMode, setRepeatMode } = useSettings()
+  const analysis                                           = useTrackAnalysis(currentTrack?.id)
   const toggleWindowScale                                  = useWindowScale()
 
   /**
@@ -305,7 +323,7 @@ export function Player ({ expanded = false }: PlayerProps) {
     data-mode={ activeMode === 'default' ? undefined : activeMode }
     aria-label={ playerAriaLabel(currentTrack) }>
     {currentArt &&
-        <div className='album-art-bg' aria-hidden='true'>
+        <div key={ currentTrack?.id } className='album-art-bg' aria-hidden='true'>
           <img src={ currentArt } alt='' />
         </div>
     }
@@ -337,13 +355,19 @@ export function Player ({ expanded = false }: PlayerProps) {
           onClose={ closeOverlay } />
       }
 
-      <PlayerPanel mode={ activeMode } lyrics={ currentTrack?.lyrics } analyzer={ analyzer } />
+      <PlayerPanel
+        mode={ activeMode }
+        lyrics={ currentTrack?.lyrics }
+        analyzer={ analyzer }
+        analysis={ analysis }
+        currentTime={ currentTime } />
 
       <section className='progress-section' aria-label='Playback position'>
         <WaveformProgress
           currentTime={ currentTime }
           duration={ duration }
           bars={ waveformBars }
+          markers={ visibleBeatMarkers(expanded, analysis) }
           onSeek={ seek } />
 
         <div className='time-row'>

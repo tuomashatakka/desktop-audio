@@ -9,6 +9,7 @@
  * {@link HostBridge}.
  */
 import type { TrackDTO } from '../models'
+import type { TrackAnalysis } from '../services/types'
 
 
 /** Top-level scannable folder registered by the user. */
@@ -79,8 +80,12 @@ export interface DataSource {
   readonly subscribe:    (l: DataListener) => Subscription
   readonly readBytes:    (trackId: string) => Promise<ArrayBuffer>
   readonly readMetadata: (trackId: string) => Promise<AudioMetadata>
-  readonly upsertTrack:  (track: TrackDTO) => Promise<void>
-  readonly deleteTrack:  (trackId: string) => Promise<void>
+
+  /** Resolve or read the persisted harmony analysis for one track. */
+  readonly analyzeTrack: (trackId: string) => Promise<TrackAnalysis | null>
+
+  readonly upsertTrack: (track: TrackDTO) => Promise<void>
+  readonly deleteTrack: (trackId: string) => Promise<void>
 
   /**
    * One track's album art as a data URL, or `null` if it has none.
