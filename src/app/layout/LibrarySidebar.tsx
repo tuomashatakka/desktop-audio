@@ -32,7 +32,7 @@ export function LibrarySidebar () {
     selectPlaylist,
     setSidebarWidth,
     openOverlay,
-    setPlayerMode,
+    setDspOpen,
   } = useUI()
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -137,14 +137,16 @@ export function LibrarySidebar () {
     <footer className='sidebar-footer'>
       {/* The one door to the DSP page that does not require a track: the
           player bar's own promote button is disabled when nothing is playing,
-          and an EQ curve is worth editing in silence. Setting the mode first
-          means the overlay opens straight onto it — both are plain setters, so
-          React batches them into one commit. */}
+          and an EQ curve is worth editing in silence. Opening the layer first
+          means the overlay arrives with it already showing — both are plain
+          setters, so React batches them into one commit. It is `setDspOpen`
+          rather than a toggle because this entry has to *arrive* on the page
+          whatever state the overlay was last left in. */}
       <button
         className='sidebar-action'
         type='button'
         onClick={ () => {
-          setPlayerMode('dsp')
+          setDspOpen(true)
           openOverlay('player')
         } }>
         <Icon name='dsp' />

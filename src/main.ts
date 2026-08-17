@@ -388,7 +388,7 @@ type WorkerMessage =
   { type: 'done'; id: number; totalCount: number } |
   { type: 'artwork'; id: number; art: string | null } |
   { type: 'analysis'; id: number; analysis: TrackAnalysis; cached: boolean } |
-  { type: 'error'; id: number; message: string }
+  { type: 'error'; id: number; message: string; permanent?: boolean }
 
 let nextRequestId = 0
 
@@ -735,6 +735,13 @@ ipcMain.handle('library:artwork', async (_event, trackId: string, size: ArtworkS
  * audio-processing-tools Python pipeline, then commits the result before this
  * promise settles.
  */
+/**
+ * The analyzer looked at this file and will not produce a result for it — a
+ * decode refusal, not a malfunction. Distinguished so the log can be quiet
+ * about the ordinary case; the message reaches the renderer either way.
+ */
+class AnalysisRefused extends Error {}
+
 function requestAnalysis (trackId: string, trackPath: string): Promise<TrackAnalysis> {
   const { worker, pending } = getWorker(WORKER_ANALYSIS)
   const id                  = nextRequestId++
@@ -744,7 +751,7 @@ function requestAnalysis (trackId: string, trackPath: string): Promise<TrackAnal
       onMessage: msg => {
         pending.delete(id)
         if (msg.type === 'error')
-          reject(new Error(msg.message))
+          reject(msg.permanent ? new AnalysisRefused(msg.message) : new Error(msg.message))
         else if (msg.type === 'analysis')
           resolve(msg.analysis)
         else
@@ -759,12 +766,25 @@ function requestAnalysis (trackId: string, trackPath: string): Promise<TrackAnal
   })
 }
 
+/**
+ * A refusal is a fact about the file, not an incident: an Ableton `.aif` no
+ * decoder can open will refuse identically forever, and a library full of them
+ * used to fill the log with identical multi-line stack traces. The worker says
+ * which kind it was, so the ordinary case is one line and only the surprising
+ * kind is noisy. Either way the renderer gets the message and shows it.
+ */
 ipcMain.handle('library:analysis', async (_event, trackId: string, trackPath: string) => {
   try {
     return await requestAnalysis(trackId, trackPath)
   }
   catch (error) {
-    log.warn(`⨂ analysis failed for ${trackId}: ${String(error)}`)
+    const message = error instanceof Error ? error.message : String(error)
+
+    if (error instanceof AnalysisRefused)
+      log.info(`◦ no analysis for ${trackPath}: ${message}`)
+    else
+      log.warn(`⨂ analysis failed for ${trackPath}: ${message}`)
+
     throw error
   }
 })

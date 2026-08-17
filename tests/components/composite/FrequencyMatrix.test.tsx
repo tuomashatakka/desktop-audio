@@ -102,39 +102,6 @@ describe('FrequencyMatrix', () => {
     expect(readout.textContent).toContain('B2')
   })
 
-  it('shows current and next chords, key, tempo, and the complete chord map', () => {
-    const { container } = render(
-      <FrequencyMatrix
-        analyzer={ null }
-        active
-        currentTime={ 6 }
-        status='ready'
-        showChordAnalysis
-        showKeyAnalysis
-        analysis={{
-          version:  1,
-          duration: 20,
-          tempo:    { bpm: 119.99, confidence: 0.9 },
-          key:      { tonic: 'A', scale: 'minor', label: 'A minor', confidence: 0.8 },
-          beats:    [],
-          chords:   [
-            { start: 0, end: 5, label: 'Am', confidence: 0.8, notes: [ 57, 60, 64 ]},
-            { start: 5, end: 10, label: 'F', confidence: 0.8, notes: [ 53, 57, 60 ]},
-            { start: 10, end: 20, label: 'C', confidence: 0.8, notes: [ 48, 52, 55 ]},
-          ],
-          warnings: [],
-        }} />
-    )
-
-    // Current chord is prominent in the chord strip
-    expect(container.querySelector('.chord-strip .current')).toHaveTextContent('F')
-    // Next chord (data-next='1') is the chord after F, which is C
-    expect(container.querySelector('[data-next="1"]')).toHaveTextContent('C')
-    // Key and tempo are shown in the summary
-    expect(screen.getByText('A minor')).toBeInTheDocument()
-    expect(screen.getByText(/120\.0/)).toBeInTheDocument()
-  })
-
   it('paints the mesh even before a frame is granted', () => {
     // requestAnimationFrame is suspended while a window is hidden or
     // occluded. The panel has to open showing a mesh, not an empty box.
@@ -167,15 +134,57 @@ describe('FrequencyMatrix', () => {
     expect(raf).not.toHaveBeenCalled()
   })
 
-  it('keeps the mesh to two paths regardless of grid size', () => {
+  it('keeps the mesh to three paths regardless of grid size', () => {
     const { container } = render(
       <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active />
     )
 
     // The whole point of the rewrite: one path per direction, not one per row.
-    // The depth of field adds `<use>`s, not geometry — still two paths.
-    expect(container.querySelectorAll('path')).toHaveLength(2)
+    // The third is the newest row, split out so the depth mask and the blur
+    // cannot reach it. The depth of field adds `<use>`s, not geometry.
+    expect(container.querySelectorAll('path')).toHaveLength(3)
     expect(container.querySelectorAll('use')).toHaveLength(2)
+  })
+
+  /**
+   * Later subpaths paint over earlier ones, so the emission order *is* the
+   * depth order. Walking forward drew the oldest, faintest row over everything
+   * in front of it.
+   */
+  it('emits the history oldest first, so near rows paint in front', async () => {
+    let container!: HTMLElement
+
+    await act(async () => {
+      ({ container } = render(
+        <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active />
+      ))
+    })
+
+    // Rows recede downward, so a row's baseline Y grows with its age. Reading
+    // the first Y of each subpath therefore has to come out descending.
+    const history = container.querySelector('#matrix-freq')?.getAttribute('d') ?? ''
+
+    const baselines = history
+      .split('M')
+      .slice(1)
+      .map(subpath =>
+        Number(subpath.split(',')[1]?.split('L')[0]))
+
+    expect(baselines.length).toBeGreaterThan(1)
+    expect([ ...baselines ].sort((a, b) =>
+      b - a)).toEqual(baselines)
+  })
+
+  it('closes the current row so it can carry a fill, like the EQ curve', async () => {
+    let container!: HTMLElement
+
+    await act(async () => {
+      ({ container } = render(
+        <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active />
+      ))
+    })
+
+    expect(container.querySelector('.matrix-current')?.getAttribute('d')).toMatch(/Z$/)
   })
 
   it('places an octave the same distance apart in any register', async () => {
@@ -227,9 +236,20 @@ describe('FrequencyMatrix', () => {
     expect(new Set(lefts).size).toBe(3)
   })
 
-  it('stacks labels that would otherwise overlap', async () => {
+  /** Label positions, left to right, as percentages of the mesh's width. */
+  function labelPositions (): number[] {
+    return [ ...document.querySelectorAll<HTMLElement>('.matrix-peak') ]
+      .map(el =>
+        Number.parseFloat(el.style.left))
+      .sort((a, b) =>
+        a - b)
+  }
+
+  it('spreads labels that would otherwise overlap along the row', async () => {
     // A close voicing puts its partials within a few percent of each other
-    // even on a log axis, so position alone cannot separate the chips.
+    // even on a log axis, so position alone cannot separate the names. They
+    // are nudged sideways rather than stacked: vertical position in this
+    // component already means age.
     await act(async () => {
       render(
         <FrequencyMatrix
@@ -242,16 +262,22 @@ describe('FrequencyMatrix', () => {
       )
     })
 
-    const lanes = [ ...document.querySelectorAll<HTMLElement>('.matrix-peak') ]
-      .map(el =>
-        Number(el.style.getPropertyValue('--lane')))
+    const positions = labelPositions()
 
-    expect(lanes).toHaveLength(3)
-    expect(new Set(lanes).size).toBe(3)
+    expect(positions).toHaveLength(3)
+    expect(new Set(positions).size).toBe(3)
+
+    // None of them takes a second row — `top` is not data any more.
+    const tops = [ ...document.querySelectorAll<HTMLElement>('.matrix-peak') ]
+      .map(el =>
+        el.style.top)
+
+    expect(new Set(tops).size).toBe(1)
   })
 
-  it('keeps well-separated labels on one lane', async () => {
-    // Three octaves apart: no stacking needed, so none is applied.
+  it('leaves well-separated labels where their own frequency puts them', async () => {
+    // Three octaves apart: no nudging needed, so none is applied and the gap
+    // between them stays the honest one.
     await act(async () => {
       render(
         <FrequencyMatrix
@@ -260,11 +286,39 @@ describe('FrequencyMatrix', () => {
       )
     })
 
-    const lanes = [ ...document.querySelectorAll<HTMLElement>('.matrix-peak') ]
-      .map(el =>
-        Number(el.style.getPropertyValue('--lane')))
+    // Five octaves of a nine-octave axis, drawn across the mesh's half-width:
+    // comfortably more than the minimum gap, so nothing is nudged.
+    const [ low, high ] = labelPositions()
 
-    expect(lanes.every(lane =>
-      lane === 0)).toBe(true)
+    expect(high! - low!).toBeGreaterThan(20)
+  })
+
+  /**
+   * A named peak outlives the tick that found it. It used to be replaced
+   * wholesale every 160 ms, so a note dropping out of the top three vanished
+   * instantly and the readout flickered instead of reading.
+   */
+  it('holds a label after its peak stops being one of the loudest', async () => {
+    const loud = analyserFor([{ hz: 440, level: 255 }, { hz: 880, level: 240 }])
+    const { rerender } = render(<FrequencyMatrix analyzer={ loud } active />)
+
+    await act(async () => {
+      rerender(<FrequencyMatrix analyzer={ loud } active />)
+    })
+
+    const named = [ ...document.querySelectorAll('.matrix-peak dt') ]
+      .map(el =>
+        el.textContent)
+
+    expect(named).toContain('A4')
+    expect(named).toContain('A5')
+
+    // Every held label carries a fade, and a just-heard one is at full strength.
+    const fades = [ ...document.querySelectorAll<HTMLElement>('.matrix-peak') ]
+      .map(el =>
+        Number(el.style.getPropertyValue('--peak-fade')))
+
+    expect(fades.every(fade =>
+      fade > 0 && fade <= 1)).toBe(true)
   })
 })

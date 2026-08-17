@@ -26,17 +26,19 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 export type OverlayName = 'player' | 'settings' | 'tag-editor'
 
 /**
- * What fills the middle of the now-playing overlay. One at a time, not a
- * boolean each: the artwork, the spectrum and the DSP page all claim the same
- * space.
+ * Which of the two now-playing views is showing. Exactly two, because exactly
+ * two things claim the space above the title: the album artwork, and the
+ * spectrum mesh the analysis readout belongs to.
  *
- * Lyrics are deliberately *not* in this union — see `lyricsOpen` below.
+ * Neither lyrics nor the DSP page are in this union — they are *layers*
+ * (`lyricsOpen`, `dspOpen` below), composable with either view and with each
+ * other. A mode replaces what you were looking at; a layer arrives beside it.
  *
- * It lives here rather than inside `Player` because the sidebar's DSP entry has
- * to be able to open the overlay *on* a mode. Session-only, like `overlay` —
- * which panel you last had open is not a preference.
+ * It lives here rather than inside `Player` because the sidebar has to be able
+ * to open the overlay *on* a view. Session-only, like `overlay` — which panel
+ * you last had open is not a preference.
  */
-export type PlayerMode = 'default' | 'visualizer' | 'dsp'
+export type PlayerMode = 'default' | 'analysis'
 
 /**
  * How the track collection is laid out. The first three are row heights for
@@ -81,12 +83,22 @@ interface UIState {
   /**
    * Lyrics layer over the now-playing overlay, independent of `playerMode`.
    *
-   * It used to be a fourth mode, which meant reading along cost you the
-   * spectrum, the EQ *and* the transport — the panel it replaced. It is its own
-   * flag because it is its own layer: it sits to one side of whatever mode is
-   * showing and nudges that mode's content out of its way.
+   * It used to be a mode, which meant reading along cost you the spectrum, the
+   * EQ *and* the transport — the panel it replaced. It is its own flag because
+   * it is its own layer: it sits to one side of whatever view is showing and
+   * nudges that view's content out of its way.
    */
-  readonly lyricsOpen:         boolean
+  readonly lyricsOpen: boolean
+
+  /**
+   * The audio-processing page, layered over either view for the same reason.
+   *
+   * It was a third `playerMode` until that meant an EQ you could not set while
+   * looking at what you were setting it against. As a layer it opens *between*
+   * the type column and the transport: the blocks above ride up, the transport
+   * rides down, and nothing on screen is lost.
+   */
+  readonly dspOpen:            boolean
   readonly sidebarOpen:        boolean
   readonly selectedFolderPath: string | null
   readonly selectedPlaylistId: string | null
@@ -103,6 +115,8 @@ interface UIContextValue extends UIState {
   readonly closeOverlay:    () => void
   readonly setPlayerMode:   (mode: PlayerMode) => void
   readonly toggleLyrics:    () => void
+  readonly toggleDsp:       () => void
+  readonly setDspOpen:      (open: boolean) => void
   readonly toggleSidebar:   () => void
   readonly selectFolder:    (path: string | null) => void
   readonly selectPlaylist:  (id: string | null) => void
@@ -199,6 +213,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       overlay:        null,
       playerMode:     'default',
       lyricsOpen:     false,
+      dspOpen:        false,
       sidebarOpen:    false,
       ...NO_SCOPE,
       editingTrackId: null,
@@ -225,6 +240,21 @@ export function UIProvider ({ children, value }: UIProviderProps) {
   const toggleLyrics = useCallback(() => {
     setState(s =>
       ({ ...s, lyricsOpen: !s.lyricsOpen }))
+  }, [])
+
+  const toggleDsp = useCallback(() => {
+    setState(s =>
+      ({ ...s, dspOpen: !s.dspOpen }))
+  }, [])
+
+  /**
+   * Set rather than toggled, because the sidebar's DSP entry has to *arrive* on
+   * the page whatever state the overlay was left in — a toggle there would
+   * close it half the time.
+   */
+  const setDspOpen = useCallback((open: boolean) => {
+    setState(s =>
+      s.dspOpen === open ? s : { ...s, dspOpen: open })
   }, [])
 
   const toggleSidebar = useCallback(() => {
@@ -299,6 +329,8 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       closeOverlay,
       setPlayerMode,
       toggleLyrics,
+      toggleDsp,
+      setDspOpen,
       toggleSidebar,
       selectFolder,
       selectPlaylist,
@@ -314,6 +346,8 @@ export function UIProvider ({ children, value }: UIProviderProps) {
     closeOverlay,
     setPlayerMode,
     toggleLyrics,
+    toggleDsp,
+    setDspOpen,
     toggleSidebar,
     selectFolder,
     selectPlaylist,

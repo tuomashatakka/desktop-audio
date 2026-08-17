@@ -71,15 +71,16 @@ const settings = {
  * panel imports from the same barrel stay real, so this mock does not have to
  * grow a stub every time one is added.
  *
- * `useUI` has to be *stateful*: `playerMode` and `lyricsOpen` moved out of
- * `Player` and into `UIContext`, so a frozen object would leave every button
- * up there a no-op.
+ * `useUI` has to be *stateful*: `playerMode`, `lyricsOpen` and `dspOpen` moved
+ * out of `Player` and into `UIContext`, so a frozen object would leave every
+ * button up there a no-op.
  */
 vi.mock('../../../src/app/contexts', async importOriginal => ({
   ...await importOriginal<typeof import('../../../src/app/contexts')>(),
   useUI: () => {
     const [ playerMode, setPlayerMode ] = useState<PlayerMode>('default')
     const [ lyricsOpen, setLyricsOpen ] = useState(false)
+    const [ dspOpen, setDspOpen ]       = useState(false)
 
     return {
       openOverlay,
@@ -89,6 +90,11 @@ vi.mock('../../../src/app/contexts', async importOriginal => ({
       lyricsOpen,
       toggleLyrics: () =>
         setLyricsOpen(open =>
+          !open),
+      dspOpen,
+      setDspOpen,
+      toggleDsp: () =>
+        setDspOpen(open =>
           !open),
     }
   },
@@ -199,57 +205,75 @@ describe('Player', () => {
     expect(screen.getByRole('button', { name: 'Hide lyrics' })).toBeInTheDocument()
   })
 
-  it('stacks the lyrics over whichever mode is showing', () => {
+  it('stacks the lyrics over whichever view is showing', () => {
     render(<Player expanded />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show frequency spectrum' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show audio analysis' }))
     fireEvent.click(screen.getByRole('button', { name: 'Show lyrics' }))
 
     expect(screen.getByRole('region', { name: 'Frequency spectrum' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Lyrics' })).toBeInTheDocument()
   })
 
-  it('shows the frequency spectrum, and only one panel at a time', () => {
+  /**
+   * The whole point of the two-view rewrite: the title and the transport are
+   * not a mode's furniture, they are the player. Nothing a button here does may
+   * take them off the screen.
+   */
+  it('keeps the title and the transport through every view and layer', () => {
     render(<Player expanded />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show frequency spectrum' }))
-    expect(screen.getByRole('region', { name: 'Frequency spectrum' })).toBeInTheDocument()
-
-    // The modes claim the same space, so asking for one has to put the other
-    // away rather than stacking them.
+    fireEvent.click(screen.getByRole('button', { name: 'Show audio analysis' }))
     fireEvent.click(screen.getByRole('button', { name: 'Show audio processing' }))
-    expect(screen.getByRole('region', { name: 'Audio processing' })).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Frequency spectrum' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Show lyrics' }))
+
+    expect(screen.getByRole('heading', { name: track.title })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+    expect(screen.getByRole('slider', { name: 'Seek' })).toBeInTheDocument()
   })
 
-  it('shows the DSP page as a third panel, exclusive with the other two', () => {
+  it('swaps the artwork for the analysis readout, and only those two', () => {
     render(<Player expanded />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show audio processing' }))
-    expect(screen.getByRole('region', { name: 'Audio processing' })).toBeInTheDocument()
+    // Closed, the readout is in the DOM for its transition but out of the
+    // accessibility tree — the same arrangement the lyrics layer uses.
+    expect(screen.queryByRole('region', { name: 'Audio analysis' })).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show frequency spectrum' }))
-    expect(screen.queryByRole('region', { name: 'Audio processing' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Show audio analysis' }))
+    expect(screen.getByRole('region', { name: 'Audio analysis' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Frequency spectrum' })).toBeInTheDocument()
+  })
+
+  it('layers the DSP page over either view rather than replacing it', () => {
+    render(<Player expanded />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show audio analysis' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show audio processing' }))
+
+    // A layer, not a third mode: asking for it costs you nothing you had.
+    expect(screen.getByRole('region', { name: 'Audio processing' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Audio analysis' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Hide audio processing' })).toBeInTheDocument()
   })
 
   it('leaves the DSP button live with no track, unlike the other two', () => {
     audio.currentTrack = null
     render(<Player expanded />)
 
-    // Lyrics need tags and the spectrum needs signal; an EQ curve is worth
-    // editing in silence. (The lyrics button is a layer toggle now, but it
-    // still has nothing to show without a track.)
+    // Lyrics need tags and the analysis needs a track; an EQ curve is worth
+    // editing in silence, which is exactly when you might want to set one up.
     expect(screen.getByRole('button', { name: 'Show lyrics' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Show frequency spectrum' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Show audio analysis' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Show audio processing' })).toBeEnabled()
   })
 
-  it('returns to the artwork when the active mode is clicked again', () => {
+  it('returns to the artwork when the analysis view is clicked again', () => {
     render(<Player expanded />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show frequency spectrum' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show audio analysis' }))
     fireEvent.click(screen.getByRole('button', { name: 'Show album art' }))
 
+    expect(screen.queryByRole('region', { name: 'Audio analysis' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Frequency spectrum' })).toBeNull()
   })
 

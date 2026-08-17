@@ -297,6 +297,43 @@ version + source-mtime SQLite cache, launches the Essentia/musicpy adapter
 without blocking Electron's main thread, and commits the compact beat/chord/key/
 tempo result before replying. See `docs/music-analysis.md`.
 
+### Why an analysis fails, and what happens then
+
+**The resolver reports a refusal on stdout and *still* exits non-zero.** A
+promisified `execFile` rejects on that exit code and throws the output away, so
+`{"error": "…Could not open file…"}` became `Command failed:` followed by the
+entire command line — in the log, and in the UI. Stdout is now read on failure
+too, and whenever it is there it is the more specific answer. `humanize()` puts
+a sentence in front of the decoder's own words; Ableton's `.aif` samples are the
+common case, an `able` codec in an AIFF-C wrapper that neither ffmpeg nor
+CoreAudio decodes, so the honest message is that the format cannot be read.
+
+**A refusal is cached like a result.** `track_analysis.result_json` holds either
+an analysis or `{"error": …}`, read back as a discriminated `CachedOutcome`. The
+file will refuse identically until it changes, and re-launching Python on every
+view of an undecodable track is the difference between a quiet message and a
+stutter. Only refusals are written down — a missing interpreter, a timeout or a
+preemption might work next time, so those are never recorded.
+
+**The current track outranks whatever is running.** The renderer only ever asks
+about the track it is showing, so the newest request *is* the current track:
+`drain()` takes from the **end** of the backlog, and a new request `kill()`s the
+resolver still running for a track the listener has already left. A strict queue
+analysed abandoned tracks in the order they were abandoned, ahead of the one on
+screen. Preempted requests are not requeued — the renderer asks again if it
+still needs to — and the backlog is trimmed to `QUEUE_LIMIT`.
+
+**There is no progress channel, so the estimate is learned.** The resolver
+prints one line of JSON when it finishes and nothing before it. Every result
+already carries `engine.analysisSeconds` beside the audio `duration` it took it
+for, so `useTrackAnalysis` folds that ratio into a running rate and multiplies
+it by the current track's duration. `AnalysisProgress` renders a native
+`<progress>`, which is both states for free: with a `value` it is a bar, without
+one it is the platform's indeterminate sweep — which is exactly the first
+analysis of a session, before there is anything to learn from. It is
+deliberately *not* a live region; a countdown announcing twice a second is
+unusable, and the bar reports itself.
+
 ## Subscriptions
 
 Anything that binds a listener returns a disposable from `disposable-events`,
@@ -595,11 +632,21 @@ and it keeps the full-window layout.
 - **Height** → `data-height-tier` on `.app-shell` (`normal` / `snug` /
   `compact` / `mini`, from `useHeightTier`). Height has to be JS because it
   hides chrome *outside* the `.player-view` container (titlebar, player bar).
-- **Width** → `@container` queries against `.player-view`. Shedding order as
-  the window narrows: album art at `260px`, then (mini only) the next button
-  at `180px`. Below `260px` wide the compact tier stacks
-  title → progress → controls instead of putting controls beside the progress
-  bar. Title and progress line are the last to go.
+- **Width** → `@container` queries against `.player-view`. The album art is
+  **never shed** — it shrinks. It used to be dropped at `260px`, which is
+  exactly the width at which a cover is the fastest way to tell which track the
+  window is showing (the title is already marqueeing by then), so the small
+  tiers keep it pinned to the inline start down to the narrowest layout and
+  only `--art-size` changes. What goes instead, mini only, is the next button
+  at `180px`. Title and progress line are the last to go.
+
+**The overlay under `720px` wide turns the cover into a banner.** Instead of a
+card beside the type, `.player-art` goes `position: absolute` across the top at
+`--art-banner-h`, and `.album-art-card` takes a `mask-image` that dissolves its
+lower half — `.player-content`'s block-start padding then places the title
+*inside* that fade rather than under a hard edge. Scoped to `.player-overlay`,
+because the footer bar and the small-window height tiers arrange the artwork
+themselves and must not be reached by it.
 
 Two separate height thresholds, and conflating them is a trap:
 
@@ -637,13 +684,13 @@ track, because the engine keeps no play history.
 
 ### The lyrics layer
 
-**Lyrics are a layer over the now-playing overlay, not one of its modes.** They
-were a fourth `playerMode` until reading along cost you the spectrum, the EQ
-*and* the transport — the panel it replaced. `UIContext.lyricsOpen` +
-`toggleLyrics` are their own session state, and `data-lyrics` on `.player-view`
-translates `.player-content` by `--lyrics-nudge` so the column steps aside
-rather than being replaced. Only the overlay offers it: `.player-actions` (the
-mode buttons + close) is not rendered at all unless `expanded`.
+**Lyrics are a layer over the now-playing overlay, not one of its views.** They
+were a `playerMode` until reading along cost you the spectrum, the EQ *and* the
+transport — the panel it replaced. `UIContext.lyricsOpen` + `toggleLyrics` are
+their own session state, and `data-lyrics` on `.player-view` translates
+`.player-content` by `--lyrics-nudge` so the column steps aside rather than
+being replaced. Only the overlay offers it: `.player-actions` (the view button,
+the two layer toggles and close) is not rendered at all unless `expanded`.
 
 `PlayerLyrics` is **always mounted**, unlike `PlayerActions`, and shown by
 `data-open`. `display` is what animates it in and out (`allow-discrete` +
@@ -680,27 +727,85 @@ The footer bar has **no volume slider** — the system volume and the full playe
 both already own that, and the width is better spent on the progress bar. The
 `.player-volume` element still renders; the bar-mode rules hide it.
 
-## Now playing: what fills the middle
+## Now playing: two views, two layers
 
-`Player` has three modes — `default` (artwork), `visualizer`, `dsp` — and one at
-a time, not a boolean each. They all claim the same space, so independent
-toggles would let the user ask for two at once and leave the answer to selector
-order. `data-mode` on `.player-view` is what the tier CSS reads; `default`
-writes no attribute. Lyrics are deliberately *not* in this union — see "The
-lyrics layer" above.
+**`PlayerMode` is `'default' | 'analysis'` — and nothing else.** It was
+`default | visualizer | dsp`, which meant three panels claiming one space and,
+with lyrics beside them, four things you could only have one of. Pressing any
+button changed what screen you were on.
 
-**`playerMode` lives in `UIContext`, not in `Player`.** It was local `useState`
-until the sidebar needed to open the overlay *onto* a mode — `.player-promote`
-is `disabled` with no track, so without that lift the DSP page was unreachable
-in silence, which is exactly when you might want to set up an EQ. It is
-session-only, like `overlay`: which panel you last had open is not a preference.
+The distinction that replaced it:
 
-The mode buttons live in `.player-actions` and exist only in the overlay
-(`expanded`), alongside the lyrics toggle and the close button. The DSP one is
-deliberately **not** `disabled={!hasTrack}` like its two neighbours: lyrics need
-tags and the spectrum needs signal, but an EQ curve does not need anything
-playing. The lyrics button looks identical to the mode buttons and is not one of
-them — it toggles the layer over whichever mode is showing.
+- A **view** replaces what you were looking at, so there can only be one. The
+  artwork and the spectrum mesh both fill the space above the title, so they
+  are the two views. `data-mode` on `.player-view` is what the tier CSS reads;
+  `default` writes no attribute.
+- A **layer** arrives *beside* what is showing and costs you nothing. Lyrics
+  (`lyricsOpen`, `data-lyrics`) and the audio-processing page (`dspOpen`,
+  `data-dsp`) are layers, and they compose — with either view and with each
+  other.
+
+**The title, the artist, the album, the progress bar and the transport are on
+screen through all of it.** The analysis view hides the artwork and *only* the
+artwork; the old `visualizer` and `dsp` modes hid `.progress-section` too.
+
+All three pieces of state live in `UIContext`, not in `Player`, because the
+sidebar has to be able to open the overlay *onto* the DSP layer —
+`.player-promote` is `disabled` with no track, so without that lift the DSP page
+was unreachable in silence, which is exactly when you might want to set up an
+EQ. `setDspOpen` rather than `toggleDsp` is what the sidebar calls: that entry
+has to *arrive* on the page whatever state the overlay was last left in. All
+session-only, like `overlay` — which panel you last had open is not a
+preference.
+
+The buttons live in `.player-actions` and exist only in the overlay
+(`expanded`). The DSP one is deliberately **not** `disabled={!hasTrack}` like
+its two neighbours: lyrics need tags and the analysis needs a track, but an EQ
+curve does not need anything playing.
+
+**The transitions have a direction, and it is the same one both ways.** The
+artwork leaves *upward* (`opacity` + `translate` + `display` with
+`allow-discrete`, `@starting-style` for the return) and `.analysis-readout`
+rises into the space it vacated. The DSP layer is a wrapper animating
+`grid-template-rows` from `0fr` to `1fr` — `height: auto` and `display` cannot
+interpolate, a fraction can — so the type column *travels* up and the transport
+travels down instead of the page jumping around a panel that appeared.
+`.player-content[data-dsp]` also sheds padding and shrinks the play button, so
+the whole column still fits without a scrollbar.
+
+### The analysis readout
+
+`AnalysisReadout` is key, tempo and chords set as type under the title. It used
+to live inside `FrequencyMatrix`, which made the track's own musical data a
+sub-detail of a spectrum widget; it is the other way round — the mesh is the
+backdrop, and this is what the analysis view is *for*. Always mounted, shown by
+`data-open`, `aria-hidden` while closed: the same arrangement as the lyrics
+layer, for the same reason.
+
+It is `position: relative; z-index: var(--z-raised)` because the mesh is
+positioned and paints over non-positioned siblings — that overlap is deliberate
+for `.player-info`, but a *moving* line of type under a `color-burn` wireframe
+is unreadable.
+
+**The chord ribbon's distance from its anchor is time.** Every queued chord
+carries its own `start` as `--at`, the lane carries `--now`, and CSS resolves
+each offset to `(start − now) × --chord-pps`. So the pixels-per-second lives in
+CSS next to the width that decides how far ahead you can see, and a frame is one
+property write on one element whatever the chord count.
+
+`currentTime` arrives from a `timeupdate` listener at about 4 Hz — nowhere near
+enough to move a ribbon — so a rAF loop interpolates against `performance.now()`
+between ticks. Re-running that effect on every `currentTime` change is
+deliberate: each tick re-anchors the interpolation to the real playback
+position, so the lane cannot drift away from the audio.
+
+**Both chord animations run because their element is newly mounted.** The two
+slots in `.chord-now` are keyed by `chord.start`, so a chord change *mounts*
+them: the arriving one flashes because it is new, and the departing one drifts
+off to the left because it is new too, in a slot that animates that way
+(`animation-fill-mode: both` keeps it gone once it has gone). Neither needs a
+timer to clean up after it. The queue is keyed off an *index*, not off `time`,
+or four re-keyings a second would restart every animation three times per chord.
 
 The DSP page is set flat, like everything else on this screen. Its modules were
 raised cards with borders and radii, which read as a settings dialog dropped
@@ -730,10 +835,10 @@ next to playback:
 
 - **Static geometry is precomputed.** X and each row's baseline depend only on
   grid indices, so only Y moves per frame.
-- **Two paths, not sixty-four.** Every frequency line is one subpath of one
-  `<path>` and every time line of another, so a frame is two `setAttribute`
-  calls. The age fade is a vertical gradient rather than per-row opacity —
-  rows recede downward, so position *is* age.
+- **Three paths, not sixty-four.** Every past frequency line is one subpath of
+  one `<path>`, every time line of another, and the newest row is a third — so
+  a frame is three `setAttribute` calls. The age fade is a vertical gradient
+  rather than per-row opacity — rows recede downward, so position *is* age.
 - **Nothing is allocated in the loop.** The history is one flat
   `Float32Array` rotated by index, not an array of rows that shifts.
 - **Labels tick on their own clock** (`LABEL_INTERVAL_MS`), not per frame.
@@ -757,9 +862,23 @@ a semitone down low, so reading the bin index straight off would quantise the
 note. That fftSize is why it can name a pitch at all — the analyser used to be
 256, whose bins are ~172 Hz apart, most of an octave in the low register.
 
-Chips that would overlap are stacked into lanes (`assignLanes`): even on a log
-axis a close voicing puts its partials within a few percent of each other, so
-position alone cannot separate them.
+**Emission order is depth order.** Later subpaths paint over earlier ones, so
+the history loop runs `t = HISTORY-1 → 1` — oldest first, newest last. Walking
+forward drew the oldest, faintest row *over* everything in front of it, which is
+exactly backwards. Row 0 is excluded from that path entirely and written to
+`.matrix-current` instead, so it is reached by neither the depth mask nor the
+blur, and it is drawn like the EQ's own line: a flat `--accent` stroke over a
+20% fill, closed back along its baseline so it can carry one.
+
+**Peak labels are held, and they live in one row.** They used to be replaced
+wholesale every `LABEL_INTERVAL_MS`, so a note dropping out of the top three
+vanished inside 160 ms and the readout flickered rather than reading; a `Map`
+keyed by note name now keeps them for `LABEL_TTL_MS` (2.4 s) with a
+`--peak-fade` that decays across it. Their `y` is gone — vertical position in
+this component already means age, so spending it on decluttering made the row
+look scattered. `spreadLabels` nudges collisions sideways to `LABEL_MIN_GAP`
+instead and pulls the tail back inside the right edge; even on a log axis a
+close voicing puts its partials within a few percent of each other.
 
 **The mesh is the page's backdrop, not a panel in the column.** It is
 `position: absolute` against `.player-content` — inset `--matrix-inset-block`
@@ -892,16 +1011,28 @@ curve redraws as they move — the same arrangement `SegmentedControl` and
 a gesture across bands rather than one fader at a time. `.eq-curve` carries the
 focus ring on behalf of the clipped inputs.
 
+**The clipping is on the `input`s, not on the `<ol>` around them** — and moving
+it down there is what turned the band frequencies from accessibility-tree-only
+text into a visible ruler. They were always in the DOM (`{band.label} Hz`); the
+list was simply `clip-path`'d whole, so the curve read as a picture with three
+unlabelled decade lines on it. Each `<li>` now sits at its own band centre
+(`--at`, the same `axisPosition` the curve samples) along the lower edge, shows
+on `.eq-curve:is(:hover, :focus-within)`, and staggers onto two rows because
+sixteen names across a 52ch column touch. `bandAtX` also drives a `hovered`
+index for the band under the pointer, which is the only one that shows its dB —
+`setState` fires at most sixteen times across a full sweep, so this is not a
+per-frame render. The gain readout is a *sibling* of the label text with the
+input carrying its own `aria-label`, for the reason `ParamControl` documents: a
+content-derived name would otherwise change on every step of a drag.
+
 The panel sits at the inline edge under `.player-info` (`align-self: start` in a
 centred flex column), not in a sheet across the window — the track's own data is
 the block it belongs to.
 
 **Below 720px of player width the page is not offered at all.** The container
-query hides `.dsp-toggle` along with `.dsp-panel`, so there is no control that
-opens an empty space, and the `dsp` mode falls back to the ordinary artwork
-layout — the rule that hides the artwork for that mode lives inside the matching
-`min-width` query. Nothing in JS knows about this; widening the window restores
-the page with the mode still selected.
+query hides `.dsp-toggle` along with `.dsp-layer`, so there is no control that
+opens an empty space. Nothing in JS knows about this; widening the window
+restores the page with the layer still open.
 
 ### DSP controls
 

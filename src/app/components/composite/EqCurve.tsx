@@ -15,9 +15,16 @@
  * are still here, clipped rather than removed: they are what keyboard and
  * screen-reader users operate, and they are the reason this is a control and
  * not a picture.
+ *
+ * Their *labels* are no longer clipped with them. The band frequencies were in
+ * the accessibility tree and nowhere on screen, so the curve was a picture with
+ * three unlabelled decade lines on it; they surface as a ruler along the bottom
+ * edge on hover, with the band under the pointer called out. The clipping moved
+ * from the list to the inputs, which is the only part that has to stay
+ * invisible.
  */
-import { useEffect, useMemo, useRef } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import { DSP_RANGES, EQ_BANDS } from '../../contexts'
 import { axisFrequency, axisPosition, eqResponseDb } from '../../services/eqResponse'
 
@@ -109,6 +116,15 @@ export function EqCurve ({ gains, enabled, analyzer, onGain }: EqCurveProps) {
   const spectrumRef = useRef<SVGPathElement>(null)
 
   /**
+   * Which band the pointer is nearest, or `null` when it is elsewhere.
+   *
+   * `bandAtX` has only sixteen possible answers, and the setter bails out when
+   * the answer has not changed — so a drag across the whole curve re-renders
+   * fifteen times, not once per pointer event.
+   */
+  const [ hovered, setHovered ] = useState<number | null>(null)
+
+  /**
    * The curve is pure render — it only moves when a gain does.
    *
    * The device's own rate, not a nominal one: a 44.1 kHz output warps the top
@@ -190,9 +206,20 @@ export function EqCurve ({ gains, enabled, analyzer, onGain }: EqCurveProps) {
   }
 
   const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const box = svgRef.current?.getBoundingClientRect()
+
+    if (box && box.width > 0) {
+      const next = bandAtX((event.clientX - box.left) / box.width * VIEW_W)
+      setHovered(current =>
+        current === next ? current : next)
+    }
+
     if (enabled && event.currentTarget.hasPointerCapture(event.pointerId))
       applyAt(event)
   }
+
+  const onPointerLeave = () =>
+    setHovered(null)
 
   return <div className='eq-curve' data-off={ enabled ? undefined : '' }>
     <svg
@@ -202,7 +229,8 @@ export function EqCurve ({ gains, enabled, analyzer, onGain }: EqCurveProps) {
       preserveAspectRatio='none'
       focusable='false'
       onPointerDown={ onPointerDown }
-      onPointerMove={ onPointerMove }>
+      onPointerMove={ onPointerMove }
+      onPointerLeave={ onPointerLeave }>
       <path ref={ spectrumRef } className='eq-spectrum' />
       <line className='eq-zero' x1='0' y1={ HALF } x2={ VIEW_W } y2={ HALF } />
 
@@ -220,17 +248,35 @@ export function EqCurve ({ gains, enabled, analyzer, onGain }: EqCurveProps) {
     </svg>
 
     {/*
-      * The real controls. Clipped, never `display: none`, so they keep their
-      * place in the tab order and their names in the accessibility tree — the
-      * same arrangement `SegmentedControl` and `Rating` use for their radios.
+      * The real controls, and the ruler that names them.
+      *
+      * The inputs are clipped, never `display: none`, so they keep their place
+      * in the tab order and their names in the accessibility tree — the same
+      * arrangement `SegmentedControl` and `Rating` use for their radios. The
+      * list around them is not clipped: each item sits at its own band centre
+      * on the log axis (`--at`) and shows on hover.
+      *
+      * The `aria-label` names the input rather than letting the wrapping
+      * `<label>` do it, for the reason `ParamControl` documents: the gain
+      * readout beside it would otherwise become part of the accessible name
+      * and change on every step of a drag.
       */}
     <ol className='eq-bands'>
       {EQ_BANDS.map((band, index) =>
-        <li key={ band.hz }>
+        <li
+          key={ band.hz }
+          /* eslint-disable-next-line react-strict/no-style-prop -- The band's position on the log axis is measured data, shared with the curve it labels. */
+          style={{ '--at': ((BAND_X[index] ?? 0) / VIEW_W).toFixed(4) } as CSSProperties}
+          data-hover={ hovered === index || undefined }>
           <label>
-            <span>{band.label} Hz</span>
+            <span className='eq-band-hz'>{band.label} Hz</span>
+
+            <b className='eq-band-gain' aria-hidden='true'>
+              {(gains[index] ?? 0).toFixed(1)} dB
+            </b>
 
             <input
+              aria-label={ `${band.label} Hz` }
               aria-valuetext={ `${(gains[index] ?? 0).toFixed(1)} dB` }
               type='range'
               value={ gains[index] ?? 0 }

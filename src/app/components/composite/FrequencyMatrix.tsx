@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { findPeaks, formatHz, frequencyToPitch } from '../../utils/pitch'
-import type { Peak } from '../../utils/pitch'
-import type { TrackAnalysis, ChordSegment } from '../../services/types'
-import type { AnalysisStatus } from '../../hooks/useTrackAnalysis'
 
 
 /** Frequency bands across the X axis. */
@@ -66,60 +63,81 @@ const LABEL_INTERVAL_MS = 160
 const PEAK_LIMIT = 3
 
 /**
- * Labels closer than this (in viewBox units) are stacked instead of overlapped.
+ * How long a named peak stays on screen after it was last heard, fading out
+ * across that whole span.
+ *
+ * Labels used to be whatever `findPeaks` returned on the last tick, so a note
+ * that dropped out of the top three vanished within 160 ms — the readout
+ * flickered rather than reading as a list of what is sounding. Holding them
+ * means the row describes the last couple of seconds of the piece.
+ */
+const LABEL_TTL_MS = 2400
+
+/** Labels held at once. The least recently heard are dropped first. */
+const LABEL_MAX = 8
+
+/**
+ * Labels closer than this (in viewBox units) are pushed apart along the row.
  *
  * Even on a log axis a close voicing puts its partials within a few percent of
  * each other — a major triad spans barely half an octave — so position alone
- * cannot keep the chips apart.
+ * cannot keep the names apart.
  */
 const LABEL_MIN_GAP = 110
 
 interface FrequencyMatrixProps {
-  readonly analyzer:           AnalyserNode | null
-  readonly active:             boolean
-  readonly analysis?:          TrackAnalysis | null
-  readonly status?:            AnalysisStatus
-  readonly error?:             string | null
-  readonly currentTime?:       number
-  readonly showChordAnalysis?: boolean
-  readonly showKeyAnalysis?:   boolean
+  readonly analyzer: AnalyserNode | null
+
+  /** Drives the rAF loop. The mesh stays mounted while it fades out. */
+  readonly active: boolean
 }
 
 interface PeakLabel {
-  readonly id:    string
-  readonly note:  string
-  readonly hz:    string
-  readonly cents: number
-  readonly x:     number
-  readonly y:     number
+  readonly id:   string
+  readonly note: string
+  readonly hz:   string
+  readonly x:    number
 
-  /** How many chips already sit at this position; each lane stacks upward. */
-  readonly lane: number
+  /** `1` when just heard, `0` at {@link LABEL_TTL_MS}. */
+  readonly fade: number
+}
+
+/** A held label, before its age has been turned into a fade. */
+interface HeldPeak extends Omit<PeakLabel, 'fade'> {
+  readonly at: number
 }
 
 /**
- * Assigns each label a lane so overlapping chips stack rather than collide.
+ * Spreads overlapping labels apart **along the row**, left to right, then pulls
+ * the tail back inside the right edge.
  *
- * Walks left to right and drops a label into the first lane whose last
- * occupant is far enough away — the standard decluttering pass, and cheap at
- * three labels.
+ * This replaced a lane assignment that stacked collisions vertically. Vertical
+ * position already means something in this component — it is age — so spending
+ * it on decluttering made the row read as scattered. One clean line of names,
+ * nudged sideways where they would touch, says the same thing without
+ * borrowing an axis.
  */
-function assignLanes (labels: Omit<PeakLabel, 'lane'>[]): PeakLabel[] {
-  const laneEnds: number[] = []
+function spreadLabels (labels: readonly PeakLabel[]): PeakLabel[] {
+  let previous = -Infinity
 
-  return [ ...labels ]
+  const forward = [ ...labels ]
     .sort((a, b) =>
       a.x - b.x)
     .map(label => {
-      let lane = laneEnds.findIndex(end =>
-        label.x - end >= LABEL_MIN_GAP)
-
-      if (lane === -1)
-        lane = laneEnds.length
-
-      laneEnds[lane] = label.x
-      return { ...label, lane }
+      previous = Math.max(label.x, previous + LABEL_MIN_GAP)
+      return { ...label, x: previous }
     })
+
+  let ceiling = VIEW_W
+
+  return forward
+    .reverse()
+    .map(label => {
+      const x = Math.min(label.x, ceiling)
+      ceiling = x - LABEL_MIN_GAP
+      return { ...label, x }
+    })
+    .reverse()
 }
 
 /**
@@ -177,86 +195,6 @@ function buildGeometry (): Geometry {
   return { xs, baseY, scale }
 }
 
-interface HarmonyDetailsProps {
-  readonly analysis:    TrackAnalysis | null
-  readonly status:      AnalysisStatus
-  readonly error:       string | null
-  readonly currentTime: number
-  readonly showChord:   boolean
-  readonly showKey:     boolean
-}
-
-function chordAt (chords: readonly ChordSegment[], time: number): number {
-  return chords.findIndex(chord =>
-    time >= chord.start && time < chord.end)
-}
-
-interface ChordStripProps {
-  readonly chords:      readonly ChordSegment[]
-  readonly currentTime: number
-}
-
-function ChordStrip ({ chords, currentTime }: ChordStripProps) {
-  const index   = chordAt(chords, currentTime)
-  const current = index >= 0 ? chords[index] : undefined
-  const next1   = index >= 0
-    ? chords[index + 1]
-    : chords.find(c =>
-      c.start > currentTime)
-  const next2   = index >= 0 ? chords[index + 2] : undefined
-
-  return <div className='chord-strip' aria-live='polite' aria-atomic='true'>
-    <span className='current'>{current?.label ?? '\u2014'}</span>
-    <span className='next' data-next='1'>{next1?.label ?? ''}</span>
-    <span className='next' data-next='2'>{next2?.label ?? ''}</span>
-  </div>
-}
-
-interface KeyTempoProps {
-  readonly analysis: TrackAnalysis
-}
-
-function KeyTempo ({ analysis }: KeyTempoProps) {
-  return <dl className='key-tempo-summary'>
-    <div>
-      <dt>Key</dt>
-      <dd>{analysis.key.label}</dd>
-    </div>
-
-    <div>
-      <dt>Tempo</dt>
-
-      <dd>
-        {analysis.tempo.bpm.toFixed(1)}
-        {' '}
-        <abbr title='beats per minute'>bpm</abbr>
-      </dd>
-    </div>
-  </dl>
-}
-
-function HarmonyDetails ({ analysis, status, error, currentTime, showChord, showKey }: HarmonyDetailsProps) {
-  if (status === 'loading')
-    return <p className='status-message harmony-status'>Resolving chords, key and tempo…</p>
-
-  if (status === 'error')
-    return <p className='status-message harmony-status' role='status'>
-      Harmony analysis failed: {error}
-    </p>
-
-  if (!analysis)
-    return <p className='status-message harmony-status'>Harmony analysis is unavailable</p>
-
-  return <section className='harmony-details' aria-labelledby='harmony-details-heading'>
-    <h4 id='harmony-details-heading' className='sr-only'>Resolved harmony</h4>
-
-    {showChord && analysis.chords.length > 0 &&
-      <ChordStrip chords={ analysis.chords } currentTime={ currentTime } />}
-
-    {showKey && <KeyTempo analysis={ analysis } />}
-  </section>
-}
-
 /**
  * An FFT wireframe matrix: frequency across, time receding, with the dominant
  * partials named.
@@ -264,11 +202,11 @@ function HarmonyDetails ({ analysis, status, error, currentTime, showChord, show
  * Three things keep it cheap:
  *
  * 1. **Static geometry is precomputed** ({@link buildGeometry}). Only Y moves.
- * 2. **Two paths, not sixty-four.** Every frequency line lives in one `<path>`
- *    as separate subpaths and every time line in another, so a frame is two
- *    `setAttribute` calls. The age fade that would otherwise need a per-row
- *    opacity is a vertical gradient on the stroke instead — rows recede
- *    downward, so position *is* age.
+ * 2. **Three paths, not sixty-four.** Every past frequency line lives in one
+ *    `<path>` as separate subpaths, every time line in another, and the newest
+ *    row in a third — so a frame is three `setAttribute` calls. The age fade
+ *    that would otherwise need a per-row opacity is a vertical gradient on the
+ *    stroke instead: rows recede downward, so position *is* age.
  * 3. **No allocation in the loop.** The history is a single flat
  *    `Float32Array` rotated by index, and the path strings are assembled from
  *    a reused parts array.
@@ -276,19 +214,15 @@ function HarmonyDetails ({ analysis, status, error, currentTime, showChord, show
  * React renders once and never again for the mesh; the loop writes to the DOM
  * through refs. Only the peak labels use state, and they tick at
  * {@link LABEL_INTERVAL_MS}, not per frame.
+ *
+ * The harmony readout used to live here too. It is its own block now
+ * (`AnalysisReadout`) — the track's key, tempo and chords are what the analysis
+ * view is *for*, and this is the backdrop they are read against.
  */
-export function FrequencyMatrix ({
-  analyzer,
-  active,
-  analysis = null,
-  status = 'unavailable',
-  error = null,
-  currentTime = 0,
-  showChordAnalysis = false,
-  showKeyAnalysis = false,
-}: FrequencyMatrixProps) {
-  const freqPathRef = useRef<SVGPathElement>(null)
-  const timePathRef = useRef<SVGPathElement>(null)
+export function FrequencyMatrix ({ analyzer, active }: FrequencyMatrixProps) {
+  const freqPathRef    = useRef<SVGPathElement>(null)
+  const timePathRef    = useRef<SVGPathElement>(null)
+  const currentPathRef = useRef<SVGPathElement>(null)
 
   const [ peaks, setPeaks ] = useState<readonly PeakLabel[]>([])
 
@@ -316,6 +250,9 @@ export function FrequencyMatrix ({
     // Reused across frames so a frame allocates nothing.
     const parts = new Array<string>(HISTORY * (BANDS + 1))
     let lastLabelAt = 0
+
+    /** Named peaks, held past the tick that found them. See {@link LABEL_TTL_MS}. */
+    const held = new Map<string, HeldPeak>()
 
     /** Row `t` back from the newest, in the rotating buffer. */
     const rowAt = (t: number) =>
@@ -352,8 +289,15 @@ export function FrequencyMatrix ({
     }
 
     const paint = () => {
+      // History, **oldest subpath first**. Later subpaths paint over earlier
+      // ones, so emitting the newest row last is what puts the near rows in
+      // front of the far ones — walking forward drew the oldest, faintest row
+      // over everything in front of it.
+      //
+      // Row 0 is excluded; it gets its own path below, so it can be neither
+      // masked nor blurred.
       let n = 0
-      for (let t = 0; t < HISTORY; t++) {
+      for (let t = HISTORY - 1; t >= 1; t--) {
         const row = rowAt(t)
         const s   = scale[t]
         const b   = baseY[t]
@@ -365,6 +309,22 @@ export function FrequencyMatrix ({
         }
       }
       freqPathRef.current?.setAttribute('d', parts.slice(0, n).join(''))
+
+      // The newest row, drawn like the EQ's own curve: a flat accent stroke
+      // over a filled ground. It closes back along its baseline so the shape
+      // can carry that fill — the same construction `.eq-spectrum` uses.
+      n = 0
+
+      const row0 = rowAt(0)
+      for (let i = 0; i < BANDS; i++) {
+        const y    = baseY[0] - levels[row0 + i] * MAX_HEIGHT * scale[0]
+        parts[n++] = `${i === 0 ? 'M' : 'L'}${xs[i].toFixed(1)},${y.toFixed(1)}`
+      }
+
+      parts[n++] = `L${xs[BANDS - 1].toFixed(1)},${baseY[0].toFixed(1)}`
+      parts[n++] = `L${xs[0].toFixed(1)},${baseY[0].toFixed(1)}`
+      parts[n++] = 'Z'
+      currentPathRef.current?.setAttribute('d', parts.slice(0, n).join(''))
 
       n = 0
       for (let i = 0; i < BANDS; i++)
@@ -381,26 +341,34 @@ export function FrequencyMatrix ({
         return
       lastLabelAt = now
 
-      const found = findPeaks(bins, analyzer.context.sampleRate, analyzer.fftSize, PEAK_LIMIT)
-
-      setPeaks(assignLanes(found.map((peak: Peak) => {
+      for (const peak of findPeaks(bins, analyzer.context.sampleRate, analyzer.fftSize, PEAK_LIMIT)) {
         const pitch = frequencyToPitch(peak.hz)
 
-        // Place the label above the newest row, at the peak's own frequency
-        // position — so it sits over the ridge it names. Same log mapping the
-        // bands use, or the label would drift off its own peak.
-        const band  = Math.min(BANDS - 1, Math.floor(axisPosition(peak.hz) * BANDS))
-        const level = levels[rowAt(0) + band]
+        // Only X is data. The label takes the peak's own frequency position
+        // from the same log mapping the bands use, or a name would drift off
+        // the ridge it belongs to. Its Y is a fixed row, because vertical
+        // position in this component already means age.
+        const band = Math.min(BANDS - 1, Math.floor(axisPosition(peak.hz) * BANDS))
 
-        return {
-          id:    pitch?.label ?? String(Math.round(peak.hz)),
-          note:  pitch?.label ?? '—',
-          hz:    formatHz(peak.hz),
-          cents: pitch?.cents ?? 0,
-          x:     xs[band],
-          y:     baseY[0] - level * MAX_HEIGHT * scale[0],
-        }
-      })))
+        held.set(pitch?.label ?? String(Math.round(peak.hz)), {
+          id:   pitch?.label ?? String(Math.round(peak.hz)),
+          note: pitch?.label ?? '—',
+          hz:   formatHz(peak.hz),
+          x:    xs[band],
+          at:   now,
+        })
+      }
+
+      for (const [ id, label ] of held)
+        if (now - label.at > LABEL_TTL_MS)
+          held.delete(id)
+
+      setPeaks(spreadLabels([ ...held.values() ]
+        .sort((a, b) =>
+          b.at - a.at)
+        .slice(0, LABEL_MAX)
+        .map(({ at, ...label }) =>
+          ({ ...label, fade: 1 - (now - at) / LABEL_TTL_MS }))))
     }
 
     // Paint once, synchronously, before waiting on a frame. `requestAnimation
@@ -427,33 +395,26 @@ export function FrequencyMatrix ({
     }
   }, [ analyzer, active, geometry ])
 
-  return <section className='frequency-resolver' aria-labelledby='frequency-resolver-heading'>
-    <h3 id='frequency-resolver-heading' className='sr-only'>Frequency and harmony</h3>
-
-    <HarmonyDetails
-      analysis={ analysis }
-      status={ status }
-      error={ error }
-      currentTime={ currentTime }
-      showChord={ showChordAnalysis }
-      showKey={ showKeyAnalysis } />
-
-    <section className='frequency-matrix' aria-label='Frequency spectrum'>
-      <svg
-        viewBox={ `0 0 ${VIEW_W} ${VIEW_H}` }
-        preserveAspectRatio='xMidYMid meet'
-        focusable='false'>
-        <defs>
-          {/* Rows recede downward, so vertical position *is* age: the newest
+  return <section
+    className='frequency-matrix'
+    data-open={ active || undefined }
+    aria-label='Frequency spectrum'
+    aria-hidden={ active ? undefined : true }>
+    <svg
+      viewBox={ `0 0 ${VIEW_W} ${VIEW_H}` }
+      preserveAspectRatio='xMidYMid meet'
+      focusable='false'>
+      <defs>
+        {/* Rows recede downward, so vertical position *is* age: the newest
               row sits at the top and the oldest at the bottom. One gradient
               replaces the per-row opacity the mesh would otherwise need. */}
-          <linearGradient id='matrix-age' x1='0' y1='0' x2='0' y2='1'>
-            <stop offset='0%' stopColor='currentColor' stopOpacity='1' />
-            <stop offset='55%' stopColor='currentColor' stopOpacity='0.55' />
-            <stop offset='100%' stopColor='currentColor' stopOpacity='0.08' />
-          </linearGradient>
+        <linearGradient id='matrix-age' x1='0' y1='0' x2='0' y2='1'>
+          <stop offset='0%' stopColor='currentColor' stopOpacity='1' />
+          <stop offset='55%' stopColor='currentColor' stopOpacity='0.55' />
+          <stop offset='100%' stopColor='currentColor' stopOpacity='0.08' />
+        </linearGradient>
 
-          {/*
+        {/*
             * Depth of field. The same reasoning as the age gradient: distance
             * is vertical position, so focus can be too — near rows stay sharp
             * and far ones defocus, which is what makes a flat wireframe read
@@ -465,84 +426,85 @@ export function FrequencyMatrix ({
             * the near and far copies are masked with opposite ramps of one
             * gradient and cross-fade into each other across the middle.
             */}
-          <filter id='matrix-dof' x='-5%' y='-5%' width='110%' height='110%'>
-            <feGaussianBlur stdDeviation={ DOF_BLUR } />
-          </filter>
+        <filter id='matrix-dof' x='-5%' y='-5%' width='110%' height='110%'>
+          <feGaussianBlur stdDeviation={ DOF_BLUR } />
+        </filter>
 
-          <linearGradient
-            id='matrix-depth'
-            gradientUnits='userSpaceOnUse'
-            x1='0'
-            y1='0'
-            x2='0'
-            y2={ VIEW_H }>
-            <stop offset='0%' stopColor='#000' />
-            <stop offset={ `${DOF_FOCUS_PLANE}%` } stopColor='#000' />
-            <stop offset='100%' stopColor='#fff' />
-          </linearGradient>
+        <linearGradient
+          id='matrix-depth'
+          gradientUnits='userSpaceOnUse'
+          x1='0'
+          y1='0'
+          x2='0'
+          y2={ VIEW_H }>
+          <stop offset='0%' stopColor='#000' />
+          <stop offset={ `${DOF_FOCUS_PLANE}%` } stopColor='#000' />
+          <stop offset='100%' stopColor='#fff' />
+        </linearGradient>
 
-          <mask id='matrix-far'>
-            <rect
-              x={ -VIEW_W }
-              y={ -VIEW_H }
-              width={ VIEW_W * 3 }
-              height={ VIEW_H * 3 }
-              fill='url(#matrix-depth)' />
-          </mask>
+        <mask id='matrix-far'>
+          <rect
+            x={ -VIEW_W }
+            y={ -VIEW_H }
+            width={ VIEW_W * 3 }
+            height={ VIEW_H * 3 }
+            fill='url(#matrix-depth)' />
+        </mask>
 
-          {/* The near copy rides the same ramp inverted, so the pair always
+        {/* The near copy rides the same ramp inverted, so the pair always
               sums to one: no band is painted twice, and none is left unpainted. */}
-          <linearGradient
-            id='matrix-depth-near'
-            gradientUnits='userSpaceOnUse'
-            x1='0'
-            y1='0'
-            x2='0'
-            y2={ VIEW_H }>
-            <stop offset='0%' stopColor='#fff' />
-            <stop offset={ `${DOF_FOCUS_PLANE}%` } stopColor='#fff' />
-            <stop offset='100%' stopColor='#000' />
-          </linearGradient>
+        <linearGradient
+          id='matrix-depth-near'
+          gradientUnits='userSpaceOnUse'
+          x1='0'
+          y1='0'
+          x2='0'
+          y2={ VIEW_H }>
+          <stop offset='0%' stopColor='#fff' />
+          <stop offset={ `${DOF_FOCUS_PLANE}%` } stopColor='#fff' />
+          <stop offset='100%' stopColor='#000' />
+        </linearGradient>
 
-          <mask id='matrix-near'>
-            <rect
-              x={ -VIEW_W }
-              y={ -VIEW_H }
-              width={ VIEW_W * 3 }
-              height={ VIEW_H * 3 }
-              fill='url(#matrix-depth-near)' />
-          </mask>
+        <mask id='matrix-near'>
+          <rect
+            x={ -VIEW_W }
+            y={ -VIEW_H }
+            width={ VIEW_W * 3 }
+            height={ VIEW_H * 3 }
+            fill='url(#matrix-depth-near)' />
+        </mask>
 
-          {/* Geometry only. The two `<use>`s below are what paint it. */}
-          <path ref={ freqPathRef } id='matrix-freq' />
-        </defs>
+        {/* Geometry only, and history only. The two `<use>`s below paint it;
+            the newest row is a separate path so it stays sharp and unmasked. */}
+        <path ref={ freqPathRef } id='matrix-freq' />
+      </defs>
 
-        <path ref={ timePathRef } className='matrix-line-z' />
-        <use className='matrix-line-x' href='#matrix-freq' mask='url(#matrix-far)' filter='url(#matrix-dof)' />
-        <use className='matrix-line-x' href='#matrix-freq' mask='url(#matrix-near)' />
-      </svg>
+      <path ref={ timePathRef } className='matrix-line-z' />
+      <use className='matrix-line-x' href='#matrix-freq' mask='url(#matrix-far)' filter='url(#matrix-dof)' />
+      <use className='matrix-line-x' href='#matrix-freq' mask='url(#matrix-near)' />
+      <path ref={ currentPathRef } className='matrix-current' />
+    </svg>
 
-      {/*
-        * The readout is a description list because that is what it is: a term
-        * (the note) and its value (the frequency). Positioned over the ridge it
-        * names, and `aria-live` so the reading is available without sight of it.
-        */}
-      <dl className='matrix-peaks' aria-live='polite' aria-atomic='true'>
-        {peaks.map(peak =>
-          <div
-            key={ peak.id }
-            className='matrix-peak'
-            /* eslint-disable-next-line react-strict/no-style-prop -- Position is measured data, not a stylesheet's decision. */
-            style={{
-              'left':   `${(peak.x / VIEW_W * 100).toFixed(2)}%`,
-              'top':    `${(peak.y / VIEW_H * 100).toFixed(2)}%`,
-              '--lane': peak.lane,
-            } as CSSProperties}>
-            <dt>{peak.note}</dt>
-            <dd>{peak.hz}</dd>
-          </div>
-        )}
-      </dl>
-    </section>
+    {/*
+      * The readout is a description list because that is what it is: a term
+      * (the note) and its value (the frequency). One row across the top of the
+      * mesh — only the horizontal position carries meaning — and `aria-live`
+      * so the reading is available without sight of it.
+      */}
+    <dl className='matrix-peaks' aria-live='polite' aria-atomic='true'>
+      {peaks.map(peak =>
+        <div
+          key={ peak.id }
+          className='matrix-peak'
+          /* eslint-disable-next-line react-strict/no-style-prop -- Position and age are measured data, not a stylesheet's decision. */
+          style={{
+            'left':        `${(peak.x / VIEW_W * 100).toFixed(2)}%`,
+            '--peak-fade': peak.fade.toFixed(3),
+          } as CSSProperties}>
+          <dt>{peak.note}</dt>
+          <dd>{peak.hz}</dd>
+        </div>
+      )}
+    </dl>
   </section>
 }

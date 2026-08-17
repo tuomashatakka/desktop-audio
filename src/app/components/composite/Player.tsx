@@ -1,5 +1,6 @@
 import { useUI, useAudio, useSettings } from '../../contexts'
 import { FrequencyMatrix } from './FrequencyMatrix'
+import { AnalysisReadout } from './AnalysisReadout'
 import { DspPanel } from './DspPanel'
 import type { Track, RepeatMode, PlayerMode } from '../../contexts'
 import { Icon, IconButton, Button } from '../atomic'
@@ -185,67 +186,41 @@ function PlayerInfo ({ track }: PlayerInfoProps) {
   </hgroup>
 }
 
-type PlayerPanelProps = {
-  readonly mode:              PlayerMode
-  readonly analyzer:          AnalyserNode | null
-  readonly analysis:          TrackAnalysisState
-  readonly currentTime:       number
-  readonly showChordAnalysis: boolean
-  readonly showKeyAnalysis:   boolean
-}
-
-/** Whatever the chosen mode puts in the middle of the screen. */
-function PlayerPanel ({ mode, analyzer, analysis, currentTime, showChordAnalysis, showKeyAnalysis }: PlayerPanelProps) {
-  if (mode === 'visualizer')
-    return <FrequencyMatrix
-      analyzer={ analyzer }
-      active
-      analysis={ analysis.analysis }
-      status={ analysis.status }
-      error={ analysis.error }
-      currentTime={ currentTime }
-      showChordAnalysis={ showChordAnalysis }
-      showKeyAnalysis={ showKeyAnalysis } />
-
-  if (mode === 'dsp')
-    return <DspPanel />
-
-  return null
-}
-
 type PlayerActionsProps = {
   readonly mode:       PlayerMode
   readonly lyricsOpen: boolean
+  readonly dspOpen:    boolean
   readonly hasTrack:   boolean
-  readonly onMode:     (mode: Exclude<PlayerMode, 'default'>) => void
+  readonly onMode:     () => void
   readonly onLyrics:   () => void
+  readonly onDsp:      () => void
   readonly onClose:    () => void
 }
 
 /**
- * The overlay's top-right controls: pick what fills the middle, put the lyrics
- * alongside it, or leave.
+ * The overlay's top-right controls: switch the view, add a layer to it, or
+ * leave.
  *
  * A menu of controls, like `.playback-controls` — same shape, so the two read
- * alike and neither is a bare `<div>`. Each mode button is `aria-pressed`
- * rather than a radio group: they are toggles that also happen to be mutually
- * exclusive, and pressing the active one returns to the artwork. The lyrics
- * button looks identical and is *not* one of them — it layers over any mode.
+ * alike and neither is a bare `<div>`. Only the first button changes the
+ * *view*; lyrics and audio processing are layers that arrive beside whichever
+ * view is showing, which is why all three are `aria-pressed` toggles and none
+ * of them is a radio in a group.
  */
-function PlayerActions ({ mode, lyricsOpen, hasTrack, onMode, onLyrics, onClose }: PlayerActionsProps) {
-  const showing = (target: Exclude<PlayerMode, 'default'>) =>
-    mode === target
+function PlayerActions ({
+  mode, lyricsOpen, dspOpen, hasTrack, onMode, onLyrics, onDsp, onClose,
+}: PlayerActionsProps) {
+  const analysing = mode === 'analysis'
 
   return <menu className='player-actions' aria-label='Player'>
     <li>
       <IconButton
-        className='visualizer-toggle'
-        aria-pressed={ showing('visualizer') }
-        label={ showing('visualizer') ? 'Show album art' : 'Show frequency spectrum' }
+        className='analysis-toggle'
+        aria-pressed={ analysing }
+        label={ analysing ? 'Show album art' : 'Show audio analysis' }
         type='button'
         disabled={ !hasTrack }
-        onClick={ () =>
-          onMode('visualizer') }>
+        onClick={ onMode }>
         <Icon name='spectrum' />
       </IconButton>
     </li>
@@ -262,16 +237,16 @@ function PlayerActions ({ mode, lyricsOpen, hasTrack, onMode, onLyrics, onClose 
       </IconButton>
     </li>
 
-    {/* No `disabled` here, unlike the two above: the spectrum and lyrics need a
-        track to have anything to show, but an EQ curve is editable in silence. */}
+    {/* No `disabled` here, unlike the two above: the analysis and the lyrics
+        need a track to have anything to show, but an EQ curve is editable in
+        silence — which is exactly when you might want to set one up. */}
     <li>
       <IconButton
         className='dsp-toggle'
-        aria-pressed={ showing('dsp') }
-        label={ showing('dsp') ? 'Show album art' : 'Show audio processing' }
+        aria-pressed={ dspOpen }
+        label={ dspOpen ? 'Hide audio processing' : 'Show audio processing' }
         type='button'
-        onClick={ () =>
-          onMode('dsp') }>
+        onClick={ onDsp }>
         <Icon name='dsp' />
       </IconButton>
     </li>
@@ -299,6 +274,16 @@ function playerAriaLabel (track: Track | null): string {
  */
 function lyricsShowing (expanded: boolean, lyricsOpen: boolean): true | undefined {
   return expanded && lyricsOpen ? true : undefined
+}
+
+/**
+ * `''` when there is nothing playing, `undefined` when there is — the same
+ * present-or-absent shape `data-empty` wants. It is what retracts the footer
+ * bar to zero height (`--player-h`), so it has to be an attribute rather than a
+ * class.
+ */
+function emptyFlag (track: Track | null): '' | undefined {
+  return track ? undefined : ''
 }
 
 type PlayerProps = {
@@ -334,37 +319,43 @@ function visibleBeatMarkers (
  * that system.
  */
 export function Player ({ expanded = false }: PlayerProps) {
-  const { openOverlay, closeOverlay, playerMode, setPlayerMode, lyricsOpen, toggleLyrics } = useUI()
+  const {
+    openOverlay, closeOverlay, playerMode, setPlayerMode,
+    lyricsOpen, toggleLyrics, dspOpen, toggleDsp,
+  } = useUI()
   const {
     currentTrack, isPlaying, currentTime, duration, waveformBars, analyzer,
     pause, resume, seek, playNext, playPrevious,
   }                                                        = useAudio()
   const { shuffle, setShuffle, repeatMode, setRepeatMode,
     showBeatMarkers, showChordAnalysis, showKeyAnalysis } = useSettings()
-  const analysis                                          = useTrackAnalysis(currentTrack?.id)
+  const analysis                                          = useTrackAnalysis(currentTrack)
   const toggleWindowScale                                 = useWindowScale()
 
   /**
-   * Clicking the active mode's button returns to the artwork. The value lives
-   * in `UIContext` so the sidebar can open the overlay straight onto a mode.
+   * One button, two views. The value lives in `UIContext` so the sidebar can
+   * open the overlay straight onto one.
    */
-  const toggleMode = (next: Exclude<PlayerMode, 'default'>) =>
-    setPlayerMode(playerMode === next ? 'default' : next)
+  const toggleMode = () =>
+    setPlayerMode(playerMode === 'analysis' ? 'default' : 'analysis')
 
-  // These panels only make sense in the full-window player; the footer bar and
+  // These layers only make sense in the full-window player; the footer bar and
   // the mini tiers have nowhere to put them, so they aren't in their DOM at
   // all rather than being hidden after the fact.
   const activeMode = expanded ? playerMode : 'default'
   const showLyrics = lyricsShowing(expanded, lyricsOpen)
+  const analysing  = activeMode === 'analysis'
+  const showDsp    = expanded && dspOpen ? true : undefined
 
   // Shares the cache entry `PlayerArt` above already warmed for this track.
   const currentArt = useArtwork(currentTrack?.id, 'full')
 
   return <article
     className='player-view'
-    data-empty={ currentTrack ? undefined : '' }
-    data-mode={ activeMode === 'default' ? undefined : activeMode }
+    data-empty={ emptyFlag(currentTrack) }
+    data-mode={ analysing ? activeMode : undefined }
     data-lyrics={ showLyrics }
+    data-dsp={ showDsp }
     aria-label={ playerAriaLabel(currentTrack) }>
     {currentArt &&
         <div key={ currentTrack?.id } className='album-art-bg' aria-hidden='true'>
@@ -388,26 +379,51 @@ export function Player ({ expanded = false }: PlayerProps) {
       <PlayerArtwork track={ currentTrack } onToggle={ toggleWindowScale } />
       <PlayerInfo track={ currentTrack } />
 
-      {/* A menu of controls, like `.playback-controls` below — same shape so
-          the two read alike and neither is a bare <div>. Only the overlay has
-          anywhere to put it. */}
-      {expanded &&
+      {/* Everything the overlay adds, in one branch: the footer bar and the
+          mini tiers have nowhere to put any of it, so none of it is in their
+          DOM rather than being hidden after the fact.
+
+          The mesh is the page's backdrop rather than a block in this column,
+          but it is absolutely positioned against `.player-content`, so it has
+          to live inside it. `active` is what drives its rAF loop — the loop
+          stops the moment the view changes, while the element stays behind for
+          its fade-out. The readout and the DSP layer are mounted for the same
+          reason: their arrival and departure are `display` transitions, and an
+          unmounted element has nothing to animate. */}
+      {expanded && <>
+        <FrequencyMatrix analyzer={ analyzer } active={ analysing } />
+
+        <AnalysisReadout
+          open={ analysing }
+          analysis={ analysis.analysis }
+          status={ analysis.status }
+          error={ analysis.error }
+          currentTime={ currentTime }
+          isPlaying={ isPlaying }
+          showChord={ showChordAnalysis }
+          showKey={ showKeyAnalysis }
+          startedAt={ analysis.startedAt }
+          estimateMs={ analysis.estimateMs } />
+
+        {/* A menu of controls, like `.playback-controls` below — same shape so
+            the two read alike and neither is a bare <div>. */}
         <PlayerActions
           mode={ activeMode }
           lyricsOpen={ lyricsOpen }
+          dspOpen={ dspOpen }
           hasTrack={ Boolean(currentTrack) }
           onMode={ toggleMode }
           onLyrics={ toggleLyrics }
+          onDsp={ toggleDsp }
           onClose={ closeOverlay } />
-      }
 
-      <PlayerPanel
-        mode={ activeMode }
-        analyzer={ analyzer }
-        analysis={ analysis }
-        currentTime={ currentTime }
-        showChordAnalysis={ showChordAnalysis }
-        showKeyAnalysis={ showKeyAnalysis } />
+        {/* The wrapper is what animates: `grid-template-rows` interpolates
+            between `0fr` and `1fr` where `height: auto` cannot, so the blocks
+            above ride up and the transport rides down rather than jumping. */}
+        <div className='dsp-layer' data-open={ showDsp } aria-hidden={ showDsp ? undefined : true }>
+          <DspPanel />
+        </div>
+      </>}
 
       <section className='progress-section' aria-label='Playback position'>
         <WaveformProgress

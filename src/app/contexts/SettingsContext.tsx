@@ -186,8 +186,8 @@ const defaultSettings: Settings = {
   accentLight:       DEFAULT_ACCENT_LIGHT,
   dsp:               DEFAULT_DSP,
   showBeatMarkers:   false,
-  showChordAnalysis: false,
-  showKeyAnalysis:   false,
+  showChordAnalysis: true,
+  showKeyAnalysis:   true,
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
