@@ -2,7 +2,27 @@
 
 Music player for linux and mac. Built with Electron, React and TypeScript.
 
-![Now playing with the live spectrum, the current chord, key and tempo](assets/screenshots/now-playing-harmony.png)
+![Now playing in the analysis view, with the live spectrum, the current chord, key and tempo](assets/screenshots/now-playing-harmony.png)
+
+## Now playing: two views, two layers
+
+The now-playing screen has **two views** and **two layers**, and the difference
+is the whole design.
+
+A **view** replaces what you were looking at, so there is only ever one: the
+**album art**, or the **audio analysis**. Switching to the analysis fades the
+cover upward and the key, tempo and chords rise into the space it leaves, over a
+live spectrum mesh.
+
+A **layer** arrives *beside* what is showing and costs you nothing. **Lyrics**
+step the column aside to make room. **Audio processing** opens between the type
+and the transport, riding the title up and the controls down. Both compose —
+with either view, and with each other.
+
+Through all of it the **title, artist, album, seek bar and transport stay on
+screen**. They used to be furniture that a mode could take away; four things you
+could only have one of meant every button press changed which screen you were
+on.
 
 ## Audio processing
 
@@ -29,7 +49,9 @@ inputs behind it for keyboard and screen-reader use, and each knob is a range
 input under a drawn face — pointer, wheel and keyboard all work, dragging is
 vertical and relative so a full sweep takes real travel rather than 52 pixels,
 and holding <kbd>Shift</kbd>, <kbd>⌘</kbd> or <kbd>Ctrl</kbd> drops it to fine
-mode. The page needs a wide window and is not offered in a narrow one.
+mode. Hovering the curve raises a ruler of the sixteen band frequencies and
+calls out the one under your pointer with its current gain. The page needs a
+wide window and is not offered in a narrow one.
 
 ## Chords, key and tempo
 
@@ -40,20 +62,35 @@ work happens once per file and a re-scan never repeats it. The cache is its own
 table, not a column on `tracks`, so hydrating the library never drags every beat
 of every song through the renderer.
 
-![Lyrics laid over the spectrum, with the chord strip and key and tempo readout](assets/screenshots/now-playing-lyrics.png)
+![Lyrics laid over the spectrum, with the chord ribbon and key and tempo readout](assets/screenshots/now-playing-lyrics.png)
 
 What you get on screen:
 
-- the **current chord** with the next two trailing behind it, moving as playback
-  crosses each boundary
+- a **chord ribbon** where distance is time. The sounding chord is pinned at the
+  left and flashes as it takes over; the ones ahead slide in from the right, each
+  one exactly as far away as it is *seconds* away. The outgoing chord scrolls off
+  and fades.
 - the **key and tempo** of the track, read straight off the analysis
 - **beat and downbeat markers** drawn into the full now-playing waveform
 - a **live FFT wireframe** — this one is real-time, not cached — with the
   dominant partials named by pitch and frequency, on a logarithmic axis, because
-  pitch is logarithmic and a linear one buries five octaves in the left tenth
+  pitch is logarithmic and a linear one buries five octaves in the left tenth.
+  The current instant is drawn like the EQ's own curve, in front, with the
+  history receding behind it; named partials hold their place in a clean row and
+  fade out over a couple of seconds instead of flickering.
 
-All three static readouts are **off by default** and switch on individually under
-**Settings → Preferences**; the analysis only runs for what you have asked to see.
+![A custom theme derived from the album artwork, over the analysis view](assets/screenshots/now-playing-harmony-derived.png)
+
+While a track is being analysed you get a progress bar and an estimate, learned
+from how long previous analyses actually took. **If a file cannot be analysed,
+it says so** rather than spinning — some formats simply cannot be decoded
+(Ableton's `.aif` samples wrap a proprietary codec that neither ffmpeg nor macOS
+can open), and that answer is remembered so the same file is never re-attempted.
+Whatever you are listening to is always analysed first, ahead of anything queued
+behind it.
+
+Beat markers are **off by default** and switch on under **Settings →
+Preferences**, alongside the chord and key readouts.
 
 ## Lyrics
 
@@ -67,21 +104,28 @@ yours.
 | ![Now playing with album art, waveform and the lyrics layer](assets/screenshots/now-playing-artwork-lyrics.png) | ![The same view under a light theme derived from the album artwork](assets/screenshots/now-playing-lyrics-light.png) |
 | **Over the artwork** | **Under a theme derived from the cover** |
 
+![Lyrics in a narrow window, where the cover becomes a full-width banner behind the title](assets/screenshots/now-playing-lyrics-compact.png)
+
+*Narrow the window and the cover stops being a card beside the type — it becomes
+the top of the page, dissolving into a gradient that the title sits inside.*
+
 ## The mini player
 
 Drag the window smaller and the player rebuilds itself around whatever room is
-left. Album art goes first, then the buttons — the title and the progress line
-are the last things standing. At its smallest it's a strip of chrome that still
-plays your music.
+left. The buttons go before the artwork does — a cover is the fastest way to
+tell what is playing, so it shrinks and stays pinned to the left rather than
+being dropped. The title and the progress line are the last things standing. At
+its smallest it's a strip of chrome that still plays your music.
 
 | | | |
 |:--:|:--:|:--:|
-| ![Mini player in a short wide window with art, controls and waveform side by side](assets/screenshots/mini-player-landscape.png) | ![Mini player in a tall narrow window with the full stacked layout](assets/screenshots/mini-player-portrait.png) | ![Mini player with the album art dropped, title over waveform and controls](assets/screenshots/mini-player-compact.png) |
-| **Landscape** — art, controls & waveform | **Portrait** — the full stack, narrowed | **Compact** — art sheds, controls stack |
+| ![Mini player in a short wide window with art, controls and waveform side by side](assets/screenshots/mini-player-landscape.png) | ![Mini player in a tall narrow window with the full stacked layout](assets/screenshots/mini-player-portrait.png) | ![Mini player with the controls stacked under the title and waveform](assets/screenshots/mini-player-compact.png) |
+| **Landscape** — art, controls & waveform | **Portrait** — the full stack, narrowed | **Compact** — controls stack under the title |
 
-![Mini player as a slim bar with title, next button and a hairline progress line](assets/screenshots/mini-player-wide.png)
-
-*Slim bar — the progress bar flattens into a hairline pinned to the window edge.*
+| | |
+|:--:|:--:|
+| ![Mini player as a slim bar with title, next button and a hairline progress line](assets/screenshots/mini-player-wide.png) | ![The mini player under a custom theme](assets/screenshots/mini-player-themed.png) |
+| **Slim bar** — progress flattens to a hairline | **Themed** — the same bar under a custom palette |
 
 ## Library
 

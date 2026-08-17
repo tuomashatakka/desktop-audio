@@ -36,8 +36,8 @@ const exts = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
  */
 const captions = {
   'now-playing-harmony': {
-    caption: 'Now Playing — Live spectrum, chords, key & tempo',
-    alt: 'Now playing view with the frequency mesh, the current chord, key and tempo',
+    caption: 'Now Playing — The analysis view: spectrum, chords, key & tempo',
+    alt: 'Now playing in the analysis view, with the frequency mesh, the chord ribbon, key and tempo',
     order: 0,
   },
   'now-playing-lyrics': {
@@ -61,8 +61,8 @@ const captions = {
     order: 4,
   },
   'now-playing-lyrics-compact': {
-    caption: 'Now Playing — Narrower window, same layers',
-    alt: 'Now playing view in a narrower window with lyrics and spectrum',
+    caption: 'Now Playing — Narrow window: the cover becomes a banner',
+    alt: 'Now playing in a narrow window, the album art filling the top and dissolving behind the title',
     order: 5,
   },
   'now-playing-harmony-derived': {
@@ -71,8 +71,8 @@ const captions = {
     order: 6,
   },
   'mini-player-themed': {
-    caption: 'Mini player — Art, transport & waveform in a bar',
-    alt: 'Compact player bar with album art, transport controls and a waveform',
+    caption: 'Mini player — The same bar under a custom palette',
+    alt: 'Compact player bar with album art, transport controls and a waveform, under a custom colour theme',
     order: 7,
   },
   'library-breadcrumbs': {
@@ -101,8 +101,8 @@ const captions = {
     order: 21,
   },
   'mini-player-compact': {
-    caption: 'Mini player — Compact: art sheds, controls stack',
-    alt: 'Mini player with the album art dropped, title over waveform and controls',
+    caption: 'Mini player — Compact: controls stack under the title',
+    alt: 'Mini player with the controls stacked under the title and waveform',
     order: 22,
   },
   'mini-player-wide': {

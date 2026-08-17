@@ -416,7 +416,7 @@ export function SettingsView () {
         <h2 id='settings-analysis-heading'>Analysis</h2>
 
         <p className='section-description'>
-          Musical analysis overlays shown in the visualizer and waveform.
+          Musical analysis shown in the now-playing analysis view and on the waveform.
         </p>
 
         <label className='field checkbox-field'>

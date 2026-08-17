@@ -140,8 +140,9 @@
     <section id="player" class="scroll-section" aria-label="Player">
       <div class="split-layout">
         <div class="split-text fade-blur">
-          <h2>A Player That Doesn't Get In The Way</h2>
-          <p>The interface is designed to be non-obtrusive — compact, responsive, and usable even on smaller screens. Controls stay out of your way until you need them, and the layout adapts so nothing ever feels cramped.</p>
+          <h2>Two Views, Two Layers</h2>
+          <p>Now playing has <strong>two views</strong> — the album art, or the audio analysis — and switching between them fades the cover upward while the key, tempo and chords rise into the space it leaves.</p>
+          <p>Everything else is a <strong>layer</strong>. Lyrics step the column aside to make room. The audio processing page opens between the type and the transport, riding the title up and the controls down. Both compose, with either view and with each other — and through all of it the title, the seek bar and the transport stay exactly where they were.</p>
         </div>
         <div class="split-image fade-blur delay-2">
           <img src="screenshots/now-playing-artwork-lyrics.png" alt="Now playing view with album art, waveform seek bar and lyrics laid alongside" loading="lazy">
@@ -158,7 +159,7 @@
         <div class="split-text fade-blur delay-2">
           <h2>Shape The Sound, Not Just The Volume</h2>
           <p>A <strong>sixteen-band equaliser</strong>, a <strong>compressor</strong> and a <strong>limiter</strong>, each switchable on its own. The equaliser is <strong>one line you draw on</strong>, laid over the sound it is shaping: the curve is the filter cascade's real response, and the filled shape underneath is the analyser — which sits <em>after</em> the chain, so a band you lift lifts the ground under the bump you just drew.</p>
-          <p>Bypassing a module sets neutral parameters instead of unplugging it: splicing a node in or out of a live graph shifts the sample stream in time and clicks, while a flat band and a 1:1 compressor are already transparent. Everything is a native range input underneath — the curve keeps sixteen of them for the keyboard, and each knob is one under a drawn face.</p>
+          <p>Bypassing a module sets neutral parameters instead of unplugging it: splicing a node in or out of a live graph shifts the sample stream in time and clicks, while a flat band and a 1:1 compressor are already transparent. Everything is a native range input underneath — the curve keeps sixteen of them for the keyboard, and each knob is one under a drawn face. Hover the curve and a ruler of the band frequencies rises under it, calling out the one beneath your pointer.</p>
         </div>
       </div>
     </section>
@@ -169,11 +170,11 @@
         <div class="split-text fade-blur">
           <h2>It Knows What It's Playing</h2>
           <p>Every track is analysed <strong>once</strong>, in the background, on its own thread — chord regions, main key, tempo and a steady beat grid — then cached against the file's modification time so it never happens twice.</p>
-          <p>The <strong>current chord</strong> moves with playback, with the next two trailing behind it. <strong>Key and tempo</strong> sit under it. <strong>Beat and downbeat markers</strong> are drawn into the waveform. And over the top of all of it, a live FFT wireframe names the dominant partials by pitch — on a logarithmic axis, because a linear one buries five octaves in the leftmost tenth of the screen.</p>
-          <p>All of it is off until you ask for it, under <strong>Settings → Preferences</strong>.</p>
+          <p>The <strong>chord ribbon</strong> turns distance into time: the sounding chord is pinned at the left and flashes as it takes over, the ones ahead slide in from the right exactly as far away as they are seconds away, and the outgoing one scrolls off and fades. <strong>Key and tempo</strong> sit above it. <strong>Beat and downbeat markers</strong> are drawn into the waveform. Behind all of it a live FFT wireframe names the dominant partials by pitch — on a logarithmic axis, because a linear one buries five octaves in the leftmost tenth of the screen.</p>
+          <p>While a track is being analysed you get a progress bar and an estimate learned from how long previous ones took, and whatever you are listening to is analysed first. If a file <em>can't</em> be read, it says so instead of spinning — and remembers.</p>
         </div>
         <div class="split-image fade-blur delay-2">
-          <img src="screenshots/now-playing-harmony.png" alt="Now playing view with the frequency mesh, the current chord, key and tempo" loading="lazy">
+          <img src="screenshots/now-playing-harmony.png" alt="Now playing in the analysis view, with the frequency mesh, the chord ribbon, key and tempo" loading="lazy">
         </div>
       </div>
     </section>
@@ -183,7 +184,7 @@
       <div class="mini-showcase">
         <div class="split-text fade-blur">
           <h2>Shrink It Down To Nothing</h2>
-          <p>Drag the window smaller and the player rebuilds itself around whatever room is left. Album art goes first, then the buttons — the title and the progress line are the last things standing. At its smallest it's a strip of chrome that still plays your music.</p>
+          <p>Drag the window smaller and the player rebuilds itself around whatever room is left. The buttons go before the artwork does — a cover is the fastest way to tell what is playing, so it shrinks and stays pinned to the left rather than being dropped. The title and the progress line are the last things standing. At its smallest it's a strip of chrome that still plays your music.</p>
         </div>
 
         <figure class="mini-shot fade-blur delay-1">
@@ -197,8 +198,13 @@
         </figure>
 
         <figure class="mini-shot fade-blur delay-3">
-          <img src="screenshots/mini-player-compact.png" alt="Mini player with the album art dropped, title over waveform and controls" loading="lazy">
-          <figcaption>Compact — art sheds, controls stack</figcaption>
+          <img src="screenshots/mini-player-compact.png" alt="Mini player with the controls stacked under the title and waveform" loading="lazy">
+          <figcaption>Compact — controls stack under the title</figcaption>
+        </figure>
+
+        <figure class="mini-shot fade-blur delay-4">
+          <img src="screenshots/mini-player-themed.png" alt="The mini player under a custom colour palette" loading="lazy">
+          <figcaption>Themed — the same bar, custom palette</figcaption>
         </figure>
 
         <figure class="mini-shot wide fade-blur delay-4">

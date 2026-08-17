@@ -108,10 +108,10 @@ interface Settings {
   /** Show beat/downbeat markers on the waveform. */
   readonly showBeatMarkers: boolean
 
-  /** Show chord analysis in the visualizer. */
+  /** Show the chord ribbon in the now-playing analysis view. */
   readonly showChordAnalysis: boolean
 
-  /** Show key/scale analysis in the visualizer. */
+  /** Show key and tempo in the now-playing analysis view. */
   readonly showKeyAnalysis: boolean
 }
 

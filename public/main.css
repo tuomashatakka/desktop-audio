@@ -499,8 +499,8 @@
   text-align: center;
 }
 
-/* Three portrait-ish shots on the first row, then the slim bar and the
-   smallest one share the last — 8 columns divides for both. */
+/* Three portrait-ish shots on the first row (3 + 3 + 2), then the themed bar
+   and the slim bar share the second (3 + 5) — 8 columns divides for both. */
 .mini-shot {
   grid-column: span 3;
   margin: 0;
@@ -512,9 +512,9 @@
 
 .mini-shot:nth-of-type(3) { grid-column: span 2; }
 
-/* The slim bar is far wider than it is tall — it closes the section on a
-   row of its own, offset so it doesn't run the full 8 columns. */
-.mini-shot.wide { grid-column: 2 / span 6; }
+/* The slim bar is far wider than it is tall, so it takes the wider half of
+   the second row and the themed shot fills the rest. */
+.mini-shot.wide { grid-column: span 5; }
 
 .mini-shot img {
   width: 100%;

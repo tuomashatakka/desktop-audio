@@ -1,8 +1,8 @@
 const screenshots = [
   {
     "src": "screenshots/now-playing-harmony.png",
-    "alt": "Now playing view with the frequency mesh, the current chord, key and tempo",
-    "caption": "Now Playing — Live spectrum, chords, key & tempo"
+    "alt": "Now playing in the analysis view, with the frequency mesh, the chord ribbon, key and tempo",
+    "caption": "Now Playing — The analysis view: spectrum, chords, key & tempo"
   },
   {
     "src": "screenshots/now-playing-lyrics.png",
@@ -26,8 +26,8 @@ const screenshots = [
   },
   {
     "src": "screenshots/now-playing-lyrics-compact.png",
-    "alt": "Now playing view in a narrower window with lyrics and spectrum",
-    "caption": "Now Playing — Narrower window, same layers"
+    "alt": "Now playing in a narrow window, the album art filling the top and dissolving behind the title",
+    "caption": "Now Playing — Narrow window: the cover becomes a banner"
   },
   {
     "src": "screenshots/now-playing-harmony-derived.png",
@@ -36,8 +36,8 @@ const screenshots = [
   },
   {
     "src": "screenshots/mini-player-themed.png",
-    "alt": "Compact player bar with album art, transport controls and a waveform",
-    "caption": "Mini player — Art, transport & waveform in a bar"
+    "alt": "Compact player bar with album art, transport controls and a waveform, under a custom colour theme",
+    "caption": "Mini player — The same bar under a custom palette"
   },
   {
     "src": "screenshots/library-breadcrumbs.png",
@@ -66,8 +66,8 @@ const screenshots = [
   },
   {
     "src": "screenshots/mini-player-compact.png",
-    "alt": "Mini player with the album art dropped, title over waveform and controls",
-    "caption": "Mini player — Compact: art sheds, controls stack"
+    "alt": "Mini player with the controls stacked under the title and waveform",
+    "caption": "Mini player — Compact: controls stack under the title"
   },
   {
     "src": "screenshots/mini-player-wide.png",
