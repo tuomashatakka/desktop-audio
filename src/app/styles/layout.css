@@ -123,6 +123,14 @@
   > .menu-toggle { margin-left: var(--sp-2); -webkit-app-region: no-drag; }
 }
 
+/*
+ * `flex: 1`, so this slot is the whole middle of the bar — and it is what the
+ * window is dragged by. It used to be `no-drag` as a block, which subtracted
+ * that entire span from the titlebar's drag region and left the window with
+ * nothing to grab but a few pixels of padding. Only the controls inside it opt
+ * out, and the search field is a collapsed glyph most of the time, so almost
+ * all of this is draggable again.
+ */
 .titlebar-context {
   display: flex;
   flex: 1;
@@ -132,15 +140,17 @@
   height: 100%;
   opacity: 1;
   transition: opacity var(--duration-fast) var(--ease);
-  -webkit-app-region: no-drag;
+  -webkit-app-region: drag;
+
+  :is(search, input, button, a, select, [role='search']) { -webkit-app-region: no-drag; }
 }
 
+/* Decorative, so it stays part of the drag region rather than punching a hole. */
 .logo-icon {
   width: 18px;
   height: 18px;
   margin-inline: var(--sp-2);
   color: var(--accent);
-  -webkit-app-region: no-drag;
 }
 
 .titlebar-controls {
@@ -429,7 +439,7 @@ body::before {
   --lyrics-inset-block: 10vh;
   --lyrics-marker: rgb(255 255 255 / 58%);
   --lyrics-ink: var(--mono-fg-inverse);
-  --lyrics-blend: overlay;
+  --lyrics-blend: normal;
 }
 
 [data-theme='light'] {
@@ -456,7 +466,7 @@ body::before {
    * screensaver — and neither is a DSP page you have to close to hear what you
    * just changed.
    */
-  &:is([data-mode='visualizer'], [data-mode='dsp']) :is(.player-art, .progress-section) { display: none; }
+  &[data-mode='visualizer'] :is(.player-art, .progress-section) { display: none; }
 
   /*
    * Lyrics are a layer rather than a mode, so nothing is replaced: the column
@@ -464,9 +474,6 @@ body::before {
    * the mesh and the transport all move as one thing.
    */
   &[data-lyrics] .player-content { translate: calc(-1 * var(--lyrics-nudge)) 0; }
-
-  /* This is the container, so its own padding cannot come from a container query. */
-  &[data-mode='dsp'] .player-content { padding-inline: var(--sp-4); }
 }
 
 .album-art-bg {
@@ -1015,17 +1022,17 @@ body::before {
   }
 
   pre {
-    display: inline;
-    padding: 0.15em var(--sp-1);
-    color: var(--lyrics-ink);
-    background: var(--lyrics-marker);
+    display:              inline;
+    white-space:          pre-line;
     box-decoration-break: clone;
-    font-family: inherit;
-    font-size: inherit;
-    font-weight: var(--font-semibold);
-    letter-spacing: -0.03em;
-    line-height: 1.95;
-    white-space: pre-line;
+    font-family:          inherit;
+    font-size:            inherit;
+    font-weight:          var(--weight-normal);
+    background:           var(--lyrics-marker);
+    color:                var(--lyrics-ink);
+    padding:              0.15em var(--sp-1);
+    line-height:          1.76;
+    letter-spacing:      -0.01em;
   }
 }
 
@@ -1047,9 +1054,16 @@ body::before {
  * cover. A hairline between modules separates them just as well.
  */
 .dsp-panel {
+  /*
+   * The controls hang under the track's own data at the inline edge, not in a
+   * centred sheet across the window: `.player-info` above it is the block they
+   * belong to, and `align-self` is what keeps them lined up with it inside a
+   * centred flex column.
+   */
+  align-self: start;
   display: grid;
   gap: var(--sp-4);
-  width: min(100%, 760px);
+  width: min(100%, 52ch);
   min-height: 0;
   overflow-y: auto;
   padding: var(--sp-1);
@@ -1057,6 +1071,72 @@ body::before {
   animation: surface-in var(--duration) var(--ease-emphasis);
 
   &::-webkit-scrollbar { display: none; }
+}
+
+/*
+ * The equaliser: one line over the chain's own output.
+ *
+ * `preserveAspectRatio: none` lets the box be any shape the column gives it,
+ * which is why every stroke below is `non-scaling-stroke` — otherwise the
+ * horizontal squash would thin the curve and fatten the grid.
+ */
+.eq-curve {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1000 / 260;
+  border-bottom: 1px solid var(--border);
+  cursor: crosshair;
+
+  /* Drawing on the curve is a drag; the panel must not scroll out from under it. */
+  touch-action: none;
+
+  > svg { display: block; width: 100%; height: 100%; }
+
+  /* The sliders are clipped, so the curve has to carry their focus ring. */
+  &:has(input:focus-visible) { box-shadow: var(--focus-ring); }
+
+  &[data-off] { opacity: 0.4; cursor: default; }
+}
+
+/* What the chain is putting out right now — filled, so it reads as ground. */
+.eq-spectrum {
+  fill: color-mix(in srgb, var(--accent) 20%, transparent);
+  stroke: none;
+}
+
+.eq-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Unity, and the decade marks. Both are reference, not data. */
+.eq-zero,
+.eq-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.eq-grid { opacity: 0.6; }
+
+/*
+ * The real controls, clipped rather than removed — they keep their place in
+ * the tab order and their names in the accessibility tree, and the curve
+ * redraws as they move. Never `display: none`, which would take both away.
+ */
+.eq-bands {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  list-style: none;
 }
 
 .dsp-module {
@@ -1160,21 +1240,6 @@ body::before {
   &::-webkit-meter-optimum-value { background: var(--accent); }
 }
 
-.dsp-bands {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  grid-template-columns: repeat(16, minmax(0, 1fr));
-  gap: var(--sp-1);
-  align-items: end;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-
-  /* Sixteen columns in a fixed width; each one has to be allowed to collapse. */
-  > li { min-width: 0; }
-}
-
 .dsp-note {
   margin: 0;
   color: var(--text-muted);
@@ -1188,6 +1253,20 @@ body::before {
   gap: var(--sp-6);
   flex-wrap: wrap;
   justify-content: flex-start;
+}
+
+/*
+ * The DSP page needs a column wide enough for a readable curve and six knobs.
+ * Below this it is not offered at all — the button goes with the panel, rather
+ * than leaving a control that opens an empty space — and the mode falls back to
+ * the ordinary artwork layout until there is room again.
+ */
+@container player (min-width: 721px) {
+  .player-view[data-mode='dsp'] :is(.player-art, .progress-section) { display: none; }
+}
+
+@container player (max-width: 720px) {
+  :is(.dsp-toggle, .dsp-panel) { display: none; }
 }
 
 /* ─── waveform ─────────────────────────────────────────────────────────── */

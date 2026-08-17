@@ -1,83 +1,78 @@
 const screenshots = [
   {
+    "src": "screenshots/now-playing-harmony.png",
+    "alt": "Now playing view with the frequency mesh, the current chord, key and tempo",
+    "caption": "Now Playing — Live spectrum, chords, key & tempo"
+  },
+  {
+    "src": "screenshots/now-playing-lyrics.png",
+    "alt": "Lyrics scrolling down the right edge over the frequency mesh",
+    "caption": "Now Playing — Lyrics laid over the spectrum"
+  },
+  {
+    "src": "screenshots/dsp-chain.png",
+    "alt": "Audio processing page with sixteen EQ faders, compressor knobs and a limiter",
+    "caption": "DSP — 16-band EQ, compressor & limiter"
+  },
+  {
+    "src": "screenshots/now-playing-artwork-lyrics.png",
+    "alt": "Now playing view with album art, waveform seek bar and the lyrics layer",
+    "caption": "Now Playing — Artwork, waveform & lyrics"
+  },
+  {
+    "src": "screenshots/now-playing-lyrics-light.png",
+    "alt": "The same view under a light theme derived from the album artwork",
+    "caption": "Themes — The palette is derived from the cover"
+  },
+  {
+    "src": "screenshots/now-playing-lyrics-compact.png",
+    "alt": "Now playing view in a narrower window with lyrics and spectrum",
+    "caption": "Now Playing — Narrower window, same layers"
+  },
+  {
+    "src": "screenshots/now-playing-harmony-derived.png",
+    "alt": "Now playing view with a lime accent derived from the album artwork",
+    "caption": "Themes — Accent follows the artwork, chrome stays dark"
+  },
+  {
+    "src": "screenshots/mini-player-themed.png",
+    "alt": "Compact player bar with album art, transport controls and a waveform",
+    "caption": "Mini player — Art, transport & waveform in a bar"
+  },
+  {
     "src": "screenshots/library-breadcrumbs.png",
     "alt": "Library view with clickable breadcrumb navigation",
-    "caption": "Library \u2014 Breadcrumb navigation & hamburger toggle"
+    "caption": "Library — Breadcrumb navigation & hamburger toggle"
   },
   {
     "src": "screenshots/library-sticky-header.png",
     "alt": "Library scrolled down, column header pinned to the top",
-    "caption": "Library \u2014 Header collapses on scroll, columns stay pinned"
+    "caption": "Library — Header collapses on scroll, columns stay pinned"
   },
   {
     "src": "screenshots/library-album-groups.png",
     "alt": "Library grouped by album with cover art beside each group",
-    "caption": "Library \u2014 Grouped by album"
+    "caption": "Library — Grouped by album"
   },
   {
     "src": "screenshots/mini-player-landscape.png",
     "alt": "Mini player in a short wide window with art, controls and waveform side by side",
-    "caption": "Mini player \u2014 Landscape: art, controls & waveform"
+    "caption": "Mini player — Landscape: art, controls & waveform"
   },
   {
     "src": "screenshots/mini-player-portrait.png",
     "alt": "Mini player in a tall narrow window with the full stacked layout",
-    "caption": "Mini player \u2014 Portrait: full stack in a narrow window"
+    "caption": "Mini player — Portrait: full stack in a narrow window"
   },
   {
     "src": "screenshots/mini-player-compact.png",
     "alt": "Mini player with the album art dropped, title over waveform and controls",
-    "caption": "Mini player \u2014 Compact: art sheds, controls stack"
+    "caption": "Mini player — Compact: art sheds, controls stack"
   },
   {
     "src": "screenshots/mini-player-wide.png",
     "alt": "Mini player as a slim bar with title, next button and a hairline progress line",
-    "caption": "Mini player \u2014 Slim bar with hairline progress"
-  },
-  {
-    "src": "screenshots/library-view.png",
-    "alt": "Library view showing folder tree and track list",
-    "caption": "Library \u2014 Folder navigation & track list"
-  },
-  {
-    "src": "screenshots/player-view.png",
-    "alt": "Now playing view with album art and waveform",
-    "caption": "Now Playing \u2014 Album art & waveform"
-  },
-  {
-    "src": "screenshots/settings-view.png",
-    "alt": "Settings view with theme and playback options",
-    "caption": "Settings \u2014 Theme & playback options"
-  },
-  {
-    "src": "screenshots/Screenshot 2026-04-30 at 19.03.17.png",
-    "alt": "Hero section with sine waves and typewriter effect",
-    "caption": "Hero section \u2014 Typewriter effect & sine waves"
-  },
-  {
-    "src": "screenshots/Screenshot 2026-04-30 at 19.04.04.png",
-    "alt": "Hero section with animated features",
-    "caption": "Hero section \u2014 Animated feature cards"
-  },
-  {
-    "src": "screenshots/Screenshot 2026-04-30 at 19.04.35.png",
-    "alt": "Application with updated hero section",
-    "caption": "Updated hero \u2014 Prominent sine waves"
-  },
-  {
-    "src": "screenshots/Screenshot 2026-04-30 at 19.04.50.png",
-    "alt": "Application with typewriter effect",
-    "caption": "Typewriter effect \u2014 Caret visibility fix"
-  },
-  {
-    "src": "screenshots/Screenshot 2026-05-04 at 23.28.06.png",
-    "alt": "Application with all hero section improvements",
-    "caption": "Hero section \u2014 Complete improvements"
-  },
-  {
-    "src": "screenshots/Screenshot 2026-05-04 at 23.28.21.png",
-    "alt": "Application with fixed tests and DeepSource config",
-    "caption": "Tests fixed \u2014 UIProvider integration"
+    "caption": "Mini player — Slim bar with hairline progress"
   }
 ]
 

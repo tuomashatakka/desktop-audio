@@ -96,3 +96,7 @@ dist/
 
 # Playwright MCP scratch output
 .playwright-mcp/
+
+# Landing-page screenshots, copied out of assets/screenshots by
+# scripts/build-screenshots-manifest.mjs. The originals are the tracked copy.
+public/screenshots/

@@ -6,7 +6,7 @@
   <meta name="description" content="Desktop Audio — A beautiful, lightweight music player built with Electron and React.">
   <meta name="theme-color" content="#0a0a0f">
   <meta property="og:title" content="Desktop Audio">
-  <meta property="og:description" content="A beautiful desktop music player with waveform visualization, library management, and native media controls.">
+  <meta property="og:description" content="A desktop music player with a 16-band EQ, compressor and limiter, background chord/key/tempo analysis, waveform visualization and native media controls.">
   <meta property="og:type" content="website">
   <title>Desktop Audio</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300e5d1' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M9 18V6l10-2v12M9 9l10-2M6.5 21A2.5 2.5 0 1 0 6.5 16 2.5 2.5 0 0 0 6.5 21Zm10-2A2.5 2.5 0 1 0 16.5 14a2.5 2.5 0 0 0 0 5Z'/%3E%3C/svg%3E">
@@ -19,6 +19,8 @@
     <a href="#hero"     class="nav-dot active" aria-label="Hero"></a>
     <a href="#features" class="nav-dot" aria-label="Features"></a>
     <a href="#player"   class="nav-dot" aria-label="Player"></a>
+    <a href="#dsp"      class="nav-dot" aria-label="Audio processing"></a>
+    <a href="#analysis" class="nav-dot" aria-label="Chords, key and tempo"></a>
     <a href="#mini"     class="nav-dot" aria-label="Mini player"></a>
     <a href="#library"  class="nav-dot" aria-label="Library"></a>
     <a href="#download" class="nav-dot" aria-label="Download"></a>
@@ -109,6 +111,28 @@
           <h3>Native Media Keys</h3>
           <p>Full MediaSession API support — play, pause, next, previous from your OS.</p>
         </article>
+        <article class="feature-card fade-blur delay-2">
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="icon-draw">
+              <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+              <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+              <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+            </svg>
+          </span>
+          <h3>16-Band EQ, Comp &amp; Limiter</h3>
+          <p>Draw the curve straight over the output spectrum — a real DSP chain between the file and your speakers.</p>
+        </article>
+        <article class="feature-card fade-blur delay-3">
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon-draw">
+              <path d="M9 18V6l10-2v12"/><path d="M9 9l10-2"/>
+              <circle cx="6.5" cy="18.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/>
+            </svg>
+          </span>
+          <h3>Chords, Key &amp; Tempo</h3>
+          <p>Every track analysed once in the background, then cached — chord changes follow playback.</p>
+        </article>
       </div>
     </section>
 
@@ -120,12 +144,41 @@
           <p>The interface is designed to be non-obtrusive — compact, responsive, and usable even on smaller screens. Controls stay out of your way until you need them, and the layout adapts so nothing ever feels cramped.</p>
         </div>
         <div class="split-image fade-blur delay-2">
-          <img src="screenshots/player-view.png" alt="Now playing view" loading="lazy">
+          <img src="screenshots/now-playing-artwork-lyrics.png" alt="Now playing view with album art, waveform seek bar and lyrics laid alongside" loading="lazy">
         </div>
       </div>
     </section>
 
-    <!-- ════════ SECTION 4: MINI PLAYER ════════ -->
+    <!-- ════════ SECTION 4: AUDIO PROCESSING ════════ -->
+    <section id="dsp" class="scroll-section" aria-label="Audio processing">
+      <div class="split-layout reverse">
+        <div class="split-image fade-blur">
+          <img src="screenshots/dsp-chain.png" alt="Audio processing page with sixteen EQ faders, compressor knobs and a limiter" loading="lazy">
+        </div>
+        <div class="split-text fade-blur delay-2">
+          <h2>Shape The Sound, Not Just The Volume</h2>
+          <p>A <strong>sixteen-band equaliser</strong>, a <strong>compressor</strong> and a <strong>limiter</strong>, each switchable on its own. The equaliser is <strong>one line you draw on</strong>, laid over the sound it is shaping: the curve is the filter cascade's real response, and the filled shape underneath is the analyser — which sits <em>after</em> the chain, so a band you lift lifts the ground under the bump you just drew.</p>
+          <p>Bypassing a module sets neutral parameters instead of unplugging it: splicing a node in or out of a live graph shifts the sample stream in time and clicks, while a flat band and a 1:1 compressor are already transparent. Everything is a native range input underneath — the curve keeps sixteen of them for the keyboard, and each knob is one under a drawn face.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ SECTION 5: ANALYSIS ════════ -->
+    <section id="analysis" class="scroll-section" aria-label="Chords, key and tempo">
+      <div class="split-layout">
+        <div class="split-text fade-blur">
+          <h2>It Knows What It's Playing</h2>
+          <p>Every track is analysed <strong>once</strong>, in the background, on its own thread — chord regions, main key, tempo and a steady beat grid — then cached against the file's modification time so it never happens twice.</p>
+          <p>The <strong>current chord</strong> moves with playback, with the next two trailing behind it. <strong>Key and tempo</strong> sit under it. <strong>Beat and downbeat markers</strong> are drawn into the waveform. And over the top of all of it, a live FFT wireframe names the dominant partials by pitch — on a logarithmic axis, because a linear one buries five octaves in the leftmost tenth of the screen.</p>
+          <p>All of it is off until you ask for it, under <strong>Settings → Preferences</strong>.</p>
+        </div>
+        <div class="split-image fade-blur delay-2">
+          <img src="screenshots/now-playing-harmony.png" alt="Now playing view with the frequency mesh, the current chord, key and tempo" loading="lazy">
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ SECTION 6: MINI PLAYER ════════ -->
     <section id="mini" class="scroll-section" aria-label="Mini player">
       <div class="mini-showcase">
         <div class="split-text fade-blur">
@@ -155,7 +208,7 @@
       </div>
     </section>
 
-    <!-- ════════ SECTION 5: LIBRARY ════════ -->
+    <!-- ════════ SECTION 7: LIBRARY ════════ -->
     <section id="library" class="scroll-section" aria-label="Library">
       <div class="split-layout reverse">
         <div class="split-image fade-blur">
@@ -168,7 +221,7 @@
       </div>
     </section>
 
-    <!-- ════════ SECTION 6: DOWNLOAD ════════ -->
+    <!-- ════════ SECTION 8: DOWNLOAD ════════ -->
     <section id="download" class="scroll-section" aria-label="Download">
       <div class="download-content">
         <h2 class="fade-blur">Get Desktop Audio</h2>

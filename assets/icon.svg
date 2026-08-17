@@ -3,7 +3,7 @@
   <polyline
     points="120,512 320,512 432,232 624,792 736,512 904,512"
     fill="none"
-    stroke="#ff4d79"
+    stroke="currentColor"
     stroke-width="56"
     stroke-linecap="round"
     stroke-linejoin="round"

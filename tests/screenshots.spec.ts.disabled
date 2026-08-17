@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 
-const SCREENSHOT_DIR = 'public/screenshots'
+// Captures are authored here; `scripts/build-screenshots-manifest.mjs` copies
+// them into `public/screenshots`, which is generated output and gitignored.
+const SCREENSHOT_DIR = 'assets/screenshots'
 
 // Create screenshot directory before all tests
 test.beforeAll(async () => {

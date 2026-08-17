@@ -45,7 +45,9 @@ jobs:
       - name: Sync app design tokens into public/
         run: cp src/app/styles/tokens.css public/tokens.css
 
-      - name: Generate screenshots manifest
+      # Copies assets/screenshots into public/ as well as writing the manifest:
+      # the Pages artifact is public/ alone, so nothing outside it is reachable.
+      - name: Sync screenshots into public/ and generate the manifest
         run: node scripts/build-screenshots-manifest.mjs
 
       - name: Build browser app

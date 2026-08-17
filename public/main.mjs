@@ -1289,7 +1289,9 @@ function main () {
     { threshold: 0.15 }
   )
 
-  document.querySelectorAll('#features .fade-blur, #features .feature-card, #download .fade-blur, #player .fade-blur, #mini .fade-blur, #library .fade-blur, .typewriter-line').forEach(el => {
+  // Every section, not a hand-written list of ids: a new section used to ship
+  // with its content stuck at opacity 0 because nobody remembered to add it here.
+  document.querySelectorAll('.scroll-section .fade-blur, .typewriter-line').forEach(el => {
     observer.observe(el)
   })
 

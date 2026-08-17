@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
 import {
-  useSettings, useAudio, DSP_RANGES, EQ_BANDS,
+  useSettings, useAudio, DSP_RANGES,
   withEqGain, withFlatEq, withEqEnabled, withCompressor, withLimiter,
 } from '../../contexts'
 import type { DspSettings, DynamicsModule } from '../../contexts'
-import { Button, Fader, Knob } from '../atomic'
+import { Button, Knob } from '../atomic'
+import { EqCurve } from './EqCurve'
 
 
 /** Gain reduction at or beyond this many dB reads as a full meter. */
@@ -163,6 +164,7 @@ function KnobRow ({ specs, disabled, onChange }: KnobRowProps) {
  */
 export function DspPanel () {
   const { dsp, updateDsp } = useSettings()
+  const { analyzer }       = useAudio()
 
   return <section className='dsp-panel' aria-label='Audio processing'>
     <fieldset className='dsp-module' data-module='eq'>
@@ -182,28 +184,17 @@ export function DspPanel () {
         </Button>
       </ModuleHeader>
 
-      {/* Ordered: ascending frequency is the point, not incidental. */}
-      <ol className='dsp-bands'>
-        {EQ_BANDS.map((band, index) =>
-          <li key={ band.hz }>
-            <Fader
-              label={ `${band.label} Hz` }
-              value={ dsp.eq.gains[index] ?? 0 }
-              min={ DSP_RANGES.eqGain.min }
-              max={ DSP_RANGES.eqGain.max }
-              step={ DSP_RANGES.eqGain.step }
-              unit='dB'
-              disabled={ !dsp.eq.on }
-              onChange={ gain =>
-                updateDsp(d =>
-                  withEqGain(d, index, gain)) } />
-          </li>
-        )}
-      </ol>
+      <EqCurve
+        gains={ dsp.eq.gains }
+        enabled={ dsp.eq.on }
+        analyzer={ analyzer }
+        onGain={ (index, gain) =>
+          updateDsp(d =>
+            withEqGain(d, index, gain)) } />
 
       <p className='dsp-note'>
-        Sixteen overlapping bands can add up to more than unity. Switch the
-        limiter on if you are boosting hard.
+        Drag on the curve to draw. The filled shape is the chain's own output,
+        so a band you lift lifts the spectrum under it.
       </p>
     </fieldset>
 

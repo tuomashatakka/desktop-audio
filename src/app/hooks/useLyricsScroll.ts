@@ -8,22 +8,31 @@
  * overflow has gone past. That is a guess, and being wrong about it is exactly
  * why taking over has to be free.
  *
- * The takeover is detected by comparing the element against what was last
- * written to it rather than by listening for wheel, touch and key separately:
- * a programmatic `scrollTop` assignment fires the same `scroll` event a human
- * does, but it lands on the value we asked for. Anything else is somebody else
- * driving.
+ * **Takeover is read from input events, not from scroll position.** The
+ * obvious test — "did it end up somewhere other than where we put it?" — stops
+ * working the moment the scroll is smooth, because a smooth scroll spends most
+ * of its life somewhere other than its target and fires a `scroll` event on
+ * every frame of the way there. A wheel, a drag or an arrow key is the reader
+ * taking over; nothing else is.
  */
 import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
-import { listen } from '../utils/events'
+import { listenAll } from '../utils/events'
 
 
-/** How far the panel may sit from where it was put before it counts as human. */
-const MANUAL_EPSILON_PX = 4
+/** The gestures that hand the panel over. `scroll` is deliberately not one. */
+const TAKEOVER_EVENTS = [ 'wheel', 'touchmove', 'pointerdown', 'keydown' ]
 
 function clamp01 (value: number): number {
   return Math.min(Math.max(value, 0), 1)
+}
+
+/** Smooth is the whole point here, but not against the user's stated wishes. */
+function scrollBehavior (): ScrollBehavior {
+  const reduced = typeof matchMedia === 'function' &&
+    matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  return reduced ? 'auto' : 'smooth'
 }
 
 /**
@@ -37,7 +46,6 @@ export function useLyricsScroll<T extends HTMLElement> (
 ): RefObject<T | null> {
   const ref     = useRef<T | null>(null)
   const manual  = useRef(false)
-  const written = useRef(0)
   const lastKey = useRef(resetKey)
 
   // Reset in render rather than in an effect: these are refs, so there is
@@ -47,22 +55,27 @@ export function useLyricsScroll<T extends HTMLElement> (
     manual.current  = false
   }
 
-  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Binds a DOM `scroll` listener. There is no render-time way to notice the reader taking the panel over.
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Binds DOM input listeners. There is no render-time way to notice the reader taking the panel over.
   useEffect(() => {
     const element = ref.current
     if (!element)
       return
 
-    const subscription = listen(element, 'scroll', () => {
-      if (Math.abs(element.scrollTop - written.current) > MANUAL_EPSILON_PX)
-        manual.current = true
-    })
+    const take = () => {
+      manual.current = true
+    }
+
+    const subscription = listenAll(
+      element,
+      Object.fromEntries(TAKEOVER_EVENTS.map(type =>
+        [ type, take ]))
+    )
 
     return () =>
       subscription.dispose()
   }, [])
 
-  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Writes `scrollTop` on an element. Scroll offset is not a rendered value; it exists only after layout and can only be set imperatively.
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Calls `scroll()` on an element. Scroll offset is not a rendered value; it exists only after layout and can only be set imperatively.
   useEffect(() => {
     const element = ref.current
     if (!element || manual.current)
@@ -72,8 +85,10 @@ export function useLyricsScroll<T extends HTMLElement> (
     if (overflow <= 0)
       return
 
-    written.current   = Math.round(overflow * clamp01(progress))
-    element.scrollTop = written.current
+    element.scroll({
+      top:      Math.round(overflow * clamp01(progress)),
+      behavior: scrollBehavior(),
+    })
   }, [ progress ])
 
   return ref

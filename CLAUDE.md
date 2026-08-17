@@ -129,6 +129,18 @@ so they get none of `.button`'s layout. They need their own
 block child of a bare button sits at the inline start of its content box, 17px
 left of centre in a 46px button. `.menu-toggle` had this right already.
 
+**The window is dragged by `.titlebar-context`, so that slot is `drag` and only
+its controls are `no-drag`.** The bar itself has always been
+`-webkit-app-region: drag`, but a `no-drag` descendant *subtracts* from the
+region, and this slot is `flex: 1` — marking the whole thing `no-drag` cut the
+entire middle of the titlebar out of the drag region and left about three 8px
+gaps to grab the window by. The tell was that it worked wherever the slot was
+not rendered at all (`{children && …}`) and nowhere it was. The search field is
+a collapsed glyph most of the time, so scoping `no-drag` to
+`:is(search, input, button, a, select, [role='search'])` gives nearly the whole
+bar back. `.logo-icon` dropped its `no-drag` for the same reason: it is a
+decorative `<svg>`, and opting out only punched another hole.
+
 **The player is rendered twice from one component, and where it sits is the
 whole layout switch.** The footer bar's copy is inside `.app-shell`, so the
 height-tier and footer-bar rules in `layout.css` reach it; the overlay's copy
@@ -644,11 +656,17 @@ good the moment they scroll it themselves. There is no timing data behind it —
 `common.lyrics` is a plain string and synced frames are flattened before they
 reach the renderer — so the position is *proportional*: 40% through the track,
 40% of the overflow has gone past. Being wrong about that is exactly why taking
-over has to be free. The takeover is detected by comparing `scrollTop` against
-what was last written to it, because a programmatic scroll fires the same event
-a human does but lands on the value we asked for; anything else is somebody
-else driving. A new track or a reopen starts it following again, and that reset
-happens in render, not an effect — they are refs, so there is nothing to commit.
+over has to be free. The scroll is `element.scroll({ behavior: 'smooth' })`,
+dropping to `'auto'` under `prefers-reduced-motion`.
+
+**Takeover is read from input events — `wheel`, `touchmove`, `pointerdown`,
+`keydown` — and deliberately not from scroll position.** The obvious test ("did
+it end up somewhere other than where we put it?") is what this used to do, and
+it stops working the moment the scroll is smooth: a smooth scroll spends most of
+its life somewhere other than its target and fires a `scroll` event on every
+frame of the way there, so the panel handed itself over instantly. A new track
+or a reopen starts it following again, and that reset happens in render, not an
+effect — they are refs, so there is nothing to commit.
 
 Both ends of the panel dissolve into a `mask-image` gradient and the scrollbar
 is hidden: playback owns the scroll position, so a gutter would describe a
@@ -819,9 +837,9 @@ Everything else follows from that:
   nominal 20 Hz only reaches full gain below ~15 Hz and its fader does nothing
   you can hear. They sit at √(20 × 31.5) ≈ 25 Hz and √(12500 × 20000) ≈ 15.8 kHz.
   `Q` is *not* set on them — the spec ignores it for shelving filters.
-- `BAND_Q` is 1.4, not the width-matched 2.15. A 16-fader EQ is a curve-drawing
-  tool: neighbours get moved together, and at 2.15 two adjacent +6 dB bands
-  leave a visible dip between them.
+- `BAND_Q` is 1.4, not the width-matched 2.15. This EQ is a curve-drawing tool:
+  neighbours get moved together, and at 2.15 two adjacent +6 dB bands leave a
+  visible dip between them.
 - **The limiter is not a brickwall.** It is the same node with `ratio 20`,
   `knee 0`, `attack 0.001` welded, so it has no true-peak detection and cannot
   guarantee 0 dBFS. It is named for what it is for.
@@ -846,6 +864,45 @@ through a ref, so it never goes stale and never forces a render.
 builds them together — and, like `useMediaSessionRefs`, it keeps
 `AudioProvider` under the `max-statements` cap.
 
+### The EQ is a curve, not sixteen faders
+
+`EqCurve` draws one line over the chain's own output. The line is the cascade's
+real magnitude response (`services/eqResponse.ts`), and the filled shape under
+it is the live analyser — which sits *downstream* of the EQ, so a band you lift
+lifts the spectrum under the bump you just drew, in the same picture. Both share
+one logarithmic axis, because on a linear one thirteen of the sixteen bands land
+in the leftmost tenth.
+
+**The curve is evaluated, never interpolated through the fader values.** At
+`BAND_Q` 1.4 the bands overlap on purpose, so two neighbours at +6 dB sum to
+appreciably more than +6 between them; a spline through the gains would draw a
+dip the chain does not play. `eqResponseDb` therefore evaluates the same biquads
+Chromium builds — RBJ's coefficients, shelf slope `S` welded to 1, which is what
+`BiquadFilterNode` uses and why `Q` is ignored on a shelf. It is pure and takes
+no `AudioContext`: `getFrequencyResponse()` would agree, but only once a graph
+exists, which would make the panel undrawable before playback and untestable in
+jsdom. A peaking filter's magnitude at its own centre is exactly its gain, so
+that is asserted as ground truth rather than as a snapshot.
+
+**The sixteen range inputs are still there, clipped, not removed.** They keep
+their place in the tab order and their names in the accessibility tree, and the
+curve redraws as they move — the same arrangement `SegmentedControl` and
+`Rating` use for their radios. Pointer editing draws on the curve directly:
+`bandAtX` picks the nearest band centre on the log axis each move, so a drag is
+a gesture across bands rather than one fader at a time. `.eq-curve` carries the
+focus ring on behalf of the clipped inputs.
+
+The panel sits at the inline edge under `.player-info` (`align-self: start` in a
+centred flex column), not in a sheet across the window — the track's own data is
+the block it belongs to.
+
+**Below 720px of player width the page is not offered at all.** The container
+query hides `.dsp-toggle` along with `.dsp-panel`, so there is no control that
+opens an empty space, and the `dsp` mode falls back to the ordinary artwork
+layout — the rule that hides the artwork for that mode lives inside the matching
+`min-width` query. Nothing in JS knows about this; widening the window restores
+the page with the mode still selected.
+
 ### DSP controls
 
 `ParamControl` is one component painted two ways (`Knob`, `Fader`) — a
@@ -862,7 +919,7 @@ only thing JS contributes; the 270° dial sweep and the fader fill are CSS.
   out "Threshold −24 dB" and change on every drag. `aria-valuetext` carries the
   unit so AT says "−4.5 dB" and not a bare "−4.5".
 - **The `<output>` is `aria-hidden`.** It is an implicit `role="status"` with
-  `aria-live="polite"`, and sixteen of them would announce on every tick of a
+  `aria-live="polite"`, and a panel of them would announce on every tick of a
   drag.
 - Gain-reduction `<meter>`s are driven by a per-meter `requestAnimationFrame`
   loop writing through a ref. Through `useState` it would re-render the whole
