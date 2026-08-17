@@ -127,7 +127,7 @@ describe('FrequencyMatrix', () => {
     )
 
     // Current chord is prominent in the chord strip
-    expect(container.querySelector('.chord-strip-current')).toHaveTextContent('F')
+    expect(container.querySelector('.chord-strip .current')).toHaveTextContent('F')
     // Next chord (data-next='1') is the chord after F, which is C
     expect(container.querySelector('[data-next="1"]')).toHaveTextContent('C')
     // Key and tempo are shown in the summary
@@ -145,14 +145,16 @@ describe('FrequencyMatrix', () => {
       <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active />
     )
 
-    expect(container.querySelector('.matrix-line-x')?.getAttribute('d')).toBeTruthy()
+    // The frequency geometry lives on the shared `<path>`; the two `<use>`s
+    // that paint it near and far both reference it.
+    expect(container.querySelector('#matrix-freq')?.getAttribute('d')).toBeTruthy()
     expect(container.querySelector('.matrix-line-z')?.getAttribute('d')).toBeTruthy()
   })
 
   it('renders a resting mesh with no analyser at all', () => {
     const { container } = render(<FrequencyMatrix analyzer={ null } active />)
 
-    expect(container.querySelector('.matrix-line-x')?.getAttribute('d')).toBeTruthy()
+    expect(container.querySelector('#matrix-freq')?.getAttribute('d')).toBeTruthy()
     expect(screen.queryByText(/Hz$/)).toBeNull()
   })
 
@@ -171,7 +173,9 @@ describe('FrequencyMatrix', () => {
     )
 
     // The whole point of the rewrite: one path per direction, not one per row.
+    // The depth of field adds `<use>`s, not geometry — still two paths.
     expect(container.querySelectorAll('path')).toHaveLength(2)
+    expect(container.querySelectorAll('use')).toHaveLength(2)
   })
 
   it('places an octave the same distance apart in any register', async () => {

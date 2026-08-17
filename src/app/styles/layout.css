@@ -411,6 +411,34 @@ body::before {
 
 /* ─── persistent player ────────────────────────────────────────────────── */
 
+/*
+ * The full player layers rather than stacks: the frequency mesh is burnt over
+ * the type column, the transport is dodged back out of it, and the lyrics are
+ * marked onto it like a highlighter over a page. Every blend is a token for
+ * the same reason `--ambient-blend` is — a mode that reads as depth on a dark
+ * surface clips to flat white or flat black on a light one. `color-dodge`
+ * takes the transport to pure white over a light backdrop, so light opts out.
+ */
+:root {
+  --matrix-blend: color-burn;
+  --controls-blend: color-dodge;
+
+  /* The lyrics layer, and how far the column steps aside to make room. */
+  --lyrics-nudge: 6vw;
+  --lyrics-inset-inline: 10vw;
+  --lyrics-inset-block: 10vh;
+  --lyrics-marker: rgb(255 255 255 / 58%);
+  --lyrics-ink: var(--mono-fg-inverse);
+  --lyrics-blend: overlay;
+}
+
+[data-theme='light'] {
+  --controls-blend: normal;
+  --lyrics-marker: rgb(17 17 17 / 78%);
+  --lyrics-ink: var(--mono-fg1);
+  --lyrics-blend: normal;
+}
+
 .player-view {
   position: relative;
   display: flex;
@@ -423,13 +451,19 @@ body::before {
   container: player / size;
 
   /*
-   * Lyrics take the transport's place; the spectrum and the DSP page take the
-   * artwork's and the progress bar's but keep the transport, because a
-   * visualizer you cannot pause is a screensaver — and neither is a DSP page
-   * you have to close to hear what you just changed.
+   * The spectrum and the DSP page take the artwork's space and the progress
+   * bar's but keep the transport, because a visualizer you cannot pause is a
+   * screensaver — and neither is a DSP page you have to close to hear what you
+   * just changed.
    */
-  &[data-mode='lyrics'] :is(.progress-section, .playback-controls) { display: none; }
   &:is([data-mode='visualizer'], [data-mode='dsp']) :is(.player-art, .progress-section) { display: none; }
+
+  /*
+   * Lyrics are a layer rather than a mode, so nothing is replaced: the column
+   * steps aside instead. The nudge is on `.player-content`, so the artwork,
+   * the mesh and the transport all move as one thing.
+   */
+  &[data-lyrics] .player-content { translate: calc(-1 * var(--lyrics-nudge)) 0; }
 
   /* This is the container, so its own padding cannot come from a container query. */
   &[data-mode='dsp'] .player-content { padding-inline: var(--sp-4); }
@@ -481,7 +515,18 @@ body::before {
   --play-size: 56px;
   --play-glyph-size: 22px;
   --title-size: var(--text-xl);
-  --content-gap: var(--sp-6);
+  --content-gap: 0;
+
+  /*
+   * The full-window player is an editorial page, not a centred card: the type
+   * column is held well inside the window while the mesh bleeds past it, and
+   * the blocks sit directly on top of each other rather than on a gap scale.
+   * Every tier still overrides both — the height tiers on `.app-shell[…]`
+   * specificity, the width tiers on source order — so this only ever describes
+   * the full-window copy.
+   */
+  --content-pad-block: 24vh;
+  --content-pad-inline: 20vw;
 
   position: relative;
   z-index: var(--z-raised);
@@ -492,10 +537,11 @@ body::before {
   gap: var(--content-gap);
   width: 100%;
   height: 100%;
-  padding: var(--sp-6) var(--sp-8) var(--sp-8);
+  padding: var(--content-pad-block) var(--content-pad-inline);
   transition:
     gap var(--duration) var(--ease-emphasis),
-    padding var(--duration) var(--ease-emphasis);
+    padding var(--duration) var(--ease-emphasis),
+    translate var(--duration) var(--ease-emphasis);
 }
 
 .player-promote { display: none; }
@@ -532,11 +578,19 @@ body::before {
 .player-info {
   width: 100%;
   min-width: 0;
-  text-align: center;
+  line-height: 1.5;
+  text-align: start;
+  text-transform: lowercase;
+
+  /*
+   * The hgroup sets the leading for the whole block, so its children are lines
+   * in one column rather than three separately spaced paragraphs. Unitless, or
+   * the title's own size would fix the leading in px for the two lines under it.
+   */
+  > * { margin: 0; padding: 0; }
 
   .track-title {
     overflow: hidden;
-    margin-bottom: var(--sp-2);
     color: var(--text);
     font-size: var(--title-size);
     font-weight: var(--font-semibold);
@@ -545,7 +599,7 @@ body::before {
     transition: font-size var(--duration) var(--ease-emphasis);
   }
 
-  .track-artist { margin-bottom: var(--sp-1); color: var(--text-dim); font-size: var(--text-sm); }
+  .track-artist { color: var(--text-dim); font-size: var(--text-sm); }
   .track-album { color: var(--text-muted); font-size: var(--text-sm); }
 }
 
@@ -554,9 +608,17 @@ body::before {
 .time-label { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
 
 .playback-controls {
+  /*
+   * The mesh is positioned, so it paints over every in-flow block beside it.
+   * The transport is the one thing that has to stay in front of it — a flex
+   * item takes `z-index` without needing `position`, which is why this is one
+   * declaration and not a positioning context.
+   */
+  z-index: var(--z-raised);
   display: flex;
   align-items: center;
   gap: var(--sp-6);
+  mix-blend-mode: var(--controls-blend);
   transition: gap var(--duration) var(--ease-emphasis);
 
   .play-pause-btn {
@@ -605,10 +667,10 @@ body::before {
 }
 
 /*
- * Lyrics take the place of the transport, so the two are mutually exclusive
- * rather than stacked. Only the full-window player offers the swap — the
- * footer bar and the mini tiers have nowhere to put a column of text, and the
- * toggle is hidden there rather than being a control that does nothing.
+ * Pick what fills the middle, lay the lyrics alongside it, or leave. Only the
+ * full-window player has anywhere to put any of it — the footer bar and the
+ * mini tiers have no room for a panel or a column of text, so these are hidden
+ * there rather than being controls that do nothing.
  */
 .player-actions {
   display: none;
@@ -656,13 +718,35 @@ body::before {
   grid-template-rows: minmax(0, 1fr);
 }
 
+/*
+ * The mesh is the page's backdrop rather than a panel in the column: it hangs
+ * off the right of `.player-content` — the nearest positioned ancestor —
+ * burnt over the type it overlaps, and bleeds past the editorial padding on
+ * three sides.
+ *
+ * It keeps the default `z-index`, so it paints *above* its non-positioned
+ * siblings; that overlap is the effect. `pointer-events: none` is what stops it
+ * also swallowing every click in the right two thirds of the window, and the
+ * transport lifts itself back in front with `--z-raised`.
+ *
+ * There is deliberately no `filter` here. Blurring the element would defocus
+ * the whole thing evenly, labels included; the blur that matters is per-row
+ * and lives in the SVG, where distance can drive it — see `matrix-dof` in
+ * `FrequencyMatrix`.
+ */
 .frequency-matrix {
-  position: relative;
+  --matrix-inset-block: 30%;
+  --matrix-inset-inline-start: 33%;
+
+  position: absolute;
+  inset: var(--matrix-inset-block) 0 var(--matrix-inset-block) var(--matrix-inset-inline-start);
   display: grid;
-  width: 100%;
+  width: auto;
   min-height: 0;
   color: var(--accent);
   place-items: center;
+  pointer-events: none;
+  mix-blend-mode: var(--matrix-blend);
 
   > svg {
     width: 100%;
@@ -705,69 +789,91 @@ body::before {
 }
 
 /*
- * Chord strip: the current chord is a large heading, with the next two
- * chords visible but progressively dimmer and smaller, fading in/out
- * as the playback position crosses chord boundaries.
+ * Chord strip: the current chord is the one solid word on the page and the
+ * next two trail it in hairline, *larger* than the chord they follow — they
+ * read as the ghosts of what is coming rather than as a smaller footnote.
+ * All three fade in and out as the playback position crosses chord
+ * boundaries.
+ *
+ * The strip starts at the inline edge with the rest of the type column, and
+ * the label is a wrapped flex line above it rather than markup: it is a
+ * caption for the strip, and the strip is already an `aria-live` region that
+ * names itself through the panel's `sr-only` heading.
  */
 .chord-strip {
+  --chord-size-current: var(--text-3xl);
+  --chord-size-next: 2.4em;
+
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  justify-content: center;
+  justify-content: flex-start;
   gap: var(--sp-6);
   min-width: 0;
   padding: var(--sp-4) 0;
-}
+  font-weight: var(--weight-hairline);
 
-.chord-strip-item {
-  display: block;
-  font-family: var(--font-display);
-  font-weight: var(--font-semibold);
-  line-height: 1;
-  white-space: nowrap;
-  transition:
-    opacity var(--duration-slow) var(--ease),
-    font-size var(--duration-slow) var(--ease-emphasis),
-    color var(--duration-slow) var(--ease);
-}
+  /* Same treatment as the summary's `dt`s below — one label voice per panel.
+     Generated rather than markup: it captions the strip, and the strip already
+     names itself through the panel's `sr-only` heading. */
+  &::before {
+    flex: 1 0 100%;
+    content: 'Chord';
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
 
-.chord-strip-current {
-  color: var(--accent);
-  font-size: var(--text-3xl);
-  opacity: 1;
-}
+  .next, .current {
+    display: block;
+    font-family: var(--font-display);
+    font-weight: var(--font-semibold);
+    line-height: 1;
+    white-space: nowrap;
+    transition:
+      opacity var(--duration-slow) var(--ease),
+      font-size var(--duration-slow) var(--ease-emphasis),
+      color var(--duration-slow) var(--ease);
+  }
 
-.chord-strip-next {
-  color: var(--text-dim);
-  opacity: 0.35;
-}
+  .current {
+    color: var(--accent);
+    font-size: var(--chord-size-current);
+    opacity: 1;
+  }
 
-.chord-strip-next[data-next='1'] {
-  font-size: var(--text-xl);
-  opacity: 0.45;
-}
+  /*
+   * The upcoming pair is drawn one size *larger* than the chord it follows and
+   * in hairline, so it reads as the ghost of what is coming rather than as a
+   * smaller footnote. Only opacity separates the two, which keeps the strip
+   * one receding gesture instead of three type sizes.
+   */
+  .next {
+    color: var(--text-dim);
+    font-size: var(--chord-size-next);
+    font-weight: var(--weight-hairline);
+    opacity: 0.35;
 
-.chord-strip-next[data-next='2'] {
-  font-size: var(--text-lg);
-  opacity: 0.25;
+    &[data-next='1'] { opacity: 0.45; }
+    &[data-next='2'] { opacity: 0.25; }
+  }
 }
 
 /*
- * Key and tempo summary: a compact pair of labelled values using the
- * app's standard definition-list pattern with the raised-surface card
- * style.
+ * Key and tempo summary: labelled values on the same baseline as their label,
+ * set as bare lines rather than cards. The panel floats over the mesh now, so
+ * a raised surface behind each pair would be a box drawn around nothing.
  */
 .key-tempo-summary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-2);
+  display: block;
 
   > div {
-    display: grid;
-    gap: var(--sp-0-5);
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
     min-width: 0;
-    padding: var(--sp-2) var(--sp-3);
-    border: 1px solid var(--border);
-    background: color-mix(in srgb, var(--bg-raised) 72%, transparent);
   }
 
   dt {
@@ -794,18 +900,18 @@ body::before {
   pointer-events: none;
 }
 
+/*
+ * A peak is a label on the mesh, not a chip over it — a plate here would only
+ * be one more rectangle over an image that is already a wireframe. The lane
+ * arithmetic stays: two partials a few percent apart still need separating.
+ */
 .matrix-peak {
   position: absolute;
-  display: grid;
-  gap: 1px;
-  justify-items: center;
-  padding: var(--sp-1) var(--sp-2);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
-  /* Each lane lifts the chip a full row clear of the one below it. */
+  display: block;
+  text-align: start;
+  text-transform: lowercase;
+  /* Each lane lifts the label a full row clear of the one below it. */
   translate: -50% calc(-100% - var(--sp-2) - var(--lane, 0) * 2.4rem);
-  backdrop-filter: blur(4px);
   transition:
     left var(--duration-fast) var(--ease),
     top var(--duration-fast) var(--ease);
@@ -827,22 +933,99 @@ body::before {
   }
 }
 
+/*
+ * The lyrics layer.
+ *
+ * It hangs off the trailing edge of the player rather than taking a place in
+ * the column, and `.player-content` is nudged the other way to meet it — the
+ * two moves are one gesture, which is the whole reason lyrics stopped being a
+ * mode. Set ragged-left against that edge.
+ *
+ * Marked rather than boxed: `display: inline` on the `<pre>` makes the
+ * highlighter swipe follow the text's own line boxes instead of painting one
+ * rectangle behind the block, and `box-decoration-break: clone` is what gives
+ * every wrapped line its own padding rather than only the first and the last.
+ *
+ * Always mounted, shown by `data-open` — `display` transitions with
+ * `allow-discrete` and `@starting-style` supplies the pre-open frame, so it
+ * leaves the same way it arrives. Same pairing as `Overlay`.
+ */
 .player-lyrics {
-  width: min(100%, 640px);
-  min-height: 0;
+  --lyrics-fade: var(--sp-12);
+
+  position: absolute;
+  z-index: var(--z-sticky);
+  right: var(--lyrics-inset-inline);
+  bottom: var(--lyrics-inset-block);
+  display: none;
+  width: min(40ch, 34vw);
+  max-height: 62vh;
   overflow: auto;
-  padding: var(--sp-4) var(--sp-6);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--bg-raised) 70%, transparent);
-  text-align: center;
-  animation: surface-in var(--duration) var(--ease-emphasis);
+  font-size: var(--text-sm);
+  text-align: right;
+  opacity: 0;
+  translate: var(--shift-md) 0;
+
+  /*
+   * The blend belongs to the layer, not to the `<pre>` inside it. `z-index`
+   * makes this element a stacking context, which is also a blending isolation
+   * group — so a `mix-blend-mode` on a descendant would composite against this
+   * element's own (empty) backdrop and do nothing at all. Up here it meets the
+   * artwork and the type it is laid over, which is the point. Transparent
+   * pixels are unaffected either way, so only the marker itself blends.
+   */
+  mix-blend-mode: var(--lyrics-blend);
+
+  /* Playback drives the scroll position, so the scrollbar would describe a
+     control the reader does not have — until they take over, at which point
+     the fades are the affordance. */
+  scrollbar-width: none;
+
+  /*
+   * Reading position follows playback (`useLyricsScroll`), so both ends have
+   * to dissolve rather than stop at a cut: there is no scrollbar and no
+   * container edge to explain a hard boundary.
+   */
+  mask-image: linear-gradient(
+    transparent,
+    #000 var(--lyrics-fade),
+    #000 calc(100% - var(--lyrics-fade)),
+    transparent
+  );
+  transition:
+    opacity var(--duration) var(--ease-exit),
+    translate var(--duration) var(--ease-exit),
+    display var(--duration) allow-discrete;
+
+  &::-webkit-scrollbar { display: none; }
+
+  &[data-open] {
+    display: block;
+    opacity: 1;
+    translate: 0 0;
+    transition:
+      opacity var(--duration) var(--ease-emphasis),
+      translate var(--duration) var(--ease-emphasis),
+      display var(--duration) allow-discrete;
+
+    @starting-style {
+      opacity: 0;
+      translate: var(--shift-md) 0;
+    }
+  }
 
   pre {
-    color: var(--text-dim);
+    display: inline;
+    padding: 0.15em var(--sp-1);
+    color: var(--lyrics-ink);
+    background: var(--lyrics-marker);
+    box-decoration-break: clone;
     font-family: inherit;
-    font-size: var(--text-base);
-    line-height: 1.8;
-    white-space: pre-wrap;
+    font-size: inherit;
+    font-weight: var(--font-semibold);
+    letter-spacing: -0.03em;
+    line-height: 1.95;
+    white-space: pre-line;
   }
 }
 
@@ -854,25 +1037,37 @@ body::before {
  *
  * It scrolls internally: sixteen faders plus six knobs do not fit the `snug`
  * height tier, and clipping them would hide the low bands rather than the
- * decoration.
+ * decoration. The scrollbar is hidden, like the lyrics layer's — this is a
+ * page over the artwork, and a gutter down its edge would be the only frame
+ * anywhere on it.
+ *
+ * Flat for the same reason. Every module used to be a raised card with its own
+ * border and radius, which read as a settings dialog dropped into a screen
+ * that has no other boxes on it: the panels beside it are bare type over the
+ * cover. A hairline between modules separates them just as well.
  */
 .dsp-panel {
   display: grid;
-  gap: var(--sp-3);
+  gap: var(--sp-4);
   width: min(100%, 760px);
   min-height: 0;
   overflow-y: auto;
   padding: var(--sp-1);
+  scrollbar-width: none;
   animation: surface-in var(--duration) var(--ease-emphasis);
+
+  &::-webkit-scrollbar { display: none; }
 }
 
 .dsp-module {
   display: grid;
   gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4) var(--sp-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--bg-raised) 70%, transparent);
+  padding: var(--sp-4) 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+
+  &:first-of-type { border-top: 0; padding-top: 0; }
 }
 
 .dsp-module-header {
@@ -887,16 +1082,23 @@ body::before {
   float: none;
 }
 
+/*
+ * The module's name and its bypass in one control. Set in the panel's label
+ * voice — the same size, weight and tracking as the `dt`s in the harmony
+ * summary — and muted until it is switched on, the way shuffle and repeat read
+ * in the transport.
+ */
 .dsp-switch {
   display: flex;
   gap: var(--sp-2);
   align-items: center;
-  color: var(--text);
-  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
   font-weight: var(--font-medium);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
+  transition: color var(--duration-fast) var(--ease);
 
   /*
    * A real checkbox, painted as a switch. Not `display: none` — it stays a
@@ -977,14 +1179,15 @@ body::before {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-xs);
-  text-align: center;
+  text-align: start;
+  text-transform: lowercase;
 }
 
 .dsp-knobs {
   display: flex;
   gap: var(--sp-6);
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 /* ─── waveform ─────────────────────────────────────────────────────────── */

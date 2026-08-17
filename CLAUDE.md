@@ -623,12 +623,40 @@ handler goes through `advanceRef` so it never closes over stale modes. See
 Shuffle ignores direction: "previous" in a shuffled queue is another arbitrary
 track, because the engine keeps no play history.
 
-The lyrics panel replaces the progress bar and transport, and only in the
-now-playing overlay — the footer bar and the mini tiers have nowhere to put a
-column of text, so `.player-actions` (the mode buttons + close) is not rendered
-at all unless `expanded`, rather than being controls that do nothing. See
-"Now playing: what fills the middle" below. Lyrics come from the file's
-tags (`common.lyrics`, synced frames flattened); there is no fetching.
+### The lyrics layer
+
+**Lyrics are a layer over the now-playing overlay, not one of its modes.** They
+were a fourth `playerMode` until reading along cost you the spectrum, the EQ
+*and* the transport — the panel it replaced. `UIContext.lyricsOpen` +
+`toggleLyrics` are their own session state, and `data-lyrics` on `.player-view`
+translates `.player-content` by `--lyrics-nudge` so the column steps aside
+rather than being replaced. Only the overlay offers it: `.player-actions` (the
+mode buttons + close) is not rendered at all unless `expanded`.
+
+`PlayerLyrics` is **always mounted**, unlike `PlayerActions`, and shown by
+`data-open`. `display` is what animates it in and out (`allow-discrete` +
+`@starting-style`, as everywhere else here), and an unmounted element has
+nothing to animate. It is `aria-hidden` while closed, so it stays unreachable by
+role — that, not its absence from the DOM, is what the test asserts.
+
+`useLyricsScroll` scrolls it along with playback and yields to the reader for
+good the moment they scroll it themselves. There is no timing data behind it —
+`common.lyrics` is a plain string and synced frames are flattened before they
+reach the renderer — so the position is *proportional*: 40% through the track,
+40% of the overflow has gone past. Being wrong about that is exactly why taking
+over has to be free. The takeover is detected by comparing `scrollTop` against
+what was last written to it, because a programmatic scroll fires the same event
+a human does but lands on the value we asked for; anything else is somebody
+else driving. A new track or a reopen starts it following again, and that reset
+happens in render, not an effect — they are refs, so there is nothing to commit.
+
+Both ends of the panel dissolve into a `mask-image` gradient and the scrollbar
+is hidden: playback owns the scroll position, so a gutter would describe a
+control the reader does not have. The `<pre>` is `display: inline` with
+`box-decoration-break: clone`, which is what makes the marker swipe follow each
+line box instead of painting one rectangle behind the block.
+
+Lyrics come from the file's tags; there is no fetching.
 
 The footer bar has **no volume slider** — the system volume and the full player
 both already own that, and the width is better spent on the progress bar. The
@@ -636,11 +664,12 @@ both already own that, and the width is better spent on the progress bar. The
 
 ## Now playing: what fills the middle
 
-`Player` has four modes — `default` (artwork), `lyrics`, `visualizer`, `dsp` —
-and one at a time, not a boolean each. They all claim the same space, so
-independent toggles would let the user ask for two at once and leave the answer
-to selector order. `data-mode` on `.player-view` is what the tier CSS reads;
-`default` writes no attribute.
+`Player` has three modes — `default` (artwork), `visualizer`, `dsp` — and one at
+a time, not a boolean each. They all claim the same space, so independent
+toggles would let the user ask for two at once and leave the answer to selector
+order. `data-mode` on `.player-view` is what the tier CSS reads; `default`
+writes no attribute. Lyrics are deliberately *not* in this union — see "The
+lyrics layer" above.
 
 **`playerMode` lives in `UIContext`, not in `Player`.** It was local `useState`
 until the sidebar needed to open the overlay *onto* a mode — `.player-promote`
@@ -649,9 +678,17 @@ in silence, which is exactly when you might want to set up an EQ. It is
 session-only, like `overlay`: which panel you last had open is not a preference.
 
 The mode buttons live in `.player-actions` and exist only in the overlay
-(`expanded`), alongside the close button. The DSP one is deliberately **not**
-`disabled={!hasTrack}` like its two neighbours: lyrics need tags and the
-spectrum needs signal, but an EQ curve does not need anything playing.
+(`expanded`), alongside the lyrics toggle and the close button. The DSP one is
+deliberately **not** `disabled={!hasTrack}` like its two neighbours: lyrics need
+tags and the spectrum needs signal, but an EQ curve does not need anything
+playing. The lyrics button looks identical to the mode buttons and is not one of
+them — it toggles the layer over whichever mode is showing.
+
+The DSP page is set flat, like everything else on this screen. Its modules were
+raised cards with borders and radii, which read as a settings dialog dropped
+into a window that has no other boxes on it — the panels beside it are bare type
+over the cover. A hairline between modules separates them just as well, and its
+scrollbar is hidden for the same reason the lyrics layer's is.
 
 **That close button is the overlay's only one.** `OverlayHost` therefore does
 *not* pass `Overlay`'s `closeButton` for the player, unlike the two sheets —
@@ -705,6 +742,40 @@ note. That fftSize is why it can name a pitch at all — the analyser used to be
 Chips that would overlap are stacked into lanes (`assignLanes`): even on a log
 axis a close voicing puts its partials within a few percent of each other, so
 position alone cannot separate them.
+
+**The mesh is the page's backdrop, not a panel in the column.** It is
+`position: absolute` against `.player-content` — inset `--matrix-inset-block`
+top and bottom, `--matrix-inset-inline-start` from the left — so it hangs off
+the right of the type column, blended with `--matrix-blend`. It keeps the
+default `z-index`, which is what puts it *over* its non-positioned siblings;
+that overlap is the effect. Two things follow: `pointer-events: none`, or it
+swallows every click in the right two thirds of the window, and
+`z-index: var(--z-raised)` on `.playback-controls`, which is the one thing that
+has to stay in front (a flex item takes `z-index` without `position`). Its peak
+labels are bare lowercase text rather than bordered chips — a plate here would
+only be one more rectangle over an image that is already a wireframe.
+
+**Focus falls off with distance, and there is deliberately no CSS `filter`
+doing it.** Blurring the element would defocus everything evenly, labels
+included. Distance is vertical position — the same fact the age gradient
+already trades on — so the mesh is painted twice through `<use>`: once sharp
+under `#matrix-near` and once through `feGaussianBlur` (`#matrix-dof`) under
+`#matrix-far`, the two masks being opposite ramps of one gradient that meet at
+`DOF_FOCUS_PLANE`. Because both `<use>`s reference the same `<path>`, a frame is
+still the single `setAttribute` it always was — the depth of field costs nodes,
+not per-frame work.
+
+`--matrix-blend` and `--controls-blend` sit next to the player in `layout.css`,
+in the same `:root` / `[data-theme='light']` pair as `--ambient-blend`, for the
+same reason: `color-dodge` reads as glow over a dark surface and clips the
+transport to pure white over a light one, so light opts out.
+
+Around it the full player is set as an editorial page: `--content-pad-block`
+/ `--content-pad-inline` in `vh`/`vw` hold the type well inside the window
+while the mesh bleeds past it, `--content-gap` is `0`, and `.player-info` is
+one lowercase hgroup with its own leading and no per-child margins. Only the
+full-window copy sees any of it — the height tiers override on `.app-shell[…]`
+specificity and the width tiers on source order.
 
 ## The DSP chain
 

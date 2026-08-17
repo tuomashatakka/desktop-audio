@@ -27,14 +27,16 @@ export type OverlayName = 'player' | 'settings' | 'tag-editor'
 
 /**
  * What fills the middle of the now-playing overlay. One at a time, not a
- * boolean each: artwork, lyrics, the spectrum and the DSP page all claim the
- * same space.
+ * boolean each: the artwork, the spectrum and the DSP page all claim the same
+ * space.
+ *
+ * Lyrics are deliberately *not* in this union — see `lyricsOpen` below.
  *
  * It lives here rather than inside `Player` because the sidebar's DSP entry has
  * to be able to open the overlay *on* a mode. Session-only, like `overlay` —
  * which panel you last had open is not a preference.
  */
-export type PlayerMode = 'default' | 'lyrics' | 'visualizer' | 'dsp'
+export type PlayerMode = 'default' | 'visualizer' | 'dsp'
 
 /**
  * How the track collection is laid out. The first three are row heights for
@@ -73,8 +75,18 @@ export function isGridDensity (density: Density): density is GridDensity {
 
 /** Read-only snapshot of UI state. */
 interface UIState {
-  readonly overlay:            OverlayName | null
-  readonly playerMode:         PlayerMode
+  readonly overlay:    OverlayName | null
+  readonly playerMode: PlayerMode
+
+  /**
+   * Lyrics layer over the now-playing overlay, independent of `playerMode`.
+   *
+   * It used to be a fourth mode, which meant reading along cost you the
+   * spectrum, the EQ *and* the transport — the panel it replaced. It is its own
+   * flag because it is its own layer: it sits to one side of whatever mode is
+   * showing and nudges that mode's content out of its way.
+   */
+  readonly lyricsOpen:         boolean
   readonly sidebarOpen:        boolean
   readonly selectedFolderPath: string | null
   readonly selectedPlaylistId: string | null
@@ -90,6 +102,7 @@ interface UIContextValue extends UIState {
   readonly openOverlay:     (name: OverlayName) => void
   readonly closeOverlay:    () => void
   readonly setPlayerMode:   (mode: PlayerMode) => void
+  readonly toggleLyrics:    () => void
   readonly toggleSidebar:   () => void
   readonly selectFolder:    (path: string | null) => void
   readonly selectPlaylist:  (id: string | null) => void
@@ -185,6 +198,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
     ({
       overlay:        null,
       playerMode:     'default',
+      lyricsOpen:     false,
       sidebarOpen:    false,
       ...NO_SCOPE,
       editingTrackId: null,
@@ -206,6 +220,11 @@ export function UIProvider ({ children, value }: UIProviderProps) {
   const setPlayerMode = useCallback((mode: PlayerMode) => {
     setState(s =>
       s.playerMode === mode ? s : { ...s, playerMode: mode })
+  }, [])
+
+  const toggleLyrics = useCallback(() => {
+    setState(s =>
+      ({ ...s, lyricsOpen: !s.lyricsOpen }))
   }, [])
 
   const toggleSidebar = useCallback(() => {
@@ -279,6 +298,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       openOverlay,
       closeOverlay,
       setPlayerMode,
+      toggleLyrics,
       toggleSidebar,
       selectFolder,
       selectPlaylist,
@@ -293,6 +313,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
     openOverlay,
     closeOverlay,
     setPlayerMode,
+    toggleLyrics,
     toggleSidebar,
     selectFolder,
     selectPlaylist,

@@ -19,9 +19,17 @@ const HISTORY = 28
 const PERSPECTIVE = -0.8
 
 /** viewBox units. The SVG scales to its box, so these are ratios, not pixels. */
-const VIEW_W     = 1200
-const VIEW_H     = 560
-const MAX_HEIGHT = 150
+const VIEW_W = 1200
+const VIEW_H = 560
+
+/**
+ * Depth of field, in viewBox units — so it scales with the mesh rather than
+ * with the window. `DOF_FOCUS_PLANE` is where focus starts to fall off, as a
+ * percentage down the mesh: everything above it is sharp.
+ */
+const DOF_BLUR        = 4
+const DOF_FOCUS_PLANE = 38
+const MAX_HEIGHT      = 150
 
 /**
  * Headroom above the newest row for its peaks to rise into. The grid starts
@@ -198,17 +206,9 @@ function ChordStrip ({ chords, currentTime }: ChordStripProps) {
   const next2   = index >= 0 ? chords[index + 2] : undefined
 
   return <div className='chord-strip' aria-live='polite' aria-atomic='true'>
-    <span className='chord-strip-item chord-strip-next' data-next='2'>
-      {next2?.label ?? ''}
-    </span>
-
-    <span className='chord-strip-item chord-strip-next' data-next='1'>
-      {next1?.label ?? ''}
-    </span>
-
-    <span className='chord-strip-item chord-strip-current'>
-      {current?.label ?? '\u2014'}
-    </span>
+    <span className='current'>{current?.label ?? '\u2014'}</span>
+    <span className='next' data-next='1'>{next1?.label ?? ''}</span>
+    <span className='next' data-next='2'>{next2?.label ?? ''}</span>
   </div>
 }
 
@@ -452,10 +452,74 @@ export function FrequencyMatrix ({
             <stop offset='55%' stopColor='currentColor' stopOpacity='0.55' />
             <stop offset='100%' stopColor='currentColor' stopOpacity='0.08' />
           </linearGradient>
+
+          {/*
+            * Depth of field. The same reasoning as the age gradient: distance
+            * is vertical position, so focus can be too — near rows stay sharp
+            * and far ones defocus, which is what makes a flat wireframe read
+            * as receding rather than as a pattern.
+            *
+            * It costs two nodes, not sixty-four. The geometry is written once
+            * to the `<path>` below and painted twice through `<use>`, so the
+            * per-frame work is still the single `setAttribute` it always was;
+            * the near and far copies are masked with opposite ramps of one
+            * gradient and cross-fade into each other across the middle.
+            */}
+          <filter id='matrix-dof' x='-5%' y='-5%' width='110%' height='110%'>
+            <feGaussianBlur stdDeviation={ DOF_BLUR } />
+          </filter>
+
+          <linearGradient
+            id='matrix-depth'
+            gradientUnits='userSpaceOnUse'
+            x1='0'
+            y1='0'
+            x2='0'
+            y2={ VIEW_H }>
+            <stop offset='0%' stopColor='#000' />
+            <stop offset={ `${DOF_FOCUS_PLANE}%` } stopColor='#000' />
+            <stop offset='100%' stopColor='#fff' />
+          </linearGradient>
+
+          <mask id='matrix-far'>
+            <rect
+              x={ -VIEW_W }
+              y={ -VIEW_H }
+              width={ VIEW_W * 3 }
+              height={ VIEW_H * 3 }
+              fill='url(#matrix-depth)' />
+          </mask>
+
+          {/* The near copy rides the same ramp inverted, so the pair always
+              sums to one: no band is painted twice, and none is left unpainted. */}
+          <linearGradient
+            id='matrix-depth-near'
+            gradientUnits='userSpaceOnUse'
+            x1='0'
+            y1='0'
+            x2='0'
+            y2={ VIEW_H }>
+            <stop offset='0%' stopColor='#fff' />
+            <stop offset={ `${DOF_FOCUS_PLANE}%` } stopColor='#fff' />
+            <stop offset='100%' stopColor='#000' />
+          </linearGradient>
+
+          <mask id='matrix-near'>
+            <rect
+              x={ -VIEW_W }
+              y={ -VIEW_H }
+              width={ VIEW_W * 3 }
+              height={ VIEW_H * 3 }
+              fill='url(#matrix-depth-near)' />
+          </mask>
+
+          {/* Geometry only. The two `<use>`s below are what paint it. */}
+          <path ref={ freqPathRef } id='matrix-freq' />
         </defs>
 
         <path ref={ timePathRef } className='matrix-line-z' />
-        <path ref={ freqPathRef } className='matrix-line-x' />
+        <use className='matrix-line-x' href='#matrix-freq' mask='url(#matrix-far)' filter='url(#matrix-dof)' />
+        <use className='matrix-line-x' href='#matrix-freq' mask='url(#matrix-near)' />
       </svg>
 
       {/*

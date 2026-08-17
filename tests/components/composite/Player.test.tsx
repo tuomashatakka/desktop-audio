@@ -71,14 +71,26 @@ const settings = {
  * panel imports from the same barrel stay real, so this mock does not have to
  * grow a stub every time one is added.
  *
- * `useUI` has to be *stateful*: `playerMode` moved out of `Player` and into
- * `UIContext`, so a frozen object would leave every mode button a no-op.
+ * `useUI` has to be *stateful*: `playerMode` and `lyricsOpen` moved out of
+ * `Player` and into `UIContext`, so a frozen object would leave every button
+ * up there a no-op.
  */
 vi.mock('../../../src/app/contexts', async importOriginal => ({
   ...await importOriginal<typeof import('../../../src/app/contexts')>(),
   useUI: () => {
     const [ playerMode, setPlayerMode ] = useState<PlayerMode>('default')
-    return { openOverlay, closeOverlay, playerMode, setPlayerMode }
+    const [ lyricsOpen, setLyricsOpen ] = useState(false)
+
+    return {
+      openOverlay,
+      closeOverlay,
+      playerMode,
+      setPlayerMode,
+      lyricsOpen,
+      toggleLyrics: () =>
+        setLyricsOpen(open =>
+          !open),
+    }
   },
   useAudio: () => audio,
   useSettings: () => settings,
@@ -87,6 +99,7 @@ vi.mock('../../../src/app/contexts', async importOriginal => ({
 vi.mock('../../../src/app/hooks', () => ({
   useTrackAnalysis: () => analysisState,
   useWindowScale:   () => toggleWindowScale,
+  useLyricsScroll:  () => ({ current: null }),
 }))
 
 vi.mock('../../../src/app/components/atomic/WaveformProgress', () => ({
@@ -163,13 +176,37 @@ describe('Player', () => {
     expect(settings.setRepeatMode).toHaveBeenCalledWith('all')
   })
 
-  it('swaps the transport for lyrics on demand, in the overlay only', () => {
+  /*
+   * The lyrics layer is mounted the whole time — `display` is what animates it
+   * in and out, and an unmounted element has nothing to animate — so it is
+   * `aria-hidden` while closed rather than absent. Being unreachable by role is
+   * the assertion; the element being in the DOM is an implementation detail.
+   */
+  it('keeps the lyrics out of the accessibility tree until they are asked for', () => {
+    render(<Player expanded />)
+
+    expect(screen.queryByRole('region', { name: 'Lyrics' })).toBeNull()
+  })
+
+  it('lays the lyrics over the player without taking the transport away', () => {
     render(<Player expanded />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Show lyrics' }))
 
+    // A layer, not a mode: what it used to replace is still on screen.
     expect(screen.getByRole('region', { name: 'Lyrics' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Show album art' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Hide lyrics' })).toBeInTheDocument()
+  })
+
+  it('stacks the lyrics over whichever mode is showing', () => {
+    render(<Player expanded />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show frequency spectrum' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show lyrics' }))
+
+    expect(screen.getByRole('region', { name: 'Frequency spectrum' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Lyrics' })).toBeInTheDocument()
   })
 
   it('shows the frequency spectrum, and only one panel at a time', () => {
@@ -178,10 +215,10 @@ describe('Player', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show frequency spectrum' }))
     expect(screen.getByRole('region', { name: 'Frequency spectrum' })).toBeInTheDocument()
 
-    // Lyrics and the spectrum claim the same space, so asking for one has to
-    // put the other away rather than stacking them.
-    fireEvent.click(screen.getByRole('button', { name: 'Show lyrics' }))
-    expect(screen.getByRole('region', { name: 'Lyrics' })).toBeInTheDocument()
+    // The modes claim the same space, so asking for one has to put the other
+    // away rather than stacking them.
+    fireEvent.click(screen.getByRole('button', { name: 'Show audio processing' }))
+    expect(screen.getByRole('region', { name: 'Audio processing' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Frequency spectrum' })).toBeNull()
   })
 
@@ -200,7 +237,8 @@ describe('Player', () => {
     render(<Player expanded />)
 
     // Lyrics need tags and the spectrum needs signal; an EQ curve is worth
-    // editing in silence.
+    // editing in silence. (The lyrics button is a layer toggle now, but it
+    // still has nothing to show without a track.)
     expect(screen.getByRole('button', { name: 'Show lyrics' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Show frequency spectrum' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Show audio processing' })).toBeEnabled()

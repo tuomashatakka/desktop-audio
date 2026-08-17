@@ -4,7 +4,7 @@ import { DspPanel } from './DspPanel'
 import type { Track, RepeatMode, PlayerMode } from '../../contexts'
 import { Icon, IconButton, Button } from '../atomic'
 import { WaveformProgress } from '../atomic/WaveformProgress'
-import { useTrackAnalysis, useWindowScale } from '../../hooks'
+import { useTrackAnalysis, useWindowScale, useLyricsScroll } from '../../hooks'
 import type { TrackAnalysisState } from '../../hooks'
 import { useArtwork } from '../../hooks/useArtwork'
 import { formatTime, isoDuration } from '../../utils/time'
@@ -125,17 +125,41 @@ function PlayerTransport ({
 }
 
 /**
- * The lyrics panel, which takes the place of the progress bar and transport
- * in the full-window player. Rendered whenever it is toggled on — whether it
- * is *visible* is the tier stylesheet's call, since the compact tiers have no
- * room for it.
+ * The lyrics layer of the full-window player.
+ *
+ * It is a *layer*, not a mode: it sits down the trailing edge of whatever the
+ * mode put in the middle and nudges that content aside, rather than replacing
+ * it. Reading along used to cost you the spectrum, the EQ and the transport,
+ * all at once, because it was the panel that took their place.
+ *
+ * Always mounted once the overlay is open, and shown by `data-open`, because
+ * the enter and exit transitions are CSS (`allow-discrete` + `@starting-style`,
+ * as everywhere else in this app). Unmounting on close would animate one
+ * direction only.
  */
-type PlayerLyricsProps = { readonly lyrics?: string }
+type PlayerLyricsProps = {
+  readonly track:       Track | null
+  readonly open:        boolean
+  readonly currentTime: number
+  readonly duration:    number
+}
 
-function PlayerLyrics ({ lyrics }: PlayerLyricsProps) {
-  return <section className='player-lyrics' aria-label='Lyrics'>
-    {lyrics
-      ? <pre>{lyrics}</pre>
+function PlayerLyrics ({ track, open, currentTime, duration }: PlayerLyricsProps) {
+  // Reopening restarts the follow, so taking the panel over is never sticky
+  // beyond the reading it was meant for.
+  const ref = useLyricsScroll<HTMLElement>(
+    duration > 0 ? currentTime / duration : 0,
+    `${track?.id ?? ''}:${open}`
+  )
+
+  return <section
+    ref={ ref }
+    className='player-lyrics'
+    data-open={ open || undefined }
+    aria-label='Lyrics'
+    aria-hidden={ open ? undefined : true }>
+    {track?.lyrics
+      ? <pre>{track.lyrics}</pre>
       : <p className='status-message'>No lyrics in this file&apos;s tags</p>
     }
   </section>
@@ -163,7 +187,6 @@ function PlayerInfo ({ track }: PlayerInfoProps) {
 
 type PlayerPanelProps = {
   readonly mode:              PlayerMode
-  readonly lyrics?:           string
   readonly analyzer:          AnalyserNode | null
   readonly analysis:          TrackAnalysisState
   readonly currentTime:       number
@@ -172,10 +195,7 @@ type PlayerPanelProps = {
 }
 
 /** Whatever the chosen mode puts in the middle of the screen. */
-function PlayerPanel ({ mode, lyrics, analyzer, analysis, currentTime, showChordAnalysis, showKeyAnalysis }: PlayerPanelProps) {
-  if (mode === 'lyrics')
-    return <PlayerLyrics lyrics={ lyrics } />
-
+function PlayerPanel ({ mode, analyzer, analysis, currentTime, showChordAnalysis, showKeyAnalysis }: PlayerPanelProps) {
   if (mode === 'visualizer')
     return <FrequencyMatrix
       analyzer={ analyzer }
@@ -194,21 +214,25 @@ function PlayerPanel ({ mode, lyrics, analyzer, analysis, currentTime, showChord
 }
 
 type PlayerActionsProps = {
-  readonly mode:     PlayerMode
-  readonly hasTrack: boolean
-  readonly onMode:   (mode: Exclude<PlayerMode, 'default'>) => void
-  readonly onClose:  () => void
+  readonly mode:       PlayerMode
+  readonly lyricsOpen: boolean
+  readonly hasTrack:   boolean
+  readonly onMode:     (mode: Exclude<PlayerMode, 'default'>) => void
+  readonly onLyrics:   () => void
+  readonly onClose:    () => void
 }
 
 /**
- * The overlay's top-right controls: pick what fills the middle, or leave.
+ * The overlay's top-right controls: pick what fills the middle, put the lyrics
+ * alongside it, or leave.
  *
  * A menu of controls, like `.playback-controls` — same shape, so the two read
  * alike and neither is a bare `<div>`. Each mode button is `aria-pressed`
  * rather than a radio group: they are toggles that also happen to be mutually
- * exclusive, and pressing the active one returns to the artwork.
+ * exclusive, and pressing the active one returns to the artwork. The lyrics
+ * button looks identical and is *not* one of them — it layers over any mode.
  */
-function PlayerActions ({ mode, hasTrack, onMode, onClose }: PlayerActionsProps) {
+function PlayerActions ({ mode, lyricsOpen, hasTrack, onMode, onLyrics, onClose }: PlayerActionsProps) {
   const showing = (target: Exclude<PlayerMode, 'default'>) =>
     mode === target
 
@@ -229,12 +253,11 @@ function PlayerActions ({ mode, hasTrack, onMode, onClose }: PlayerActionsProps)
     <li>
       <IconButton
         className='lyrics-toggle'
-        aria-pressed={ showing('lyrics') }
-        label={ showing('lyrics') ? 'Show album art' : 'Show lyrics' }
+        aria-pressed={ lyricsOpen }
+        label={ lyricsOpen ? 'Hide lyrics' : 'Show lyrics' }
         type='button'
         disabled={ !hasTrack }
-        onClick={ () =>
-          onMode('lyrics') }>
+        onClick={ onLyrics }>
         <Icon name='lyrics' />
       </IconButton>
     </li>
@@ -263,6 +286,19 @@ function PlayerActions ({ mode, hasTrack, onMode, onClose }: PlayerActionsProps)
 
 function playerAriaLabel (track: Track | null): string {
   return track ? `Now playing: ${track.title}` : 'Player'
+}
+
+/**
+ * `true` when the lyrics layer is showing, `undefined` when it is not — the
+ * shape `data-lyrics` wants, since a `data-*` attribute is present or absent
+ * rather than true or false.
+ *
+ * Only the overlay has room for it, so `expanded` gates it here rather than at
+ * the call site: the layer is always mounted (its exit animation needs it to
+ * be), and this is the one place that decides whether it is open.
+ */
+function lyricsShowing (expanded: boolean, lyricsOpen: boolean): true | undefined {
+  return expanded && lyricsOpen ? true : undefined
 }
 
 type PlayerProps = {
@@ -298,7 +334,7 @@ function visibleBeatMarkers (
  * that system.
  */
 export function Player ({ expanded = false }: PlayerProps) {
-  const { openOverlay, closeOverlay, playerMode, setPlayerMode } = useUI()
+  const { openOverlay, closeOverlay, playerMode, setPlayerMode, lyricsOpen, toggleLyrics } = useUI()
   const {
     currentTrack, isPlaying, currentTime, duration, waveformBars, analyzer,
     pause, resume, seek, playNext, playPrevious,
@@ -319,6 +355,7 @@ export function Player ({ expanded = false }: PlayerProps) {
   // the mini tiers have nowhere to put them, so they aren't in their DOM at
   // all rather than being hidden after the fact.
   const activeMode = expanded ? playerMode : 'default'
+  const showLyrics = lyricsShowing(expanded, lyricsOpen)
 
   // Shares the cache entry `PlayerArt` above already warmed for this track.
   const currentArt = useArtwork(currentTrack?.id, 'full')
@@ -327,6 +364,7 @@ export function Player ({ expanded = false }: PlayerProps) {
     className='player-view'
     data-empty={ currentTrack ? undefined : '' }
     data-mode={ activeMode === 'default' ? undefined : activeMode }
+    data-lyrics={ showLyrics }
     aria-label={ playerAriaLabel(currentTrack) }>
     {currentArt &&
         <div key={ currentTrack?.id } className='album-art-bg' aria-hidden='true'>
@@ -356,14 +394,15 @@ export function Player ({ expanded = false }: PlayerProps) {
       {expanded &&
         <PlayerActions
           mode={ activeMode }
+          lyricsOpen={ lyricsOpen }
           hasTrack={ Boolean(currentTrack) }
           onMode={ toggleMode }
+          onLyrics={ toggleLyrics }
           onClose={ closeOverlay } />
       }
 
       <PlayerPanel
         mode={ activeMode }
-        lyrics={ currentTrack?.lyrics }
         analyzer={ analyzer }
         analysis={ analysis }
         currentTime={ currentTime }
@@ -402,5 +441,18 @@ export function Player ({ expanded = false }: PlayerProps) {
         onRepeat={ () =>
           setRepeatMode(REPEAT_CYCLE[repeatMode]) } />
     </div>
+
+    {/* Outside `.player-content`, because it is a layer over the whole view
+        rather than another block in its column — and because the nudge that
+        makes room for it is applied to `.player-content` itself.
+
+        Always mounted, unlike `PlayerActions`: `display` is what animates it
+        in and out, and an unmounted element has nothing to animate. The bar's
+        copy never shows it, since `data-open` can only be set when expanded. */}
+    <PlayerLyrics
+      track={ currentTrack }
+      open={ Boolean(showLyrics) }
+      currentTime={ currentTime }
+      duration={ duration } />
   </article>
 }

@@ -19,3 +19,5 @@ export * from './useAmbientPalette'
 export * from './useAppearance'
 
 export * from './useTrackAnalysis'
+
+export * from './useLyricsScroll'
