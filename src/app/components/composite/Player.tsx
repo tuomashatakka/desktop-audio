@@ -305,8 +305,8 @@ export function Player ({ expanded = false }: PlayerProps) {
   }                                                        = useAudio()
   const { shuffle, setShuffle, repeatMode, setRepeatMode,
     showBeatMarkers, showChordAnalysis, showKeyAnalysis } = useSettings()
-  const analysis                                           = useTrackAnalysis(currentTrack?.id)
-  const toggleWindowScale                                  = useWindowScale()
+  const analysis                                          = useTrackAnalysis(currentTrack?.id)
+  const toggleWindowScale                                 = useWindowScale()
 
   /**
    * Clicking the active mode's button returns to the artwork. The value lives

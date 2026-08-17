@@ -67,12 +67,12 @@ const PEAK_LIMIT = 3
 const LABEL_MIN_GAP = 110
 
 interface FrequencyMatrixProps {
-  readonly analyzer:        AnalyserNode | null
-  readonly active:          boolean
-  readonly analysis?:       TrackAnalysis | null
-  readonly status?:         AnalysisStatus
-  readonly error?:          string | null
-  readonly currentTime?:    number
+  readonly analyzer:           AnalyserNode | null
+  readonly active:             boolean
+  readonly analysis?:          TrackAnalysis | null
+  readonly status?:            AnalysisStatus
+  readonly error?:             string | null
+  readonly currentTime?:       number
   readonly showChordAnalysis?: boolean
   readonly showKeyAnalysis?:   boolean
 }
