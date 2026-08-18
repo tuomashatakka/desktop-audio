@@ -192,6 +192,16 @@ interface Settings {
    */
   readonly dsp: DspSettings
 
+  /**
+   * List the current folder's immediate subfolders above the tracks in the
+   * library table.
+   *
+   * Only meaningful while the table is ungrouped or grouped by folder — any
+   * other grouping reorders the list around something a folder is not part
+   * of, so the rows are suppressed there whatever this says.
+   */
+  readonly showSubfolders: boolean
+
   /** Show beat/downbeat markers on the waveform. */
   readonly showBeatMarkers: boolean
 
@@ -235,6 +245,7 @@ interface SettingsContextValue extends Settings {
    */
   readonly updateDsp: (change: (dsp: DspSettings) => DspSettings) => void
 
+  readonly setShowSubfolders:    (show: boolean) => void
   readonly setShowBeatMarkers:   (show: boolean) => void
   readonly setShowChordAnalysis: (show: boolean) => void
   readonly setShowKeyAnalysis:   (show: boolean) => void
@@ -333,6 +344,7 @@ const defaultSettings: Settings = {
   accentDark:        DEFAULT_ACCENT_DARK,
   accentLight:       DEFAULT_ACCENT_LIGHT,
   dsp:               DEFAULT_DSP,
+  showSubfolders:    true,
   showBeatMarkers:   false,
   showChordAnalysis: true,
   showKeyAnalysis:   true,
@@ -522,6 +534,11 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
       ({ ...s, dsp: normalizeDsp(change(s.dsp)) }))
   }, [])
 
+  const setShowSubfolders = useCallback((showSubfolders: boolean) => {
+    update(s =>
+      ({ ...s, showSubfolders }))
+  }, [])
+
   const setShowBeatMarkers = useCallback((showBeatMarkers: boolean) => {
     update(s =>
       ({ ...s, showBeatMarkers }))
@@ -576,6 +593,7 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
       setCornerStyle,
       setAccent,
       updateDsp,
+      setShowSubfolders,
       setShowBeatMarkers,
       setShowChordAnalysis,
       setShowKeyAnalysis,
@@ -604,6 +622,7 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
     prefersLight,
     setAccent,
     updateDsp,
+    setShowSubfolders,
     setShowBeatMarkers,
     setShowChordAnalysis,
     setShowKeyAnalysis,

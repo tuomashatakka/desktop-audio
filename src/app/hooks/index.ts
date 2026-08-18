@@ -6,6 +6,8 @@ export * from './useKeybindings'
 
 export * from './useSortableTable'
 
+export * from './useRowSelection'
+
 export * from './useHeightTier'
 
 export * from './useWindowScale'

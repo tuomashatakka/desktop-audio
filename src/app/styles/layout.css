@@ -328,6 +328,58 @@
 }
 
 /*
+ * Playlists, filed into folders. Depth is `--level`, written inline by
+ * `PlaylistTree`, for the same reason the folder tree does it: no fixed set of
+ * classes can express an arbitrarily deep tree.
+ *
+ * `[data-drop-target]` is the drag affordance shared by every droppable
+ * surface in the sidebar — a playlist, a playlist folder, the empty space
+ * under the tree, and the folder tree itself.
+ */
+.playlist-tree {
+  display: block;
+  min-height: var(--sp-6);
+  padding-bottom: var(--sp-2);
+}
+
+.playlist-level { display: grid; }
+
+.playlist-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  padding-left: calc(var(--sp-3) + var(--level, 0) * var(--sp-3));
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  text-align: start;
+  transition:
+    color var(--duration-fast) var(--ease),
+    background-color var(--duration-fast) var(--ease);
+
+  &:hover { color: var(--text); background: var(--bg-hover); }
+  &.active { color: var(--accent); background: var(--accent-muted); }
+
+  &.folder {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    color: var(--text-muted);
+
+    > .disclosure { transition: transform var(--duration-fast) var(--ease-emphasis); }
+    > .disclosure.open { transform: rotate(90deg); }
+  }
+
+  .name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  small { color: var(--text-muted); font-size: var(--text-xs); }
+}
+
+:is(.playlist-tree, .playlist-row, .folder-tree)[data-drop-target] {
+  background: var(--accent-muted);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/*
  * The folder tree is the WAI-ARIA tree pattern: one tab stop, arrow-key
  * roaming, and a single focusable row at a time. It renders flat — depth is
  * `--level`, written inline by `FolderTree`, because no fixed set of classes

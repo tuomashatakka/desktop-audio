@@ -85,6 +85,31 @@ ordering.
 
 ---
 
+## Drag and Drop
+
+### Invariant: One Drag Vocabulary
+
+Everything draggable — track rows, folder rows, sidebar folders, album/artist
+group headings, grid cards, playlists — describes itself as a `DragPayload` on
+the `application/x-desktop-audio` MIME type (`src/app/utils/dnd.ts`), and every
+drop target resolves it with `tracksForPayload`. Add a drag source by adding a
+payload kind there, never by inventing a second MIME type. Payloads carry ids
+and paths only, so a drop resolves against the library as it stands at drop
+time rather than against a snapshot taken when the drag started.
+
+---
+
+## Playlists
+
+Persisted to `localStorage` under `desktop-audio-playlists` as
+`{ playlists: StoredPlaylist[], folders: PlaylistFolder[] }` — **ids only**. A
+track's id is its path, so membership survives a rescan and can never hold a
+stale copy of an edited tag; `LibraryContext` resolves the ids against the
+in-memory library on read. Playlists carry an icon from `PLAYLIST_ICONS` and
+may be filed into arbitrarily nested `PlaylistFolder`s.
+
+---
+
 ## Fonts
 
 Bundled families: Montserrat (OFL), Space Grotesk (OFL), Geist (OFL),

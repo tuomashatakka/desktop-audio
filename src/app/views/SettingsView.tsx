@@ -40,13 +40,13 @@ export function SettingsView () {
     uiFont, monoFont, fontScale,
     accentDark, accentLight, accentSource, ambientStrength,
     uiDensity, cornerStyle,
-    showBeatMarkers, showChordAnalysis, showKeyAnalysis,
+    showSubfolders, showBeatMarkers, showChordAnalysis, showKeyAnalysis,
     addLibraryPath, removeLibraryPath,
     setTheme, setCustomTheme, exportTheme, importTheme, setDefaultDensity,
     setVolume, setRepeatMode, setShuffle,
     setUiFont, setMonoFont, setFontScale, setAccent,
     setAccentSource, setAmbientStrength, setUiDensity, setCornerStyle,
-    setShowBeatMarkers, setShowChordAnalysis, setShowKeyAnalysis,
+    setShowSubfolders, setShowBeatMarkers, setShowChordAnalysis, setShowKeyAnalysis,
   }                                                   = useSettings()
   const data                                          = useData()
   const themeFileRef                                  = useRef<HTMLInputElement>(null)
@@ -180,6 +180,16 @@ export function SettingsView () {
         }
 
         <Button type='button' variant='secondary' onClick={ handleAddPath }>Add Folder</Button>
+
+        <label className='field checkbox-field'>
+          <input
+            type='checkbox'
+            checked={ showSubfolders }
+            onChange={ event =>
+              setShowSubfolders(event.target.checked) } />
+
+          <span>Show subfolders in the track list</span>
+        </label>
 
         <label className='field default-density'>
           <span>Default Row Density</span>

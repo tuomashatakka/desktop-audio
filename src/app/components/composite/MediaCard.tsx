@@ -14,6 +14,13 @@ interface MediaCardProps {
   /** Secondary action. Omitted when opening already starts playback. */
   readonly onPlay?:    () => void
   readonly playLabel?: string
+
+  /**
+   * Makes the whole tile a drag source. It sits on the `<article>` rather than
+   * on the title button so the cover — most of the card's area — is what the
+   * user actually grabs.
+   */
+  readonly onDragStart?: (event: React.DragEvent) => void
 }
 
 /**
@@ -29,11 +36,15 @@ interface MediaCardProps {
  * button is invalid too, and the browser unnests it silently.
  */
 export function MediaCard ({
-  title, subtitle, trackId, color, onOpen, onPlay, playLabel,
+  title, subtitle, trackId, color, onOpen, onPlay, playLabel, onDragStart,
 }: MediaCardProps) {
   const titleId = useId()
 
-  return <article className='media-card' aria-labelledby={ titleId }>
+  return <article
+    className='media-card'
+    aria-labelledby={ titleId }
+    draggable={ onDragStart !== undefined }
+    onDragStart={ onDragStart }>
     <AlbumArt className='card-cover' trackId={ trackId } color={ color } />
 
     <h3 className='card-title' id={ titleId }>

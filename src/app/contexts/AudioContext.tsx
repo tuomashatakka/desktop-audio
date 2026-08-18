@@ -44,6 +44,17 @@ interface AudioState {
   /** The list playback is walking, and where in it we are (`-1` = nowhere). */
   readonly queue:      readonly Track[]
   readonly queueIndex: number
+
+  /**
+   * Tracks that have started playing, most recent first.
+   *
+   * Kept here rather than derived from the queue: the queue is replaced
+   * wholesale every time playback starts somewhere new, so by the time you
+   * want to know what you were listening to an hour ago it is long gone. A
+   * replay moves the track back to the front instead of duplicating it, which
+   * makes the list read as "what I have been playing" rather than as a log.
+   */
+  readonly history: readonly Track[]
 }
 
 /** Playback state plus the transport actions exposed to the UI. */
@@ -79,6 +90,9 @@ interface AudioContextValue extends AudioState {
   /** Ensure audio context is ready (resumes if suspended). Call after user gesture. */
   readonly ensureReady: () => Promise<void>
 }
+
+/** How many played tracks {@link AudioState.history} keeps. */
+const MAX_HISTORY = 200
 
 /** Direction of travel through the queue, as asked for by the transport. */
 type Step = 1 | -1
@@ -287,6 +301,7 @@ export function AudioProvider ({ children }: AudioProviderProps) {
     waveformBars: null,
     queue:        [],
     queueIndex:   -1,
+    history:      [],
   })
 
   // Playback preferences are read, never written, from here — the toggles in
@@ -447,7 +462,15 @@ export function AudioProvider ({ children }: AudioProviderProps) {
       return
 
     setState(s =>
-      ({ ...s, waveformBars: null, currentTrack: track, isPlaying: true, currentTime: 0 }))
+      ({
+        ...s,
+        waveformBars: null,
+        currentTrack: track,
+        isPlaying:    true,
+        currentTime:  0,
+        history:      [ track, ...s.history.filter(played =>
+          played.id !== track.id) ].slice(0, MAX_HISTORY),
+      }))
 
     try {
       setupAnalyzer()

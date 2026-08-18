@@ -1,9 +1,10 @@
-/* eslint-disable react-strict/no-style-prop -- `--level` is the node's depth
-   in an arbitrarily deep tree, which no fixed set of classes can express. */
 import type { CSSProperties } from 'react'
+import { useState } from 'react'
 import type { FolderNode } from '../../contexts'
 import { useTreeNavigation } from '../../hooks/useTreeNavigation'
 import type { FlatNode } from '../../hooks/useTreeNavigation'
+import { hasDragPayload, readDragPayload, setDragPayload } from '../../utils/dnd'
+import type { DragPayload } from '../../utils/dnd'
 import { Icon } from '../atomic'
 
 
@@ -23,12 +24,18 @@ import { Icon } from '../atomic'
  * The disclosure chevron is no longer a nested `<button>`: `aria-expanded`
  * belongs on the treeitem, and a button inside a treeitem would put a second
  * interactive node in the accessibility tree for the same job.
+ *
+ * Every row is a drag source carrying its path — dropping one on a playlist
+ * adds the whole folder, subfolders included. The tree itself accepts a drop
+ * too, but only of a playlist: that is how a playlist filed in a folder gets
+ * back out to the root.
  */
 interface FolderTreeProps {
   readonly folders:      ReadonlyArray<FolderNode>
   readonly selectedPath: string | null
   readonly onSelect:     (path: string) => void
   readonly onToggle:     (path: string) => void
+  readonly onDrop?:      (payload: DragPayload) => void
 }
 
 interface FolderTreeItemProps {
@@ -53,9 +60,14 @@ function FolderTreeItem ({ entry, selected, focused, onSelect, onToggle, onFocus
     aria-selected={ selected }
     aria-expanded={ hasChildren ? node.expanded : undefined }
     role='treeitem'
+    draggable
     tabIndex={ focused ? 0 : -1 }
     onClick={ () =>
       onSelect(node.path) }
+    onDragStart={ event => {
+      event.stopPropagation()
+      setDragPayload(event.dataTransfer, { kind: 'folder', path: node.path, label: node.name })
+    } }
     onFocus={ () =>
       onFocus(node.path) }>
     {hasChildren
@@ -77,10 +89,37 @@ function FolderTreeItem ({ entry, selected, focused, onSelect, onToggle, onFocus
 }
 
 /** See module docstring. */
-export function FolderTree ({ folders, selectedPath, onSelect, onToggle }: FolderTreeProps) {
+export function FolderTree ({ folders, selectedPath, onSelect, onToggle, onDrop }: FolderTreeProps) {
   const { visible, focusedPath, setFocused, onKeyDown } = useTreeNavigation({ folders, onSelect, onToggle })
+  const [ dropActive, setDropActive ]                   = useState(false)
 
-  return <ul className='folder-tree' aria-label='Folders' role='tree' onKeyDown={ onKeyDown }>
+  const handleDragOver = (event: React.DragEvent) => {
+    if (!onDrop || !hasDragPayload(event.dataTransfer))
+      return
+
+    event.preventDefault()
+    setDropActive(true)
+  }
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault()
+    setDropActive(false)
+
+    const payload = readDragPayload(event.dataTransfer)
+    if (payload)
+      onDrop?.(payload)
+  }
+
+  return <ul
+    className='folder-tree'
+    aria-label='Folders'
+    data-drop-target={ dropActive || undefined }
+    role='tree'
+    onKeyDown={ onKeyDown }
+    onDragOver={ handleDragOver }
+    onDragLeave={ () =>
+      setDropActive(false) }
+    onDrop={ handleDrop }>
     {visible.map(entry =>
       <FolderTreeItem
         key={ entry.node.id }

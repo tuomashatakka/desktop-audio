@@ -6,11 +6,12 @@
  * the library or the sidebar down. That is why there is no route state here:
  * `overlay` names at most one dialog, and `null` means "just the library".
  *
- * Three selectors scope the library. A playlist excludes the other two — it is
- * its own list, not a filter over the tree. But `selectedFolderPath` and
- * `selectedGroup` **compose**: drilling into an album card narrows the folder
- * you were already browsing, because that card was counted inside it. Picking
- * a different folder drops the drill-in, since the bucket may not exist there.
+ * Four selectors scope the library. A playlist and a playback list each
+ * exclude every other — both are their own list, not a filter over the tree.
+ * But `selectedFolderPath` and `selectedGroup` **compose**: drilling into an
+ * album card narrows the folder you were already browsing, because that card
+ * was counted inside it. Picking a different folder drops the drill-in, since
+ * the bucket may not exist there.
  *
  * Presentation preferences (density, grouping, sidebar width) are persisted;
  * everything else is session-only.
@@ -64,6 +65,15 @@ export interface GroupScope {
   readonly label:    string
 }
 
+/**
+ * The two playback-derived lists the sidebar can show.
+ *
+ * Neither is a filter over the library: `queue` is what the engine is walking
+ * and `history` is what it has already played, so both arrive in an order the
+ * table must not re-sort — see `TrackTable`'s `naturalOrder`.
+ */
+export type PlaybackList = 'queue' | 'history'
+
 /** The two card-grid densities. */
 export type GridDensity = Extract<Density, 'grid-sm' | 'grid-lg'>
 
@@ -102,6 +112,7 @@ interface UIState {
   readonly sidebarOpen:        boolean
   readonly selectedFolderPath: string | null
   readonly selectedPlaylistId: string | null
+  readonly selectedList:       PlaybackList | null
   readonly selectedGroup:      GroupScope | null
   readonly editingTrackId:     string | null
   readonly density:            Density
@@ -120,6 +131,7 @@ interface UIContextValue extends UIState {
   readonly toggleSidebar:   () => void
   readonly selectFolder:    (path: string | null) => void
   readonly selectPlaylist:  (id: string | null) => void
+  readonly selectList:      (list: PlaybackList | null) => void
   readonly selectGroup:     (scope: GroupScope | null) => void
   readonly setEditingTrack: (id: string | null) => void
   readonly setDensity:      (d: Density) => void
@@ -198,6 +210,7 @@ function loadSidebarWidth (): number {
 const NO_SCOPE = {
   selectedFolderPath: null,
   selectedPlaylistId: null,
+  selectedList:       null,
   selectedGroup:      null,
 } as const
 
@@ -273,6 +286,16 @@ export function UIProvider ({ children, value }: UIProviderProps) {
   }, [])
 
   /**
+   * The queue and the history are their own lists, like a playlist — a folder
+   * or a drilled-into album would otherwise filter what playback actually did,
+   * which is not a thing either list can mean.
+   */
+  const selectList = useCallback((list: PlaybackList | null) => {
+    setState(s =>
+      ({ ...s, ...NO_SCOPE, selectedList: list }))
+  }, [])
+
+  /**
    * A group **narrows within** the folder rather than replacing it — the card
    * the user clicked was counted inside that folder, so the list it opens has
    * to be the same set. Clearing the folder here made a card labelled
@@ -280,7 +303,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
    */
   const selectGroup = useCallback((scope: GroupScope | null) => {
     setState(s =>
-      ({ ...s, selectedPlaylistId: null, selectedGroup: scope }))
+      ({ ...s, selectedPlaylistId: null, selectedList: null, selectedGroup: scope }))
   }, [])
 
   const setEditingTrack = useCallback((id: string | null) => {
@@ -334,6 +357,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       toggleSidebar,
       selectFolder,
       selectPlaylist,
+      selectList,
       selectGroup,
       setEditingTrack,
       setDensity,
@@ -351,6 +375,7 @@ export function UIProvider ({ children, value }: UIProviderProps) {
     toggleSidebar,
     selectFolder,
     selectPlaylist,
+    selectList,
     selectGroup,
     setEditingTrack,
     setDensity,

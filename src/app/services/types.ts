@@ -17,31 +17,41 @@
  */
 export type IconName =
   | 'add' |
+  'bolt' |
   'chevron-right' |
+  'clock' |
   'close' |
   'density-compact' |
   'density-normal' |
   'density-relaxed' |
+  'disc' |
   'dsp' |
   'edit' |
+  'folder' |
   'grid-lg' |
   'grid-sm' |
+  'headphones' |
+  'heart' |
   'library' |
+  'list' |
   'lyrics' |
   'maximize' |
   'menu' |
+  'microphone' |
   'minimize' |
   'music' |
   'next' |
   'pause' |
   'play' |
   'previous' |
+  'queue' |
   'repeat' |
   'search' |
   'settings' |
   'shuffle' |
   'spectrum' |
   'star' |
+  'trash' |
   'waveform'
 
 export interface TrackFields {
@@ -164,11 +174,51 @@ export interface FolderNode {
   readonly expanded: boolean
 }
 
-/** A user-curated ordered list of tracks. */
-export interface Playlist {
-  readonly id:     string
-  readonly name:   string
+/**
+ * The icons a playlist may be given, in the order the picker offers them.
+ *
+ * A closed set rather than the whole {@link IconName} vocabulary: most of that
+ * vocabulary names a control (`pause`, `minimize`, `settings`), and a playlist
+ * wearing one of those reads as a button rather than as a list.
+ */
+export const PLAYLIST_ICONS = [
+  'music', 'heart', 'star', 'disc', 'list', 'headphones', 'microphone',
+  'bolt', 'clock', 'folder',
+] as const
+
+export type PlaylistIcon = typeof PLAYLIST_ICONS[number]
+
+export const DEFAULT_PLAYLIST_ICON: PlaylistIcon = 'music'
+
+/**
+ * A user-curated ordered list of tracks.
+ *
+ * `trackIds` is the stored membership — a track's id is its path, so it
+ * survives a rescan — and `tracks` is that list resolved against the library
+ * currently in memory. A playlist entry whose file is no longer scanned simply
+ * does not resolve; the id stays, so re-adding the folder brings it back.
+ */
+export interface StoredPlaylist {
+  readonly id:   string
+  readonly name: string
+  readonly icon: PlaylistIcon
+
+  /** The {@link PlaylistFolder} this playlist sits in; `null` at the root. */
+  readonly folderId: string | null
+  readonly trackIds: readonly string[]
+}
+
+export interface Playlist extends StoredPlaylist {
   readonly tracks: readonly Track[]
+}
+
+/** A container for playlists in the sidebar. Folders may nest. */
+export interface PlaylistFolder {
+  readonly id:       string
+  readonly name:     string
+  readonly icon:     PlaylistIcon
+  readonly parentId: string | null
+  readonly expanded: boolean
 }
 
 export interface AudioMetadata {

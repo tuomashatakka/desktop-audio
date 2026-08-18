@@ -14,6 +14,7 @@ const uiValue: UIValue = {
   sidebarOpen:        false,
   selectedFolderPath: null,
   selectedPlaylistId: null,
+  selectedList:       null,
   selectedGroup:      null,
   editingTrackId:     null,
   density:            'normal',
@@ -24,6 +25,7 @@ const uiValue: UIValue = {
   toggleSidebar:      noop,
   selectFolder:       noop,
   selectPlaylist:     noop,
+  selectList:         noop,
   selectGroup:        noop,
   setEditingTrack:    noop,
   setDensity:         noop,
@@ -333,5 +335,151 @@ describe('TrackTable grouped keyboard navigation', () => {
     )
 
     expect(container.querySelector('.track-table')).toHaveAttribute('data-density', 'normal')
+  })
+})
+
+/*
+ * Selection and playback are two different gestures now: a click picks rows,
+ * a double click starts them. A single click used to play, which made picking
+ * three tracks to drag somewhere impossible without playing all three.
+ *
+ * These render grouped, like the tests above: a flat list is virtualized, and
+ * jsdom's zero-height scroll container mounts none of its rows.
+ */
+describe('TrackTable selection', () => {
+  const renderGrouped = (onPlay = vi.fn()) => {
+    render(
+      <UIProvider value={ uiValue }>
+        <TrackTable
+          tracks={ tracks }
+          isLoading={ false }
+          currentTrack={ null }
+          isPlaying={ false }
+          onPlay={ onPlay } />
+      </UIProvider>
+    )
+    return onPlay
+  }
+
+  it('selects on a plain click without starting playback', () => {
+    const onPlay = renderGrouped()
+
+    fireEvent.click(row(/first track/i))
+
+    expect(row(/first track/i)).toHaveAttribute('aria-pressed', 'true')
+    expect(row(/second track/i)).toHaveAttribute('aria-pressed', 'false')
+    expect(onPlay).not.toHaveBeenCalled()
+  })
+
+  it('plays on a double click', () => {
+    const onPlay = renderGrouped()
+
+    fireEvent.doubleClick(row(/second track/i))
+
+    expect(onPlay).toHaveBeenCalledTimes(1)
+    expect(onPlay.mock.calls[0][0]).toMatchObject({ title: 'Second Track' })
+  })
+
+  it('adds one row at a time with ctrl/cmd, and takes a run with shift', () => {
+    renderGrouped()
+
+    fireEvent.click(row(/first track/i))
+    fireEvent.click(row(/third track/i), { ctrlKey: true })
+
+    expect(row(/first track/i)).toHaveAttribute('aria-pressed', 'true')
+    expect(row(/second track/i)).toHaveAttribute('aria-pressed', 'false')
+    expect(row(/third track/i)).toHaveAttribute('aria-pressed', 'true')
+
+    // Shift extends from the row the ctrl-click last touched, through the
+    // *rendered* order — Third and Second are adjacent on screen.
+    fireEvent.click(row(/second track/i), { shiftKey: true })
+    expect(row(/second track/i)).toHaveAttribute('aria-pressed', 'true')
+    expect(row(/third track/i)).toHaveAttribute('aria-pressed', 'true')
+    expect(row(/first track/i)).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('still plays from the keyboard, where there is no double click', () => {
+    const onPlay = renderGrouped()
+
+    fireEvent.keyDown(row(/first track/i), { key: 'Enter' })
+
+    expect(onPlay).toHaveBeenCalledTimes(1)
+  })
+})
+
+const folderRows = [
+  { path: '/music/rock', name: 'Rock', trackCount: 12 },
+  { path: '/music/jazz', name: 'Jazz', trackCount: 1 },
+]
+
+describe('TrackTable folder rows', () => {
+  it('lists the subfolders above the tracks and opens one on double click', () => {
+    const onNavigate = vi.fn()
+
+    render(
+      <UIProvider value={ uiValue }>
+        <TrackTable
+          tracks={ tracks }
+          isLoading={ false }
+          currentTrack={ null }
+          isPlaying={ false }
+          folders={ folderRows }
+          onPlay={ vi.fn() }
+          onNavigate={ onNavigate } />
+      </UIProvider>
+    )
+
+    const rock = screen.getByRole('button', { name: /Rock/ })
+    expect(rock).toHaveTextContent('12 tracks')
+    expect(screen.getByRole('button', { name: /Jazz/ })).toHaveTextContent('1 track')
+
+    fireEvent.click(rock)
+    expect(onNavigate).not.toHaveBeenCalled()
+
+    fireEvent.doubleClick(rock)
+    expect(onNavigate).toHaveBeenCalledWith('/music/rock')
+  })
+
+  it('renders nothing when the caller passes no folders', () => {
+    const { container } = render(
+      <UIProvider value={ uiValue }>
+        <TrackTable
+          tracks={ tracks }
+          isLoading={ false }
+          currentTrack={ null }
+          isPlaying={ false }
+          onPlay={ vi.fn() } />
+      </UIProvider>
+    )
+
+    expect(container.querySelector('.folder-rows')).toBeNull()
+  })
+})
+
+describe('TrackTable natural order', () => {
+  const renderQueue = (naturalOrder: string | null) => {
+    const { container } = render(
+      <UIProvider value={ uiValue }>
+        <TrackTable
+          tracks={ [ tracks[2], tracks[0], tracks[1] ] }
+          isLoading={ false }
+          currentTrack={ null }
+          isPlaying={ false }
+          naturalOrder={ naturalOrder }
+          onPlay={ vi.fn() } />
+      </UIProvider>
+    )
+
+    return [ ...container.querySelectorAll('.track-row') ]
+      .map(el => el.textContent?.match(/First|Second|Third/)?.[0])
+  }
+
+  it('shows a named list in the order it was handed, not sorted by title', () => {
+    // The queue was handed over reversed; sorting by title would undo that.
+    expect(renderQueue('queue')).toEqual([ 'Third', 'First', 'Second' ])
+  })
+
+  it('sorts by title when no list is named', () => {
+    expect(renderQueue(null)).toEqual([ 'First', 'Second', 'Third' ])
   })
 })

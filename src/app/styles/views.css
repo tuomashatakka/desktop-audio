@@ -334,7 +334,17 @@
   transition: background-color var(--duration-fast) var(--ease);
 
   &:hover { background: var(--bg-hover); }
+
+  /*
+   * Two different states, two different reads: `active` is the track that is
+   * *playing* and wears the accent; `data-selected` is what the user has
+   * picked and wears a neutral fill. A selection that borrowed the accent
+   * would leave no way to see which of five highlighted rows is the one
+   * coming out of the speakers.
+   */
+  &[data-selected] { background: var(--bg-input); box-shadow: inset 2px 0 0 var(--text-dim); }
   &.active { background: var(--accent-muted); }
+  &.active[data-selected] { box-shadow: inset 2px 0 0 var(--accent); }
   &:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
 
   > span { font-size: var(--text-sm); line-height: 1.25; }
@@ -362,6 +372,39 @@
 }
 
 button.track-row { width: 100%; color: inherit; text-align: start; }
+
+/*
+ * Subfolders of the browsed location, above the tracks.
+ *
+ * They deliberately do *not* take the track grid: none of the track columns
+ * describe a folder, so a folder row is one line of its own — icon, name, and
+ * how much is inside it.
+ */
+.folder-rows {
+  display: grid;
+  padding-block: var(--sp-1);
+  border-bottom: 1px solid var(--border);
+
+  .folder-entry {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--sp-2);
+    align-items: center;
+
+    > .icon { color: var(--text-muted); font-size: var(--text-lg); }
+    &:hover > .icon { color: var(--accent); }
+
+    small { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
+  }
+
+  .folder-entry-name {
+    overflow: hidden;
+    color: var(--text);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
 
 /* ─── track groups ─────────────────────────────────────────────────────── */
 

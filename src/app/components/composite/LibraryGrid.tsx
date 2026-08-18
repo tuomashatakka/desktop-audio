@@ -5,6 +5,7 @@ import type { VirtualItem } from '@tanstack/react-virtual'
 import type { BucketGrouping, GridDensity, Grouping, GroupScope, Track } from '../../contexts'
 import { buildGroups } from '../../utils/grouping'
 import type { GroupBlock } from '../../utils/grouping'
+import { setDragPayload } from '../../utils/dnd'
 import { basename } from './Breadcrumbs'
 import { MediaCard } from './MediaCard'
 
@@ -142,7 +143,13 @@ function VirtualCard ({
       trackId={ track.id }
       color={ track.coverColor }
       onOpen={ () =>
-        onPlay(tracks, item.index) } />
+        onPlay(tracks, item.index) }
+      onDragStart={ event =>
+        setDragPayload(event.dataTransfer, {
+          kind:     'tracks',
+          trackIds: [ track.id ],
+          label:    track.title,
+        }) } />
   }
   else {
     const group = groups[item.index]
@@ -158,7 +165,14 @@ function VirtualCard ({
       onOpen={ () =>
         onOpen({ grouping: grouping as BucketGrouping, key: group.key, label: group.label }) }
       onPlay={ () =>
-        onPlay(group.tracks, 0) } />
+        onPlay(group.tracks, 0) }
+      onDragStart={ event =>
+        setDragPayload(event.dataTransfer, {
+          kind:     'group',
+          grouping: grouping as BucketGrouping,
+          key:      group.key,
+          label:    group.label,
+        }) } />
   }
 
   return <li
