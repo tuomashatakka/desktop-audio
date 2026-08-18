@@ -499,6 +499,74 @@
     animation: surface-in var(--duration-fast) var(--ease-emphasis);
   }
 
+  /*
+   * The track table's column menu: one checkbox per column, plus the quick
+   * hide for the column that was right-clicked and a reset.
+   */
+  .config-menu {
+    display: grid;
+    gap: var(--sp-1);
+    padding: var(--sp-2);
+    border: 0;
+
+    legend {
+      padding-inline: var(--sp-1);
+      color: var(--text-muted);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+    }
+
+    label {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: var(--sp-2);
+      padding: var(--sp-1) var(--sp-2);
+      border-radius: var(--radius-sm);
+      color: var(--text-dim);
+      font-size: var(--text-sm);
+      cursor: pointer;
+
+      &:hover { color: var(--text); background: var(--bg-hover); }
+      &:has(:disabled) { color: var(--text-muted); cursor: default; }
+    }
+  }
+
+  /* A playlist's icon, picked in the menu rather than behind a submenu. */
+  .icon-picker {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--sp-1);
+    padding: var(--sp-2);
+    border: 0;
+    border-bottom: 1px solid var(--border);
+
+    legend {
+      padding-inline: var(--sp-1);
+      overflow: hidden;
+      max-width: 100%;
+      color: var(--text-muted);
+      font-size: var(--text-xs);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    button {
+      display: grid;
+      place-items: center;
+      padding: var(--sp-2);
+      border-radius: var(--radius-sm);
+      color: var(--text-dim);
+      font-size: var(--text-base);
+      transition:
+        color var(--duration-fast) var(--ease),
+        background-color var(--duration-fast) var(--ease);
+
+      &:hover { color: var(--text); background: var(--bg-hover); }
+      &.active { color: var(--accent); background: var(--accent-muted); }
+    }
+  }
+
   .context-menu-dismiss { position: fixed; inset: 0; z-index: 0; }
   .context-menu-list { padding-block: var(--sp-1); }
 

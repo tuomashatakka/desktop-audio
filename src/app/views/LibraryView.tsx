@@ -1,12 +1,13 @@
 import { useMemo, useEffect, useState, useCallback, useRef } from 'react'
 import { useUI, useLibrary, useAudio, useSettings, isGridDensity } from '../contexts'
-import type { GroupScope, Track } from '../contexts'
+import type { GroupScope, PlaybackList, Track } from '../contexts'
 import { useLibraryScanner } from '../hooks'
 import { Button, PromptDialog } from '../components/atomic'
 import { TrackTable } from '../components/composite/TrackTable'
 import { LibraryGrid } from '../components/composite/LibraryGrid'
 import { LibraryToolbar } from './LibraryToolbar'
 import { bucketKey } from '../utils/grouping'
+import { subfolderRows } from '../utils/folders'
 import { useHost } from '../data'
 import type { ContextMenuPoint, SerializableMenuItem } from '../services/types'
 
@@ -28,6 +29,17 @@ const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(item =>
                          item.separator).length * SEPARATOR_HEIGHT +
                        PADDING * 2
 
+/** Why the list in front of the user is empty, in its own words. */
+function emptyHint (list: PlaybackList | null, hasPlaylist: boolean): string {
+  if (list === 'queue')
+    return 'Nothing is queued'
+  if (list === 'history')
+    return 'Nothing has played yet'
+  return hasPlaylist
+    ? 'This playlist is empty'
+    : 'Select a folder or add library paths in Settings'
+}
+
 /**
  * The library: its toolbar, and the collection as either a list or a grid.
  *
@@ -38,18 +50,21 @@ const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(item =>
  */
 export function LibraryView () {
   const {
-    setEditingTrack, selectedFolderPath, selectedPlaylistId, selectedGroup,
-    selectFolder, selectGroup, density, grouping, openOverlay,
-  }                                                                        = useUI()
-  const { filteredTracks, playlists, addPlaylist, selectTrack, isLoading } = useLibrary()
-  const { playQueue, currentTrack, isPlaying }                             = useAudio()
-  const { libraryPaths, theme }                                            = useSettings()
-  const host                                                               = useHost()
+    setEditingTrack, selectedFolderPath, selectedPlaylistId, selectedList,
+    selectedGroup, selectFolder, selectGroup, density, grouping, openOverlay,
+  }                                                            = useUI()
+  const {
+    filteredTracks, folders, playlists, addPlaylist, selectTrack, isLoading,
+  }                                                            = useLibrary()
+  const { playQueue, currentTrack, isPlaying, queue, history } = useAudio()
+  const { libraryPaths, theme, showSubfolders }                = useSettings()
+  const host                                                   = useHost()
 
   const { isInitialLoading } = useLibraryScanner()
 
-  const [ promptOpen, setPromptOpen ] = useState(false)
-  const contextTrackRef               = useRef<Track | null>(null)
+  /** The track "Add to Playlist" was invoked on, held while the prompt is up. */
+  const [ playlistFor, setPlaylistFor ] = useState<Track | null>(null)
+  const contextTrackRef                 = useRef<Track | null>(null)
 
   const goToLibrarySettings = useCallback(() => {
     openOverlay('settings')
@@ -62,11 +77,13 @@ export function LibraryView () {
     : undefined
 
   /**
-   * A playlist is its own list. Otherwise the folder and the drilled-into
-   * group are *both* applied — a card counted inside a folder has to open the
-   * same set it advertised.
+   * A playlist and a playback list are each their own list. Otherwise the
+   * folder and the drilled-into group are *both* applied — a card counted
+   * inside a folder has to open the same set it advertised.
    */
   const displayTracks = useMemo(() => {
+    if (selectedList)
+      return selectedList === 'queue' ? queue : history
     if (activePlaylist)
       return activePlaylist.tracks
 
@@ -78,7 +95,25 @@ export function LibraryView () {
       tracks = tracks.filter(track =>
         bucketKey(track, selectedGroup.grouping) === selectedGroup.key)
     return tracks
-  }, [ activePlaylist, selectedGroup, selectedFolderPath, filteredTracks ])
+  }, [ selectedList, queue, history, activePlaylist, selectedGroup, selectedFolderPath, filteredTracks ])
+
+  /**
+   * Subfolders belong above a list of *this folder's* tracks, so they show
+   * only while the table is showing exactly that: ungrouped or grouped by
+   * folder, with nothing else scoping the view. Grouping by album or artist
+   * reorders the list around something a folder is not part of, and a playlist
+   * or a playback list has no location at all.
+   */
+  const folderRows = useMemo(() => {
+    const browsing = !activePlaylist && !selectedList && !selectedGroup
+    if (!showSubfolders || !browsing || grouping !== 'none' && grouping !== 'path')
+      return []
+
+    return subfolderRows(folders, selectedFolderPath, filteredTracks)
+  }, [
+    showSubfolders, activePlaylist, selectedList, selectedGroup, grouping,
+    folders, selectedFolderPath, filteredTracks,
+  ])
 
   /**
    * Starting a track queues the list it came from, not the whole library.
@@ -132,14 +167,14 @@ export function LibraryView () {
         return
       switch (index) {
         case 0: handleTrackPlay(track, 0); break
-        case 1: setPromptOpen(true); break
+        case 1: setPlaylistFor(track); break
         // index 2 is the separator — no action
         case 3: setEditingTrack(track.id); break
       }
       contextTrackRef.current = null
     }), [ handleTrackPlay, setEditingTrack, host ])
 
-  const scoped   = Boolean(selectedGroup || activePlaylist)
+  const scoped   = Boolean(selectedGroup || activePlaylist || selectedList)
   const showGrid = isGridDensity(density) && !scoped
 
   const collection = showGrid
@@ -155,6 +190,8 @@ export function LibraryView () {
       currentTrack={ currentTrack }
       isPlaying={ isPlaying }
       roots={ libraryPaths }
+      folders={ folderRows }
+      naturalOrder={ selectedList }
       onPlay={ handleTrackPlay }
       onPlayGroup={ tracks =>
         handleQueue(tracks, 0) }
@@ -182,22 +219,21 @@ export function LibraryView () {
         : displayTracks.length === 0 && !isLoading
           ? <p className='status-message'>
             No tracks found
-            <small>
-              {activePlaylist
-                ? 'This playlist is empty'
-                : 'Select a folder or add library paths in Settings'}
-            </small>
+            <small>{emptyHint(selectedList, activePlaylist !== undefined)}</small>
           </p>
           : collection
     }
 
+    {/* The new playlist starts with the track the menu was opened on — the
+        dialog is reached from "Add to Playlist", so creating an empty one
+        would answer a different question than the one that was asked. */}
     <PromptDialog
-      open={ promptOpen }
+      open={ playlistFor !== null }
       title='New Playlist'
       placeholder='Playlist name...'
       onConfirm={ name =>
-        addPlaylist(name) }
+        addPlaylist(name, { tracks: playlistFor ? [ playlistFor ] : []}) }
       onClose={ () =>
-        setPromptOpen(false) } />
+        setPlaylistFor(null) } />
   </section>
 }

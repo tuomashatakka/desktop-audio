@@ -14,6 +14,12 @@ const DENSITIES: readonly SegmentedOption<Density>[] = [
   { value: 'grid-lg', label: 'Large grid', icon: 'grid-lg' },
 ]
 
+/** Titles for the two playback-derived lists; they have no path to show. */
+const LIST_TITLES = {
+  queue:   'Playback queue',
+  history: 'Last played',
+} as const
+
 const GROUPINGS: readonly SegmentedOption<Grouping>[] = [
   { value: 'none', label: 'None' },
   { value: 'album', label: 'Album' },
@@ -30,8 +36,8 @@ const GROUPINGS: readonly SegmentedOption<Grouping>[] = [
  */
 export function LibraryToolbar () {
   const {
-    selectedFolderPath, selectedPlaylistId, selectedGroup, selectFolder,
-    density, setDensity, grouping, setGrouping,
+    selectedFolderPath, selectedPlaylistId, selectedList, selectedGroup,
+    selectFolder, density, setDensity, grouping, setGrouping,
   }                                              = useUI()
   const { filteredTracks, playlists, isLoading } = useLibrary()
   const { libraryPaths }                         = useSettings()
@@ -48,14 +54,16 @@ export function LibraryToolbar () {
     : []
 
   return <header className='library-toolbar'>
-    {activePlaylist
-      ? <h1>{activePlaylist.name}</h1>
-      : <Breadcrumbs
-        path={ selectedFolderPath }
-        roots={ libraryPaths }
-        trail={ trail }
-        label='Library location'
-        onNavigate={ selectFolder } />
+    {selectedList
+      ? <h1>{LIST_TITLES[selectedList]}</h1>
+      : activePlaylist
+        ? <h1>{activePlaylist.name}</h1>
+        : <Breadcrumbs
+          path={ selectedFolderPath }
+          roots={ libraryPaths }
+          trail={ trail }
+          label='Library location'
+          onNavigate={ selectFolder } />
     }
 
     {isLoading && filteredTracks.length > 0 &&
