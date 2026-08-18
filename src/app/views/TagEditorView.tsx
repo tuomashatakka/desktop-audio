@@ -298,19 +298,22 @@ function TagEditorForm ({ track, onClose, onSaved }: TagEditorFormProps) {
           onClear={ () =>
             setArt(undefined) } />
 
-        <section className='form-stack'>
-          <TagInputs fields={ PRIMARY_TAG_FIELDS } form={ form } onChange={ setField } />
+        <div className='form-stack'>
+          <fieldset className='form-stack'>
+            <legend className='sr-only'>Tags</legend>
+            <TagInputs fields={ PRIMARY_TAG_FIELDS } form={ form } onChange={ setField } />
 
-          <details className='tag-extended'>
-            <summary>
-              <Icon name='chevron-right' />
-              More tags
-            </summary>
+            <details className='tag-extended'>
+              <summary>
+                <Icon name='chevron-right' />
+                More tags
+              </summary>
 
-            <fieldset className='form-stack'>
-              <TagInputs fields={ EXTENDED_TAG_FIELDS } form={ form } onChange={ setField } />
-            </fieldset>
-          </details>
+              <div className='form-stack'>
+                <TagInputs fields={ EXTENDED_TAG_FIELDS } form={ form } onChange={ setField } />
+              </div>
+            </details>
+          </fieldset>
 
           <dl className='file-info'>
             <div>
@@ -362,7 +365,7 @@ function TagEditorForm ({ track, onClose, onSaved }: TagEditorFormProps) {
                 </div>
             }
           </dl>
-        </section>
+        </div>
       </div>
 
       <footer className='footer-actions'>

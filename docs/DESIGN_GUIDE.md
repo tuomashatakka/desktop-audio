@@ -1,6 +1,34 @@
 # Design Principles
 
-Core philosophy and guiding principles for this project, based on the **Semantic Nodes Design System**.
+Core philosophy and guiding principles for this project.
+
+---
+
+## Architecture Invariants
+
+Two rules are enforced by convention and, where noted, by tests. Every
+stylesheet, hook, and component must respect them.
+
+### 1. One token contract
+
+**Every** CSS custom property and every theme-dependent selector (`:root`,
+`[data-theme=…]`, `[data-ui-density]`, `[data-corners]`) lives in
+`src/app/styles/tokens.css` and nowhere else. No other stylesheet declares
+`--*` on `:root` or branches on `data-theme`. This is the single source of
+truth for all colours, spacing, type, motion, shadows, and ambient-wash
+parameters.
+
+A test in `tests/` parses every stylesheet and asserts no `:root` or
+`[data-theme` selector appears outside `tokens.css`.
+
+### 2. One writer for `--accent`
+
+`useAppearance` (`src/app/hooks/useAppearance.ts`) is the sole writer of
+`--accent` on `document.documentElement`. When the accent source is set to
+artwork, `useAmbientPalette` *returns* a palette object — it does not write
+the property. Two hooks writing the same custom property on the same element
+is a race whose winner depends on effect ordering; the single-writer rule
+eliminates that.
 
 ---
 
@@ -10,9 +38,8 @@ This project is built on three fundamental principles:
 
 ### 1. **Semantic HTML First**
 
-> We have components for everything already — use them!
-
-HTML5 provides semantic elements that convey meaning and structure. Use them instead of recreating the wheel:
+HTML5 provides semantic elements that convey meaning and structure. Use them
+instead of recreating the wheel:
 
 - `<article>` for independent, self-contained content
 - `<section>` for thematic groupings
@@ -44,8 +71,10 @@ Use CSS the way it was designed: cascading, composable, and maintainable.
 - Learning curve for what CSS already does
 
 **Our approach:**
-- CSS variables for theming
-- PostCSS nesting for organization
+- CSS custom properties for theming (all in `tokens.css`)
+- Native CSS nesting (Vite targets `chrome146`)
+- `@layer` for predictable cascade ordering
+- `@property` for type-safe, interpolatable custom properties
 - Semantic selectors
 - Global element styles
 - Component-specific styles in separate files
@@ -56,10 +85,9 @@ Use CSS the way it was designed: cascading, composable, and maintainable.
 
 Strict linting enforces consistency and catches errors early:
 
-- No semicolons (cleaner code)
 - Functional components only
 - Strict TypeScript
-- Meaningful whitespace
+- No `any` — use `unknown` or specific types
 - No unnecessary complexity
 
 ---
@@ -68,20 +96,21 @@ Strict linting enforces consistency and catches errors early:
 
 ### Consistency
 
-Use design tokens for all visual properties:
+Use design tokens for all visual properties. Every token is declared in
+`tokens.css` — see `docs/STYLE_GUIDE.md` for the full list.
 
 ```css
 /* ☑︎ Good - Using design tokens */
 .button {
-  padding: var(--spacing-sm) var(--spacing-md);
-  background-color: var(--color-primary-500);
-  border-radius: var(--border-radius-base);
+  padding: var(--sp-2) var(--sp-4);
+  background-color: var(--accent);
+  border-radius: var(--radius);
 }
 
 /* ☒ Bad - Magic numbers */
 .button {
   padding: 8px 16px;
-  background-color: #0ea5e9;
+  background-color: #00e5d1;
   border-radius: 4px;
 }
 ```
@@ -248,10 +277,11 @@ export const ButtonGhost = (props) => <Button variant="ghost" {...props} />
 - Form inputs
 - Component-specific state
 
-**Use global state** (Zustand) for:
-- User authentication
-- App-wide settings (theme, language)
-- Shared data across routes
+**Use context** (`createContext` + custom hooks) for:
+- App-wide settings (`SettingsContext`)
+- Audio state (`AudioContext`)
+- Library state (`LibraryContext`)
+- UI state (`UIContext`)
 
 ### Derived State
 
@@ -277,24 +307,24 @@ useEffect(() => {
 
 ### CSS Nesting
 
-Use PostCSS nesting for organization:
+Use native CSS nesting for organization (Vite targets `chrome146`):
 
 ```css
 .card {
-  background: var(--color-surface);
-  padding: var(--spacing-md);
+  background: var(--bg-raised);
+  padding: var(--sp-4);
 
   & header {
-    border-bottom: 1px solid var(--color-border);
-    margin-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--sp-2);
 
     & h3 {
-      font-size: var(--font-size-lg);
+      font-size: var(--text-lg);
     }
   }
 
   & .content {
-    color: var(--color-text-secondary);
+    color: var(--text-dim);
   }
 }
 ```
@@ -321,19 +351,19 @@ Simple class names with nesting instead of BEM:
 
 ### Global Element Styles
 
-Define base styles for HTML elements in `globals.css`:
+Define base styles for HTML elements in `base.css`:
 
 ```css
 button {
   font-family: inherit;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--duration-fast) var(--ease);
 }
 
 input {
   font-family: inherit;
-  border: 1px solid var(--color-border);
-  padding: var(--spacing-xs);
+  border: 1px solid var(--border);
+  padding: var(--sp-1);
 }
 ```
 
@@ -394,18 +424,17 @@ function handleError(error: any) {
 Organize by feature/domain:
 
 ```
-src/
-├── ui/
-│   ├── atomic/
-│   │   ├── Button.Component.tsx
-│   │   └── Button.styles.css
-│   ├── composite/
-│   │   ├── Card.Composite.tsx
-│   │   └── Card.styles.css
-│   └── hooks/
-│       └── useMediaQuery.ts
-└── store/
-    └── useAppStore.ts
+src/app/
+├── components/
+│   ├── atomic/          # Smallest units (Button, Input, Rating)
+│   └── composite/       # Functional groups (Player, Card, DspPanel)
+├── contexts/            # React context providers
+├── hooks/               # Custom hooks
+├── layout/              # App shell, titlebar, overlays
+├── services/            # Business logic (audio, DSP, analysis)
+├── styles/              # CSS entry point, tokens, fonts
+├── utils/               # Pure helpers (color, theme, time)
+└── views/               # Route-level pages (Library, Settings, NowPlaying)
 ```
 
 ### Naming Conventions
@@ -452,18 +481,21 @@ For UI components, manual testing in the browser is often sufficient:
 
 ## Performance Guidelines
 
-### Code Splitting
+### Lazy Loading
 
-Split code at route level:
+Load heavy views on demand:
 
 ```tsx
-// app/dashboard/page.tsx
-import dynamic from 'next/dynamic'
+import { lazy, Suspense } from 'react'
 
-const HeavyComponent = dynamic(() => import('@/ui/composite/HeavyComponent'))
+const DspView = lazy(() => import('./views/DspView'))
 
-export default function DashboardPage() {
-  return <HeavyComponent />
+function App() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <DspView />
+    </Suspense>
+  )
 }
 ```
 
@@ -503,19 +535,25 @@ const virtualizer = useVirtualizer({
 
 ## Summary
 
+**Invariants (enforced by convention + tests):**
+1. **One token contract** — all custom properties live in `tokens.css`, nowhere else
+2. **One writer for `--accent`** — `useAppearance` only; `useAmbientPalette` returns, never writes
+
 **Core Values:**
 1. **Simplicity** - Minimize complexity
-2. **Consistency** - Use design tokens
+2. **Consistency** - Use design tokens from `tokens.css`
 3. **Accessibility** - Design for everyone
 4. **Performance** - Optimize smartly
 5. **Maintainability** - Code for humans
 
 **Key Practices:**
 - Semantic HTML
-- CSS variables and nesting
+- CSS custom properties and native nesting
+- `@layer` architecture
+- `@property` for interpolatable tokens
 - Atomic design
 - Strict TypeScript
-- Minimal state management
+- Minimal state management via React context
 - Composition over configuration
 
 **Avoid:**
@@ -526,3 +564,4 @@ const virtualizer = useVirtualizer({
 - Inline styles
 - Class components
 - `any` types
+- Token declarations outside `tokens.css`

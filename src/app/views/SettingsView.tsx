@@ -1,7 +1,11 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
-import { useSettings, UI_FONT_LABELS, MIN_FONT_SCALE, MAX_FONT_SCALE } from '../contexts'
-import type { RepeatMode, Theme, CustomTheme, UiFont } from '../contexts'
+import {
+  useSettings,
+  UI_FONT_LABELS, MONO_FONT_LABELS, UI_DENSITY_LABELS, CORNER_STYLE_LABELS,
+  MIN_FONT_SCALE, MAX_FONT_SCALE, MIN_AMBIENT_STRENGTH, MAX_AMBIENT_STRENGTH,
+} from '../contexts/SettingsContext'
+import type { RepeatMode, Theme, CustomTheme, UiFont, MonoFont, AccentSource, UiDensity, CornerStyle } from '../contexts/SettingsContext'
 import { useData } from '../data'
 import { useKeybindings } from '../hooks'
 import { formatShortcut, shortcutFromEvent } from '../../keybindings'
@@ -33,12 +37,15 @@ export function SettingsView () {
   const {
     libraryPaths, theme, customTheme, defaultDensity,
     volume, repeatMode, shuffle,
-    uiFont, fontScale, accentDark, accentLight,
+    uiFont, monoFont, fontScale,
+    accentDark, accentLight, accentSource, ambientStrength,
+    uiDensity, cornerStyle,
     showBeatMarkers, showChordAnalysis, showKeyAnalysis,
     addLibraryPath, removeLibraryPath,
     setTheme, setCustomTheme, exportTheme, importTheme, setDefaultDensity,
     setVolume, setRepeatMode, setShuffle,
-    setUiFont, setFontScale, setAccent,
+    setUiFont, setMonoFont, setFontScale, setAccent,
+    setAccentSource, setAmbientStrength, setUiDensity, setCornerStyle,
     setShowBeatMarkers, setShowChordAnalysis, setShowKeyAnalysis,
   }                                                   = useSettings()
   const data                                          = useData()
@@ -200,6 +207,7 @@ export function SettingsView () {
               setTheme(event.target.value as Theme) }>
             <option value='dark'>Dark</option>
             <option value='light'>Light</option>
+            <option value='auto'>Auto (follows OS)</option>
             <option value='custom'>Custom</option>
           </select>
         </label>
@@ -244,9 +252,105 @@ export function SettingsView () {
           </span>
         </label>
 
+        <fieldset className='field settings-radio-group'>
+          <legend>Monospace Font</legend>
+
+          {([ 'geist-mono', 'departure', 'system' ] as MonoFont[]).map(font =>
+            <label key={ font } className='radio-option'>
+              <input
+                type='radio'
+                name='monoFont'
+                value={ font }
+                checked={ monoFont === font }
+                onChange={ () =>
+                  setMonoFont(font) } />
+
+              <span>{MONO_FONT_LABELS[font]}</span>
+            </label>
+          )}
+        </fieldset>
+
+        <fieldset className='field settings-radio-group'>
+          <legend>Accent Source</legend>
+
+          {([ 'artwork', 'custom' ] as AccentSource[]).map(source =>
+            <label key={ source } className='radio-option'>
+              <input
+                type='radio'
+                name='accentSource'
+                value={ source }
+                checked={ accentSource === source }
+                onChange={ () =>
+                  setAccentSource(source) } />
+
+              <span>{source === 'artwork' ? 'From artwork' : 'Custom colour'}</span>
+            </label>
+          )}
+        </fieldset>
+
+        <label className='field'>
+          <span>Ambient Strength</span>
+
+          <span className='volume-setting'>
+            <input
+              className='slider'
+              id='settings-ambient-strength'
+              type='range'
+              min={ MIN_AMBIENT_STRENGTH }
+              max={ MAX_AMBIENT_STRENGTH }
+              step={ 0.05 }
+              value={ ambientStrength }
+              onChange={ event =>
+                setAmbientStrength(Number(event.target.value)) } />
+
+            <output className='volume-value' htmlFor='settings-ambient-strength'>
+              {Math.round(ambientStrength * 100)}
+              %
+            </output>
+          </span>
+        </label>
+
+        <fieldset className='field settings-radio-group'>
+          <legend>Interface Spacing</legend>
+
+          {(Object.keys(UI_DENSITY_LABELS) as UiDensity[]).map(density =>
+            <label key={ density } className='radio-option'>
+              <input
+                type='radio'
+                name='uiDensity'
+                value={ density }
+                checked={ uiDensity === density }
+                onChange={ () =>
+                  setUiDensity(density) } />
+
+              <span>{UI_DENSITY_LABELS[density]}</span>
+            </label>
+          )}
+        </fieldset>
+
+        <fieldset className='field settings-radio-group'>
+          <legend>Corner Style</legend>
+
+          {(Object.keys(CORNER_STYLE_LABELS) as CornerStyle[]).map(style =>
+            <label key={ style } className='radio-option'>
+              <input
+                type='radio'
+                name='cornerStyle'
+                value={ style }
+                checked={ cornerStyle === style }
+                onChange={ () =>
+                  setCornerStyle(style) } />
+
+              <span>{CORNER_STYLE_LABELS[style]}</span>
+            </label>
+          )}
+        </fieldset>
+
         {/* Two swatches, not one: an accent tuned for a near-black surface
               rarely holds up on a light one, and vice versa. */}
-        <fieldset className='field accent-picker'>
+        <fieldset
+          className='field accent-picker'
+          data-disabled={ accentSource === 'artwork' || undefined }>
           <legend>Accent Colour</legend>
 
           <label>
@@ -255,6 +359,7 @@ export function SettingsView () {
             <input
               type='color'
               value={ accentDark }
+              disabled={ accentSource === 'artwork' }
               onChange={ event =>
                 setAccent('dark', event.target.value) } />
 
@@ -267,11 +372,18 @@ export function SettingsView () {
             <input
               type='color'
               value={ accentLight }
+              disabled={ accentSource === 'artwork' }
               onChange={ event =>
                 setAccent('light', event.target.value) } />
 
             <span className='color-value'>{accentLight}</span>
           </label>
+
+          <p className='section-description'>
+            {accentSource === 'artwork'
+              ? 'Accent follows the playing track\'s artwork.'
+              : 'Pick a custom accent for each built-in theme.'}
+          </p>
         </fieldset>
 
         <section

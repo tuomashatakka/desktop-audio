@@ -1,5 +1,13 @@
-@layer tokens, reset, base, components, layout, views, utilities;
+@layer fonts, tokens, reset, base, components, layout, views, utilities;
 
+/*
+ * `fonts` is first and separate so the `@font-face` rules can never be caught
+ * up in a token override — a face is a resource declaration, not a style.
+ * The importing side assigns the layer; fonts.css carries no `@layer` of its
+ * own. Paths inside it are relative to that file, which is what lets Vite's
+ * CSS asset pipeline hash and copy the files with no build config.
+ */
+@import './fonts.css' layer(fonts);
 @import './tokens.css';
 @import './base.css';
 @import './components.css';

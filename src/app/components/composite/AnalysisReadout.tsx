@@ -246,7 +246,7 @@ function AnalysisProgress ({ startedAt, estimateMs }: AnalysisProgressProps) {
   const ratio     = estimateMs ? Math.min(PROGRESS_CEILING, elapsed / estimateMs) : null
   const remaining = estimateMs ? Math.max(0, estimateMs - elapsed) : null
 
-  return <p className='status-message analysis-status'>
+  return <p className='analysis-status'>
     <progress
       className='analysis-progress'
       aria-label='Analysing audio'
@@ -282,12 +282,12 @@ function AnalysisBody ({
   // something that went wrong here, so it is stated plainly and not apologised
   // for.
   if (status === 'error')
-    return <p className='status-message analysis-status' role='status'>
+    return <p className='analysis-status' role='status'>
       No analysis: {error}
     </p>
 
   if (!analysis)
-    return <p className='status-message analysis-status' role='status'>
+    return <p className='analysis-status' role='status'>
       Harmony analysis is unavailable
     </p>
 

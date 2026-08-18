@@ -36,18 +36,18 @@ export function AppLayout ({ titlebar, sidebar, main, player, overlays }: AppLay
     data-sidebar-open={ sidebarOpen || undefined }>
     {titlebar && <header className='titlebar'>{titlebar}</header>}
 
-    <section className='app-workspace'>
+    <div className='app-workspace'>
       {sidebar &&
           <aside className='app-sidebar' aria-hidden={ !sidebarOpen } inert={ !sidebarOpen }>
             {sidebar}
           </aside>
       }
 
-      <section className='app-content'>
+      <div className='app-content'>
         <main className='app-main view-content'>{main}</main>
         {player && <footer className='app-player'>{player}</footer>}
-      </section>
-    </section>
+      </div>
+    </div>
 
     {overlays}
   </div>

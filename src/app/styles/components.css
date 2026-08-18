@@ -276,12 +276,13 @@
     animation: shimmer 1.5s infinite;
   }
 
-  :where(.overlay-dialog, .popover-panel) {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+  :is(.overlay-dialog, .popover-panel) {
+    /* Read by `.surface` over in the utilities layer. Declaring `box-shadow`
+       here directly would silently lose to it — a later layer beats any
+       specificity — so the override is handed over as a value instead. */
+    --surface-shadow: var(--shadow-lg);
+
     color: var(--text);
-    background: var(--bg-raised);
-    box-shadow: var(--shadow-lg);
   }
 
   /*
@@ -487,17 +488,15 @@
   #context-menu-root { height: 100%; }
 
   .context-menu-window {
+    /* As above: handed to `.surface` as a value, because a `box-shadow` here
+       would lose to the utilities layer no matter how specific it is. */
+    --surface-shadow: var(--shadow-lg);
+
     position: relative;
     isolation: isolate;
     height: 100%;
     overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--bg-raised);
-    box-shadow: var(--shadow-lg);
     animation: surface-in var(--duration-fast) var(--ease-emphasis);
-
-    .context-menu-list { position: relative; z-index: var(--z-raised); }
   }
 
   .context-menu-dismiss { position: fixed; inset: 0; z-index: 0; }
@@ -704,7 +703,7 @@
       border-radius: 50%;
       color: var(--accent-contrast);
       background: var(--accent);
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow-card);
       opacity: 0;
       translate: 0 var(--sp-2);
       transition:

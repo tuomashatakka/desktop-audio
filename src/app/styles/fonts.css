@@ -1,0 +1,78 @@
+/*
+ * Font-face declarations.
+ * Families: Montserrat (OFL), Space Grotesk (OFL), Geist (OFL), Departure Mono (OFL).
+ */
+
+/* ── Montserrat ─────────────────────────────────────────── */
+
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 100;
+  font-display: swap;
+  src: url("./fonts/Montserrat-Hairline.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("./fonts/Montserrat-Light.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/Montserrat-Regular.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("./fonts/Montserrat-Black.otf") format("opentype");
+}
+
+/* ── Space Grotesk ──────────────────────────────────────── */
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("./fonts/SpaceGrotesk-Variable.woff2") format("woff2-variations");
+}
+
+/* ── Geist ──────────────────────────────────────────────── */
+
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/Geist-Variable.woff2") format("woff2-variations");
+}
+
+/* ── Geist Mono ─────────────────────────────────────────── */
+
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/GeistMono-Variable.woff2") format("woff2-variations");
+}
+
+/* ── Departure Mono ─────────────────────────────────────── */
+
+@font-face {
+  font-family: "Departure Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/DepartureMono-Regular.woff2") format("woff2");
+}

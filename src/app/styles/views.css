@@ -550,6 +550,9 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
 
   > section > h2 { margin-bottom: var(--sp-4); padding-bottom: var(--sp-3); border-bottom: 1px solid var(--border); }
   > section > .field + .field { margin-top: var(--sp-4); }
+  > section > .settings-radio-group + .settings-radio-group,
+  > section > .settings-radio-group + .field,
+  > section > .field + .settings-radio-group { margin-top: var(--sp-4); }
 
   .status-message { margin: var(--sp-4) 0; padding: var(--sp-4); }
 }
@@ -647,6 +650,27 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
 
 .theme-actions { display: flex; gap: var(--sp-2); }
 
+.settings-radio-group {
+  border: 0;
+
+  legend {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    margin-bottom: var(--sp-2);
+  }
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
 .accent-picker {
   border: 0;
 
@@ -671,6 +695,12 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
     background: var(--bg-input);
     cursor: pointer;
   }
+}
+
+.accent-picker[data-disabled] {
+  opacity: 0.5;
+
+  input[type='color'] { cursor: not-allowed; }
 }
 
 .checkbox-field {
@@ -840,6 +870,8 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
   flex: 1;
   gap: var(--sp-3);
   min-width: 0;
+  border: 0;
+  padding: 0;
 
   .field { min-width: 0; }
 }

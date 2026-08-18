@@ -161,14 +161,37 @@ animation. It begins as a line and expands once real samples arrive. Interaction
 transitions are intentionally zero-duration; loading and ambient artwork
 feedback remain non-blocking.
 
+## Appearance and theming
+
+The ambient backdrop is three decorative pseudo-elements — a blurred cover image,
+a drifting colour mesh extracted from the album art, and a grain + vignette
+layer — with no extra DOM. The mesh cross-fades between tracks for free because
+the colour tokens are `@property`-registered and the browser interpolates them
+like any animatable value.
+
+When **accent source** is set to *artwork*, the dominant colour of the playing
+track's cover becomes the app accent — the play button, chord ribbon, EQ curve,
+and mesh stroke all shift to match. Near-black sleeves are automatically lifted
+to maintain contrast. The source can also be set to *custom* (user-picked per
+dark/light theme), or the theme itself can be *custom* with full colour control.
+
+Settings include: dark / light / auto / custom theme, UI font, mono font,
+accent source and colour, ambient wash strength, spacing density, and corner
+radius.
+
+Bundled typefaces: **Montserrat** (body), **Space Grotesk** and **Geist**
+(UI/display), **Geist Mono** and **Departure Mono** (monospace). All OFL.
+Poppins and Helvetica are resolved from the user's installed fonts.
+
 ## Development
 
 ```bash
 bun install
 bun run start        # dev (electron-forge start)
 bun run typecheck    # tsc --noEmit
-bun run lint         # eslint ./src
-bun test             # vitest run
+bun run lint         # eslint ./src --config config/eslint.config.mjs
+bun run test         # vitest run
+bun run test:e2e     # playwright test
 bun run make         # production build
 ```
 

@@ -32,3 +32,40 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/*
+ * The elevated-surface recipe, which several components had each re-written.
+ *
+ * `:where()` keeps its specificity at zero, but note that specificity is not
+ * what decides this: `utilities` is the *last* layer, so anything declared
+ * here beats the same property declared in `components` no matter how specific
+ * that rule is. That is why the shadow is a variable rather than a value —
+ * a component overriding `box-shadow` directly would silently lose, while
+ * setting `--surface-shadow` is read at use time and always wins.
+ */
+:where(.surface, .overlay-dialog, .popover-panel, .context-menu-window) {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--surface-shadow, var(--shadow-card));
+}
+
+/*
+ * Edge-fade masks. The literal `#000` is a mask alpha channel, not a colour —
+ * it must stay literal.
+ */
+:where(.fade-y) {
+  --fade-start: 0%;
+  --fade-end: 12%;
+  mask-image: linear-gradient(to bottom,
+    transparent var(--fade-start), #000 var(--fade-end),
+    #000 calc(100% - var(--fade-end)), transparent 100%);
+}
+
+:where(.fade-x) {
+  --fade-start: 0%;
+  --fade-end: 12%;
+  mask-image: linear-gradient(to right,
+    transparent var(--fade-start), #000 var(--fade-end),
+    #000 calc(100% - var(--fade-end)), transparent 100%);
+}

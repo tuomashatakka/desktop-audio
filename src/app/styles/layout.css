@@ -14,6 +14,11 @@
  */
 
 .app-shell {
+  /* Positioned so it paints after `#app::before`, which carries the blurred
+   * cover. Deliberately left at `z-index: auto`: giving it one would make it a
+   * blending isolation group and change what the mesh and the lyrics
+   * composite against. See the ambient block. */
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -382,41 +387,105 @@
 
 /* ─── ambient album-art wash ───────────────────────────────────────────── */
 
-:root {
-  --ambient-blend: screen;
-  --ambient-strength: 0.75;
-  --ambient-a1: 38%;
-  --ambient-a2: 50%;
-  --ambient-a3: 44%;
-  transition:
-    --ambient-1 var(--duration-slow) var(--ease),
-    --ambient-2 var(--duration-slow) var(--ease),
-    --ambient-3 var(--duration-slow) var(--ease);
+/*
+ * Three decorative layers, no extra DOM and nothing in JavaScript animating
+ * anything:
+ *
+ *   #app::before         the blurred cover itself, behind the UI
+ *   body::before         a drifting colour mesh built from the art's roles
+ *   body::after          grain + vignette, which is what stops the whole thing
+ *                        reading as a flat gradient
+ *
+ * The mesh cross-fades between tracks for free — `--art-*` are registered with
+ * `@property` in tokens.css, so the browser interpolates them. The cover layer
+ * cannot: `background-image` has no interpolation. It re-runs a fade-in
+ * keyframe instead, chosen by the `data-art-tick` flip `useAmbientPalette`
+ * performs, because a changed custom property never restarts an animation but
+ * a changed `animation-name` always does.
+ */
+
+/*
+ * The cover hangs off `#app` rather than `.app-shell` so it can sit at
+ * `z-index: 0` instead of `-1`. A negative layer would need `.app-shell` to
+ * establish a stacking context, and doing that would isolate the blending
+ * group the mesh and the lyrics rely on. At `z-index: 0` it paints after
+ * `#app`'s own background and before `.app-shell`, which is positioned and
+ * later in tree order — exactly the slot wanted, with nothing else disturbed.
+ */
+#app { position: relative; }
+
+#app::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--art-image, none);
+  background-position: center;
+  background-size: cover;
+  transform: scale(var(--art-cover-scale));
+  filter: blur(var(--art-blur-bg)) saturate(1.35);
+
+  /* Bright sleeves pull their own layer back, so the lyrics and the mesh stay
+   * legible over a white cover without the user reaching for the slider. */
+  opacity: calc(
+    var(--ambient-strength) * var(--art-cover-opacity) * (1 - var(--art-lum) * 0.45)
+  );
+  animation: var(--duration-slow) var(--ease) both;
 }
 
-/* `screen` would blow a light surface out to white, hence the flip. */
-[data-theme='light'] {
-  --ambient-blend: multiply;
-  --ambient-strength: 0.4;
-  --ambient-a1: 20%;
-  --ambient-a2: 28%;
-  --ambient-a3: 24%;
-}
+:root[data-art-tick='a'] #app::before { animation-name: art-fade-a; }
+:root[data-art-tick='b'] #app::before { animation-name: art-fade-b; }
+
+/* Two identical keyframes. The only thing that differs is the name, which is
+ * the entire mechanism — see the note above. */
+@keyframes art-fade-a { from { opacity: 0; } }
+
+@keyframes art-fade-b { from { opacity: 0; } }
 
 body::before {
+  content: '';
+  position: fixed;
+
+  /* Overscanned so the drift never walks an edge into frame. */
+  inset: -20%;
+  z-index: var(--z-ambient);
+  pointer-events: none;
+  background:
+    radial-gradient(48% 46% at 24% 26%,
+      color-mix(in srgb, var(--art-vibrant) var(--ambient-a2), transparent), transparent 70%),
+    radial-gradient(44% 48% at 76% 30%,
+      color-mix(in srgb, var(--art-muted) var(--ambient-a3), transparent), transparent 72%),
+    radial-gradient(58% 52% at 64% 84%,
+      color-mix(in srgb, var(--art-light) var(--ambient-a3), transparent), transparent 76%),
+    radial-gradient(66% 58% at 14% 88%,
+      color-mix(in srgb, var(--art-dark) var(--ambient-a1), transparent), transparent 78%);
+  mix-blend-mode: var(--ambient-blend);
+  filter: brightness(1.02) contrast(0.95) opacity(var(--ambient-strength));
+  animation: ambient-drift var(--ambient-drift-dur) var(--ease) infinite alternate;
+  will-change: transform;
+}
+
+/* Transform only — it composites, so a forty-second loop costs no layout and
+ * no paint. `prefers-reduced-motion` zeroes `--ambient-drift-dur` in
+ * tokens.css, which parks this on its first frame. */
+@keyframes ambient-drift {
+  from { transform: translate3d(-1.5%, -1%, 0) scale(1.02); }
+
+  to { transform: translate3d(1.5%, 1%, 0) scale(1.09); }
+}
+
+body::after {
   content: '';
   position: fixed;
   inset: 0;
   z-index: var(--z-ambient);
   pointer-events: none;
-  background: linear-gradient(
-    362deg,
-    color-mix(in srgb, var(--ambient-1) var(--ambient-a1), transparent) 5%,
-    color-mix(in srgb, var(--ambient-2) var(--ambient-a2), transparent) 40%,
-    color-mix(in srgb, var(--ambient-3) var(--ambient-a3), transparent) 95%
-  );
-  mix-blend-mode: var(--ambient-blend);
-  filter: brightness(1.02) contrast(0.95) opacity(var(--ambient-strength));
+  background-image: var(--grain-image), var(--vignette);
+  background-repeat: repeat, no-repeat;
+  background-size: 160px 160px, cover;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--grain-blend);
 }
 
 /* ─── persistent player ────────────────────────────────────────────────── */
@@ -429,42 +498,6 @@ body::before {
  * surface clips to flat white or flat black on a light one. `color-dodge`
  * takes the transport to pure white over a light backdrop, so light opts out.
  */
-:root {
-  --matrix-blend: color-burn;
-  --controls-blend: color-dodge;
-
-  /*
-   * The analysis readout rises into the space the artwork leaves. Derived from
-   * `--shift-md` rather than given its own px, so `prefers-reduced-motion`
-   * collapsing that token collapses this one with it.
-   */
-  --analysis-rise: calc(var(--shift-md) * 2);
-
-  /*
-   * Pixels per second of chord lookahead. It lives here, not in JS, because it
-   * is half of a pair: this against `.chord-queue`'s width is how far ahead the
-   * ribbon can see, and only CSS knows the width.
-   */
-  --chord-pps: 34;
-
-  /* The full-bleed cover on a narrow now-playing window. */
-  --art-banner-h: min(58cqh, 96cqw);
-
-  /* The lyrics layer, and how far the column steps aside to make room. */
-  --lyrics-nudge: 6vw;
-  --lyrics-inset-inline: 10vw;
-  --lyrics-inset-block: 10vh;
-  --lyrics-marker: rgb(255 255 255 / 58%);
-  --lyrics-ink: var(--mono-fg-inverse);
-  --lyrics-blend: normal;
-}
-
-[data-theme='light'] {
-  --controls-blend: normal;
-  --lyrics-marker: rgb(17 17 17 / 78%);
-  --lyrics-ink: var(--mono-fg1);
-  --lyrics-blend: normal;
-}
 
 .player-view {
   position: relative;
@@ -478,23 +511,64 @@ body::before {
   container: player / size;
 
   /*
-   * There are two views, and the artwork is the only thing either replaces.
-   * The title, the progress bar and the transport stay put through both — a
-   * spectrum you cannot seek in is a screensaver, and the whole reason this
-   * stopped being four exclusive modes is that picking one used to cost you
-   * the other three.
+   * The analysis view is an editorial page, not a denser artwork view.
    *
-   * The artwork leaves *upward* and the readout arrives from below into the
-   * space it vacates: one gesture in one direction, rather than a swap.
+   * The cover leaves rather than shrinking. A thumbnail reads as "the same
+   * screen, smaller"; an empty inline start reads as a different kind of page —
+   * which is what this is. What you are looking at here is the *sound*, and the
+   * sleeve is the one thing on screen that isn't about that.
+   *
+   * The progress bar and the transport still stay put. That part of the
+   * two-views argument holds: a spectrum you cannot seek in is a screensaver.
+   *
+   * Nothing here is a `display` switch, so both directions still interpolate.
    */
-  &[data-mode='analysis'] .player-art {
-    display: none;
-    opacity: 0;
-    translate: 0 calc(-1 * var(--analysis-rise));
-    transition:
-      opacity var(--duration) var(--ease-exit),
-      translate var(--duration) var(--ease-exit),
-      display var(--duration) allow-discrete;
+  &[data-mode='analysis'] {
+    .player-content {
+      align-items: flex-start;
+
+      /* The editorial inset. Wide enough that the type column sits about a
+         sixth of the way in, which is what leaves the middle to the mesh. */
+      --content-pad-block: clamp(var(--sp-8), 14cqh, 24vh);
+      --content-pad-inline: clamp(var(--sp-8), 14cqi, 20vw);
+    }
+
+    .player-art {
+      /* Out of flow rather than `display: none`: an unmounted box has nothing
+         to fade, and this one still has to leave visibly. */
+      position: absolute;
+      opacity: 0;
+      scale: 0.94;
+      pointer-events: none;
+    }
+
+    .player-info { text-align: start; }
+
+    /*
+     * The mesh stops being a block in the column and becomes the page's
+     * backdrop — full-bleed, bleeding off every edge, with the type and the
+     * readout sitting over it rather than under it. This is the single move
+     * that makes the view an editorial page instead of a stack of blocks.
+     */
+    .frequency-matrix {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      flex: none;
+      height: auto;
+    }
+
+    /* Everything else rides above the mesh. */
+    :is(.player-info, .analysis-readout, .progress-section, .playback-controls) {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* The transport drops away from the type block and re-centres, which is
+       what opens the middle of the page up for the mesh to fill. */
+    :is(.progress-section, .playback-controls) { align-self: center; }
+
+    .progress-section { margin-block-start: clamp(var(--sp-8), 12cqh, 9rem); }
   }
 
   /*
@@ -546,26 +620,53 @@ body::before {
   }
 }
 
+/*
+ * The full-window player is one distributed column: type at the top, the mesh
+ * taking whatever is left in the middle, transport at the bottom.
+ *
+ * `order` is what arranges it, so the DOM can stay in the order that makes
+ * sense to read — and every block is a real flex item. The mesh used to be
+ * absolutely positioned across the page with the type column held inside it by
+ * a 24vh/20vw inset; it bled over its siblings, which cost `pointer-events:
+ * none` here and a `z-index` there to undo, and the padding existed only to
+ * keep the words out of its way. In flow it needs neither, and the padding can
+ * be an ordinary margin around the page.
+ *
+ * **The mesh is the only thing that distributes this column**, and that is why
+ * `justify-content` stays `center`. When the mesh grows it takes every spare
+ * pixel, so the type is pushed to the top and the transport to the bottom and
+ * `center`, `space-between` and `flex-start` all resolve identically; when it
+ * is closed there is no spare space to give away and the remaining stack wants
+ * to be a centred card, which is the one case where they differ. One growing
+ * item beats two rules that have to agree.
+ *
+ * Every tier still overrides the padding — the height tiers on `.app-shell[…]`
+ * specificity, the width tiers on source order — so this only ever describes
+ * the full-window copy.
+ */
 .player-content {
-  --art-size: clamp(80px, 40cqh, 320px);
-  --play-size: 56px;
-  --play-glyph-size: 22px;
-  --title-size: var(--text-xl);
-  --content-gap: 0;
-
   /*
-   * The full-window player is an editorial page, not a centred card: the type
-   * column is held well inside the window while the mesh bleeds past it, and
-   * the blocks sit directly on top of each other rather than on a gap scale.
-   * Every tier still overrides both — the height tiers on `.app-shell[…]`
-   * specificity, the width tiers on source order — so this only ever describes
-   * the full-window copy.
+   * One fluid scale, not a ladder.
+   *
+   * These six values used to be re-declared at four `@container` breakpoints,
+   * which is the same component styled four times over. Every one of them was
+   * a *ramp* — the same thing, smaller — so a `clamp()` against the container's
+   * inline size expresses it once and covers the sizes in between, which the
+   * steps never did.
+   *
+   * `--art-size` keeps a height term as well: the artwork is the one element
+   * that can push the column past the bottom of a short window, so it has to
+   * answer to the axis that runs out first.
    */
-  --content-pad-block: 24vh;
-  --content-pad-inline: 20vw;
+  --art-size: clamp(48px, min(30cqi, 40cqh), 320px);
+  --play-size: clamp(40px, 9cqi, 56px);
+  --play-glyph-size: clamp(18px, 3.4cqi, 22px);
+  --title-size: clamp(var(--text-base), 3.6cqi, var(--text-xl));
+  --content-gap: clamp(var(--sp-2), 1.8cqi, var(--sp-4));
+  --content-pad-block: clamp(var(--sp-3), 7cqh, 6rem);
+  --content-pad-inline: clamp(var(--sp-3), 4cqi, 8rem);
 
   position: relative;
-  z-index: var(--z-raised);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -578,24 +679,41 @@ body::before {
     gap var(--duration) var(--ease-emphasis),
     padding var(--duration) var(--ease-emphasis),
     translate var(--duration) var(--ease-emphasis);
+
+  /*
+   * The reading order and the visual order differ by exactly two moves, so
+   * they are two declarations rather than a rearranged DOM: the mesh and the
+   * progress bar sit under the type block, and the transport closes the page.
+   */
+  .frequency-matrix,
+  .progress-section { order: 2; }
+
+  .playback-controls { order: 3; }
 }
 
 .player-promote { display: none; }
 
 /*
- * The shown state, so the transition listed here is the *arrival* — and
- * `@starting-style` is what gives it somewhere to arrive from, both when the
- * overlay opens and when the analysis view hands the artwork back.
+ * The artwork is never taken away — it recedes.
+ *
+ * The analysis view used to `display: none` it, which left the top of the page
+ * empty and made the switch read as two different screens rather than one
+ * screen looking at itself differently. It moves to the inline start and shrinks
+ * to a thumbnail instead: still the fastest way to see what is playing, and now
+ * the whole change is two interpolable properties rather than a discrete one.
  */
 .player-art {
   display: flex;
   flex: 0 0 auto;
+  align-self: center;
   opacity: 1;
   translate: 0 0;
+
+  /* `align-self` is not an interpolable property — the *size* is what carries
+     the change, and `.album-art-card` already transitions its width. */
   transition:
     opacity var(--duration) var(--ease-emphasis),
-    translate var(--duration) var(--ease-emphasis),
-    display var(--duration) allow-discrete;
+    translate var(--duration) var(--ease-emphasis);
 
   @starting-style {
     opacity: 0;
@@ -631,11 +749,19 @@ body::before {
   opacity: 0.35;
 }
 
+/*
+ * Centred over the artwork, ragged-left in the analysis view.
+ *
+ * The two views set the type differently because they are read differently: one
+ * is a cover with a caption under it, the other is a page of data whose labels
+ * line up down a gutter (see `--readout-label-w`). The title has to agree with
+ * whichever it is sitting on.
+ */
 .player-info {
   width: 100%;
   min-width: 0;
   line-height: 1.5;
-  text-align: start;
+  text-align: center;
   text-transform: lowercase;
 
   /*
@@ -664,15 +790,10 @@ body::before {
 .time-label { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
 
 .playback-controls {
-  /*
-   * The mesh is positioned, so it paints over every in-flow block beside it.
-   * The transport is the one thing that has to stay in front of it — a flex
-   * item takes `z-index` without needing `position`, which is why this is one
-   * declaration and not a positioning context.
-   */
-  z-index: var(--z-raised);
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
+  justify-content: center;
   gap: var(--sp-6);
   mix-blend-mode: var(--controls-blend);
   transition: gap var(--duration) var(--ease-emphasis);
@@ -740,32 +861,31 @@ body::before {
     gap: var(--sp-2);
   }
 
-  :is(.visualizer-toggle, .lyrics-toggle, .dsp-toggle, .player-close) {
+  :is(.analysis-toggle, .lyrics-toggle, .dsp-toggle, .player-close) {
     color: var(--text-muted);
     transition: color var(--duration-fast) var(--ease);
 
     &:hover:not(:disabled) { color: var(--text); }
   }
 
-  :is(.visualizer-toggle, .lyrics-toggle, .dsp-toggle)[aria-pressed='true'] { color: var(--accent); }
+  :is(.analysis-toggle, .lyrics-toggle, .dsp-toggle)[aria-pressed='true'] { color: var(--accent); }
 }
 
 /*
  * The track's resolved harmony, read as type under its own title.
  *
- * It is a block in the column, not a panel: the analysis view is *about* this,
- * and the mesh behind it is the backdrop. Positioned only so it can lift itself
- * over that mesh — a flex item takes `z-index` without needing a position, but
- * the ribbon moves, and a moving line of type under a `color-burn` wireframe is
- * unreadable.
+ * A plain block, not a grid: every row inside it is a term and its value on one
+ * line, and they line up because they share a label gutter — not because a grid
+ * is holding them in columns. That is why `--readout-label-w` lives on this
+ * element and every label in here is exactly that wide.
  *
  * Always mounted, shown by `data-open` — `display` is what animates it, so it
  * needs `allow-discrete` on the way out and `@starting-style` on the way in.
  * Same pairing as the lyrics layer and every dialog here.
  */
 .analysis-readout {
-  position: relative;
-  z-index: var(--z-raised);
+  --readout-label-w: 4em;
+
   display: none;
   width: 100%;
   min-width: 0;
@@ -777,8 +897,7 @@ body::before {
     display var(--duration) allow-discrete;
 
   &[data-open] {
-    display: grid;
-    gap: var(--sp-4);
+    display: block;
     padding-block: var(--sp-4);
     opacity: 1;
     translate: 0 0;
@@ -794,12 +913,20 @@ body::before {
   }
 }
 
-/* One label voice for the whole readout, matching the summary's `dt`s below. */
-.readout-label {
+/*
+ * One label voice, one label width. `Key`, `Tempo` and `Chord` are the same
+ * kind of word about the same track, so they are set alike and right-aligned
+ * into a shared gutter — the values then start on one line down the page
+ * without any of the three blocks knowing about the others.
+ */
+.analysis-readout :is(.readout-label, .key-tempo-summary dt) {
+  flex: 0 0 auto;
+  width: var(--readout-label-w);
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-xs);
   font-weight: var(--font-medium);
+  text-align: right;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -813,18 +940,19 @@ body::before {
  *
  * The sounding chord is pinned in `.chord-now` rather than riding the lane,
  * because "what is playing" is a fixed place on the page you can look at
- * without tracking it.
+ * without tracking it. The caption sits beside them both, in the gutter, so the
+ * row reads as `Chord | Am | F  C  G` — the same shape as `Key | A minor`.
  */
 .chord-ribbon {
   --chord-size: var(--text-3xl);
-  --chord-size-next: var(--text-xl);
+  --chord-size-next: var(--text-lg);
   --chord-lane-h: calc(var(--chord-size) * 1.15);
 
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas: 'label label' 'now queue';
+  grid-template-columns: var(--readout-label-w) auto minmax(0, 1fr);
+  grid-template-areas: 'label now queue';
   align-items: center;
-  gap: var(--sp-2) var(--sp-6);
+  gap: var(--sp-4);
   margin: 0;
   min-width: 0;
 
@@ -847,6 +975,15 @@ body::before {
   }
 }
 
+/*
+ * The queue is marked, not faded.
+ *
+ * Upcoming chords used to recede in hairline type at 45% opacity, which said
+ * "less important" about the only thing on the page that is about to happen.
+ * They are set as marker chips instead — the same swipe the lyrics layer uses,
+ * from the same two tokens, so it inverts correctly between themes. Distance
+ * already carries how far away each one is; opacity was saying it twice.
+ */
 .chord-queue {
   position: relative;
   grid-area: queue;
@@ -857,17 +994,25 @@ body::before {
   padding: 0;
   list-style: none;
 
-  /* Chords arrive out of the far edge rather than appearing at it. */
+  /* Chords arrive out of the far edge rather than appearing at it. The `#000`
+     is a mask alpha channel, not a colour, so it stays literal. */
   mask-image: linear-gradient(to right, #000 62%, transparent);
 
   .chord {
     position: absolute;
     inset-block-start: 50%;
     inset-inline-start: calc((var(--at) - var(--now, 0)) * var(--chord-pps) * 1px);
-    color: var(--text-dim);
+    padding: var(--sp-1);
+
+    /* On the app's own ramp rather than the lyrics marker's. Two layers with
+       different jobs should not share a swatch — and now that `--accent` is
+       sampled from the sleeve, a chord tinted by it says *this record*, where
+       a borrowed white chip said nothing at all. */
+    background: color-mix(in oklab, var(--accent) 13%, transparent);
+    color: color-mix(in oklab, var(--text) 74%, var(--accent));
     font-size: var(--chord-size-next);
-    font-weight: var(--weight-hairline);
-    opacity: 0.45;
+    font-weight: var(--font-medium);
+    letter-spacing: -0.04em;
     translate: 0 -50%;
   }
 }
@@ -911,15 +1056,22 @@ body::before {
 }
 
 /*
- * The mesh is the page's backdrop rather than a panel in the column: it hangs
- * off the right of `.player-content` — the nearest positioned ancestor —
- * burnt over the type it overlaps, and bleeds past the editorial padding on
- * three sides.
+ * The mesh is a block in the column, and it is the one that takes the slack.
  *
- * It keeps the default `z-index`, so it paints *above* its non-positioned
- * siblings; that overlap is the effect. `pointer-events: none` is what stops it
- * also swallowing every click in the right two thirds of the window, and the
- * transport lifts itself back in front with `--z-raised`.
+ * It used to be absolutely positioned across the page, inset 30% top and bottom
+ * and 33% from the left, painting over its siblings — which is why the type
+ * column had to be held 20vw inside the window, why this needed
+ * `pointer-events: none` to stop swallowing clicks in the right two thirds of
+ * it, and why the transport needed a `z-index` to climb back in front. All
+ * three were undoing the same decision. In flow it needs none of them: it grows
+ * into whatever the type and the transport have not claimed, and shrinks when
+ * the DSP layer opens underneath the title, which is what keeps that page on
+ * screen without a scrollbar.
+ *
+ * `position: relative` is only an anchor for the `<svg>`. A flex item's height
+ * is resolved by the flex pass, so an in-flow child asking for `height: 100%`
+ * of an `auto`-height parent gets `auto` and collapses; taking the svg out of
+ * flow against this box is what lets it fill the resolved one.
  *
  * There is deliberately no `filter` here. Blurring the element would defocus
  * the whole thing evenly, labels included; the blur that matters is per-row
@@ -927,24 +1079,31 @@ body::before {
  * `FrequencyMatrix`.
  */
 .frequency-matrix {
-  --matrix-inset-block: 30%;
-  --matrix-inset-inline-start: 33%;
+  position: relative;
 
-  position: absolute;
-  inset: var(--matrix-inset-block) 0 var(--matrix-inset-block) var(--matrix-inset-inline-start);
-  display: grid;
-  width: auto;
+  /* Collapsed while the artwork view is showing: it must not reserve the
+     middle of a page it is not on, or the album art floats at the top of a
+     window with a hole under it. */
+  flex: 0 1 auto;
+  width: 100%;
+  height: 0;
   min-height: 0;
   color: var(--accent);
-  place-items: center;
   pointer-events: none;
-  mix-blend-mode: var(--matrix-blend);
 
+  /* `preserveAspectRatio='xMidYMid meet'` does the fitting and the centring,
+     so this only has to hand it the box.
+
+     The blend belongs to the *wireframe*, not to the element: it used to sit
+     on the section, which put the peak labels inside the blending group too
+     and burnt readable type down into the background along with the mesh. */
   > svg {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
-    max-height: 46cqh;
     overflow: visible;
+    mix-blend-mode: var(--matrix-blend);
   }
 
   .matrix-line-x {
@@ -977,35 +1136,40 @@ body::before {
     stroke-linejoin: round;
     vector-effect: non-scaling-stroke;
   }
-}
 
-/* The mesh arrives and leaves with the readout, rather than popping. */
-.frequency-matrix {
+  /* It arrives and leaves with the readout rather than popping. Taking the
+     space is what pushes the type up and the transport down, so the two views
+     are one gesture: the mesh opens, and everything else is moved by it. */
   opacity: 0;
   transition: opacity var(--duration) var(--ease-exit);
 
   &[data-open] {
+    flex: 1 1 auto;
+    height: auto;
     opacity: 1;
     transition: opacity var(--duration-slow) var(--ease-emphasis);
   }
 }
 
 /*
- * The peak readout floats over the mesh at the ridge it names. It is a
- * positioned layer rather than SVG text so the labels keep the UI font and
- * never inherit the mesh's scaling.
- */
-/*
- * Whatever the readout has instead of a result: the progress of the analysis,
- * the reason there will not be one, or a plain note that none is available.
- * A fixed floor so the block does not resize under the title when it resolves.
+ * Whatever the readout has instead of a result: the progress of an analysis,
+ * the reason there will not be one, or a note that none is available.
+ *
+ * It does not borrow `.status-message` any more. That class is the library's
+ * full-view empty state — `margin: auto`, `padding: var(--sp-12)`, centred —
+ * which is the opposite of a line of text in a left-aligned gutter layout, and
+ * every one of its rules had to be fought here.
  */
 .analysis-status {
-  display: grid;
-  align-self: start;
-  gap: var(--sp-2);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
   margin: 0;
-  min-height: 3rem;
+  min-height: 2.5rem;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: start;
 }
 
 /*
@@ -1058,26 +1222,21 @@ body::before {
  * rather than a stack — two facts about the same track, read together.
  */
 .key-tempo-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2) var(--sp-8);
+  display: block;
   margin: 0;
 
+  /* One term-and-value per line, its label in the shared gutter — so `Key`,
+     `Tempo` and `Chord` stack into one column of labels and one of values
+     without any of the three blocks being laid out together. */
   > div {
     display: flex;
     align-items: baseline;
-    gap: var(--sp-2);
+    gap: var(--sp-4);
     min-width: 0;
   }
 
-  dt {
-    color: var(--text-muted);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
   dd {
+    margin: 0;
     overflow: hidden;
     color: var(--text);
     font-family: var(--font-mono);
@@ -1263,41 +1422,57 @@ body::before {
  * is lost, it just makes room.
  */
 .dsp-layer {
-  z-index: var(--z-raised);
   display: grid;
   grid-template-rows: 0fr;
+
+  /* It hangs under the track's own data at the inline edge rather than in a
+     centred sheet across the window: `.player-info` above it is the block it
+     belongs to. */
   align-self: start;
   width: min(100%, 52ch);
+
+  /* `0 1 auto`, not `1 …`: the layer is exactly as tall as the row it is
+     animating, and the *mesh* is what gives up the space it takes. Growing
+     both would make the two of them argue over the middle of the page. */
+  flex: 0 1 auto;
   min-height: 0;
-  transition: grid-template-rows var(--duration) var(--ease-exit);
+
+  /*
+   * A `0fr` row collapses the panel's *height* and nothing else, so the inset
+   * that keeps the EQ's focus ring off the clip edge has to live out here. As
+   * padding on the panel it floored the closed track at its own eight pixels —
+   * `box-sizing: border-box` has no way to compress padding — and left the
+   * artwork view with a strip of nothing sitting under the title.
+   */
+  overflow: hidden;
+  padding: 0;
+  transition:
+    grid-template-rows var(--duration) var(--ease-exit),
+    padding var(--duration) var(--ease-exit);
 
   &[data-open] {
     grid-template-rows: 1fr;
-    transition: grid-template-rows var(--duration) var(--ease-emphasis);
+    padding: var(--sp-1);
+    transition:
+      grid-template-rows var(--duration) var(--ease-emphasis),
+      padding var(--duration) var(--ease-emphasis);
   }
 }
 
 .dsp-panel {
-  /*
-   * The controls hang under the track's own data at the inline edge, not in a
-   * centred sheet across the window: `.player-info` above it is the block they
-   * belong to, and `align-self` is what keeps them lined up with it inside a
-   * centred flex column.
-   */
   display: grid;
   gap: var(--sp-4);
   width: 100%;
 
   /*
    * A ceiling, not the layout. `.player-content` sheds padding and shrinks the
-   * transport while this is open (see `[data-dsp]` below) so the whole page
-   * fits without scrolling; this only stops a very short window turning the
-   * panel into the entire screen.
+   * transport while this is open (see `[data-dsp]` below), and the mesh gives
+   * up its own height to it, so the whole page fits without scrolling; this
+   * only stops a very short window turning the panel into the entire screen.
    */
   max-height: 52cqh;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--sp-1);
   scrollbar-width: none;
 
   &::-webkit-scrollbar { display: none; }
@@ -1559,12 +1734,20 @@ body::before {
  * Everything else shrinks by a step so the whole column still fits: the
  * transport rides down into a smaller box rather than off the bottom edge.
  */
+/*
+ * With the page open, everything else gives up a step so it fits: the artwork
+ * drops to a thumbnail, the transport to a smaller button, the page to less
+ * margin — and the mesh, which is the flexible one, absorbs the rest. Nothing
+ * is hidden. It used to `display: none` the artwork here, which is the same
+ * mistake the analysis view used to make.
+ */
 @container player (min-width: 721px) {
   .player-view[data-dsp] {
-    .player-art { display: none; }
+    .player-art { --art-size: clamp(48px, 9cqh, 80px); align-self: flex-start; }
 
     .player-content {
-      --content-pad-block: 6vh;
+      --content-pad-block: clamp(var(--sp-4), 4vmin, 3rem);
+      --content-gap: var(--sp-3);
       --play-size: 44px;
       --play-glyph-size: var(--text-xl);
     }
@@ -1594,12 +1777,25 @@ body::before {
   .player-overlay {
     .player-content {
       --content-gap: var(--sp-3);
-      justify-content: center;
 
-      /* The block start clears the banner all but its faded tail, which is what
-         puts the title inside the fade rather than under a hard edge. */
+      /*
+       * The block start clears the banner all but its faded tail, so the title
+       * begins inside the dissolve rather than under a hard edge below it.
+       *
+       * This is the one layout where `space-between` is not the same as
+       * `center`: the type has to *start* at that padding edge to land in the
+       * fade, and the transport has to stay on the bottom edge — and with the
+       * mesh collapsed there is no growing item to push them apart.
+       */
+      justify-content: space-between;
       padding: calc(var(--art-banner-h) - var(--sp-8)) var(--sp-6) var(--sp-6);
     }
+
+    /* The analysis view needs the middle of the page for the mesh and the
+       readout, so the banner takes about half the room it does over the
+       artwork view. Retuning the token on the view lets it inherit down to
+       both the padding and the art, so nothing else has to know. */
+    .player-view[data-mode='analysis'] { --art-banner-h: min(30cqh, 52cqw); }
 
     .player-art {
       position: absolute;
@@ -1714,54 +1910,41 @@ body::before {
  * `.player-view` itself — its own padding and gap hang off the tier
  * attribute instead. These only change inherited sizing.
  */
+/* What survived the width ramps: the transport's own spacing, which is a
+   rearrangement of the control row rather than a step on the size scale. */
 @container player (max-width: 480px) {
-  .player-content {
-    --art-size: clamp(60px, 25cqw, 120px);
-    --play-size: 48px;
-    --content-gap: var(--sp-3);
-    padding: var(--sp-3);
-  }
-
   .playback-controls { gap: var(--sp-3); }
 }
 
 @container player (max-width: 320px) {
-  .player-content {
-    --art-size: clamp(48px, 20cqw, 80px);
-    --play-size: var(--titlebar-h);
-    --play-glyph-size: 18px;
-    --title-size: var(--text-base);
-    --content-gap: var(--sp-2);
-    padding: var(--sp-2);
-  }
-
   .playback-controls > :not(.play) { font-size: var(--text-base); }
 }
 
 .app-shell[data-height-tier='snug'] .player-content { --content-gap: var(--sp-4); padding: var(--sp-6); }
 
+/*
+ * The two short-height ramps, merged. Height keeps a breakpoint where width
+ * did not: this is the axis that runs out, and overshooting it clips the
+ * transport off the bottom of the window rather than merely looking wrong.
+ * The clamps cover 420px down to 340px and below in one curve.
+ */
 @container player (max-height: 420px) {
   .player-content {
-    --art-size: clamp(64px, 24cqh, 120px);
-    --play-size: 44px;
-    --play-glyph-size: var(--text-xl);
-    --title-size: var(--text-lg);
+    --art-size: clamp(48px, 20cqh, 120px);
+    --play-size: clamp(var(--titlebar-h), 10cqh, 44px);
+    --play-glyph-size: clamp(18px, 4.4cqh, var(--text-xl));
+    --title-size: clamp(var(--text-base), 4.4cqh, var(--text-lg));
     --content-gap: var(--sp-2);
-    padding: var(--sp-3);
+    --content-pad-block: var(--sp-3);
+    --content-pad-inline: var(--sp-3);
   }
 
   .playback-controls { gap: var(--sp-3); }
   .player-info .track-title { margin-bottom: var(--sp-1); }
 }
 
+/* Purely structural: below this there is no room for a third line of type. */
 @container player (max-height: 340px) {
-  .player-content {
-    --art-size: clamp(48px, 20cqh, 72px);
-    --play-size: var(--titlebar-h);
-    --play-glyph-size: 18px;
-    --title-size: var(--text-base);
-  }
-
   .player-info .track-album { display: none; }
   .time-row { margin-top: var(--sp-1); }
 }

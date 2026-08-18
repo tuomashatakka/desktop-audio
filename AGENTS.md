@@ -1,41 +1,128 @@
-# AGENTS — Repository Quick‑Start
+# desktop-audio — Agent Guide
 
-## Core commands (must‑run in repo root)
-- `npm run start`    → launch Electron (uses `electron‑forge start`)
-- `npm run lint`    → run ESLint on `src/`
-- `npm run typecheck` → run `tsc --noEmit`
-- `npm run test`    → run Vitest unit tests
-- `npm run test:e2e` → run Playwright end‑to‑end tests
-- `npm run rebuild`  → re‑build native modules (`better‑sqlite3`)
-- `npm run package`  → bundle app for current platform (uses Vite + Forge)
-- `npm run make`    → create distributable installers (deb, rpm, zip, …)
+Electron + React + TypeScript music player. Bun only — never npm, yarn, or pnpm.
 
-## Build nuances
-- Main‑process bundling (`config/vite/main.config.ts`) marks `better‑sqlite3` and `mpris‑service` as **external** – they are loaded from the built app, not bundled.
-- Renderer, preload and worker Vite configs live alongside but are invoked automatically by Forge; no manual steps needed.
+---
 
-## Testing quirks
-- Vitest reads TypeScript source directly – ensure `npm run rebuild` has been run if native modules are imported in tests.
-- Playwright tests require a graphical environment; CI should run with `xvfb‑run` or similar headless setup.
+## Commands
 
-## Repo layout shortcuts (high‑signal)
-- `public/` → static assets (`index.html`, `main.css`, images, manifests). The UI entry point is `public/index.html`.
-- `src/`  → application source (React UI, Electron main, preload, workers).
-- `docs/plans/` → OpenCode planning files referenced by `.claude/settings.json`.
+```bash
+bun install              # install deps
+bun run start            # dev (electron-forge start)
+bun run lint             # eslint ./src --config config/eslint.config.mjs
+bun run typecheck        # tsc --noEmit
+bun run test             # vitest run --config config/vitest.config.ts
+bun run test:e2e         # playwright test --config config/playwright/playwright.config.ts
+bun run test:coverage    # vitest run --coverage (thresholds: 35% stmts/funcs, 30% branches)
+bun run make             # production build
+```
 
-## Agent tooling rules (avoid mistakes)
-- **Never** run raw `curl`/`wget`/`fetch` – blocked. Use `webfetch` or `context‑mode` helpers.
-- For any shell output > 20 lines (e.g. `git status`), use `context‑mode_ctx_batch_execute` or `context‑mode_ctx_execute` to keep context small.
-- Use `context‑mode_ctx_search` before asking the user for prior decisions or constraints.
-- Editing files requires a prior `read` – always read before `edit`.
+Always run `bun run lint && bun run typecheck && bun run test` before committing.
 
-## Context‑mode defaults (must stay enabled)
-- All MCP tools are available; respect the routing rules listed in the original AGENTS file.
-- Session memory is auto‑enabled – query it with `ctx stats` or `ctx doctor` when needed.
+---
 
-## Things *not* needed in this repo
-- No monorepo or multiple packages – single Electron app.
-- No custom environment variables beyond Node/Electron defaults.
-- No special code‑generation steps.
+## Where Things Live
 
-*End of concise instructions*
+```
+src/app/
+├── components/atomic/       # Button, Input, Rating, WaveformProgress, etc.
+├── components/composite/    # Player, DspPanel, AnalysisReadout, TrackTable, etc.
+├── contexts/                # SettingsContext, AudioContext, LibraryContext, UIContext
+├── hooks/                   # useAmbientPalette, useAppearance, useKeyboardShortcuts, etc.
+├── layout/                  # App shell, titlebar, overlay host
+├── services/                # Audio engine, DSP chain, analysis pipeline
+├── styles/                  # CSS entry point + all stylesheets
+│   ├── main.css             # Entry: @layer declaration + imports
+│   ├── fonts.css            # @font-face declarations (fonts layer)
+│   ├── tokens.css           # All custom properties (tokens layer)
+│   ├── base.css             # Reset + element styles
+│   ├── components.css       # Component styles
+│   ├── layout.css           # Page-level layout
+│   ├── views.css            # View-specific styles
+│   └── utilities.css        # .surface, .fade-y, .fade-x, .sr-only
+├── utils/                   # color.ts, theme.ts, time.ts, pitch.ts, etc.
+└── views/                   # LibraryView, SettingsView, NowPlayingView, etc.
+```
+
+```
+tests/                       # Vitest + jsdom, mirrors src/app/ structure
+config/                      # Vite, Vitest, ESLint, Playwright configs
+docs/                        # STYLE_GUIDE.md, DESIGN_GUIDE.md, plans/
+```
+
+---
+
+## CSS Architecture
+
+Vite targets `chrome146` — native `@layer`, `@property`, `color-mix()`,
+container queries, and CSS nesting are used directly. No Tailwind, no PostCSS,
+no CSS-in-JS.
+
+### Layer Order
+
+```
+@layer fonts, tokens, reset, base, components, layout, views, utilities;
+```
+
+Declared in `src/app/styles/main.css`. Every stylesheet belongs to exactly
+one layer. The `fonts` layer is imported first so `@font-face` rules can never
+be caught by a token override.
+
+### Invariant: One Token Contract
+
+All CSS custom properties and all theme-dependent selectors (`:root`,
+`[data-theme=…]`, `[data-ui-density]`, `[data-corners]`) live in
+`src/app/styles/tokens.css` and nowhere else. A test in `tests/` enforces
+this. When adding a new token, add it to `tokens.css` — never to a component
+or layout file.
+
+### Invariant: One Writer for `--accent`
+
+`useAppearance` is the sole writer of `--accent` on `document.documentElement`.
+`useAmbientPalette` *returns* a palette; it does not write the property. Two
+hooks writing one custom property on one element is a race decided by effect
+ordering.
+
+---
+
+## Fonts
+
+Bundled families: Montserrat (OFL), Space Grotesk (OFL), Geist (OFL),
+Geist Mono (OFL), Departure Mono (OFL). Files live in `src/app/styles/fonts/`.
+
+Adding a font: drop the file in `fonts/`, add an `@font-face` in `fonts.css`,
+add the family to the stack record in `SettingsContext.tsx`. **No build config
+change required** — Vite's CSS asset pipeline handles it.
+
+---
+
+## Linting
+
+The project uses a custom `react-strict/prefer-no-use-effect` ESLint rule.
+`useEffect` is disallowed by default. Existing hooks carry a justification
+comment where an effect is unavoidable — follow the same pattern:
+
+```ts
+// eslint-disable-next-line react-strict/prefer-no-use-effect -- <why this effect is necessary>
+```
+
+Common valid justifications: DOM writes outside React's render, event listener
+subscriptions, async operations, media query listeners, canvas sampling.
+
+---
+
+## Settings
+
+Persisted via `SettingsContext` (localStorage). Appearance settings applied as
+custom properties or `data-*` attributes on `document.documentElement`:
+
+| Key | Type | Values | Applied as |
+|-----|------|--------|-----------|
+| `theme` | `Theme` | `'dark'` `'light'` `'auto'` `'custom'` | `data-theme` (`auto` resolved to `dark`/`light` in JS) |
+| `uiFont` | `UiFont` | `'montserrat'` `'space-grotesk'` `'geist'` `'departure'` `'poppins'` `'helvetica'` `'system'` | `--font`, `--font-display` |
+| `monoFont` | `MonoFont` | `'geist-mono'` `'departure'` `'system'` | `--font-mono` |
+| `accentSource` | `AccentSource` | `'artwork'` `'custom'` | branch in `useAppearance` |
+| `ambientStrength` | `number` | `0`–`1` | `--ambient-strength` |
+| `uiDensity` | `UiDensity` | `'compact'` `'comfortable'` | `[data-ui-density]` → remaps `--sp-unit` |
+| `cornerStyle` | `CornerStyle` | `'sharp'` `'soft'` | `[data-corners]` → remaps radius trio |
+| `fontScale` | `number` | `0.8`–`1.4` | root `font-size` (rem-based type scale follows) |

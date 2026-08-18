@@ -184,6 +184,16 @@ export function DspPanel () {
         </Button>
       </ModuleHeader>
 
+      {/* Above the control it describes, not under it. A note that explains how
+          to use something is an instruction while it sits before the thing and
+          a footnote once it sits after — and every module's note is in the same
+          place, so the three read as one column rather than three exceptions. */}
+      <p className='dsp-note'>
+        Drag on the curve to draw. The filled shape is the chain&apos;s own
+        output, so a band you lift lifts the spectrum under it — hover to name
+        the bands.
+      </p>
+
       <EqCurve
         gains={ dsp.eq.gains }
         enabled={ dsp.eq.on }
@@ -191,11 +201,6 @@ export function DspPanel () {
         onGain={ (index, gain) =>
           updateDsp(d =>
             withEqGain(d, index, gain)) } />
-
-      <p className='dsp-note'>
-        Drag on the curve to draw. The filled shape is the chain's own output,
-        so a band you lift lifts the spectrum under it.
-      </p>
     </fieldset>
 
     <fieldset className='dsp-module' data-module='compressor'>
@@ -207,6 +212,11 @@ export function DspPanel () {
             withCompressor(d, { on })) }>
         <ReductionMeter module='compressor' label='Compressor gain reduction' />
       </ModuleHeader>
+
+      <p className='dsp-note'>
+        The meter beside the switch is the gain reduction being applied right
+        now, read off the graph rather than out of these numbers.
+      </p>
 
       <KnobRow
         specs={ compressorKnobs(dsp) }
@@ -223,6 +233,12 @@ export function DspPanel () {
             withLimiter(d, { on })) }>
         <ReductionMeter module='limiter' label='Limiter gain reduction' />
       </ModuleHeader>
+
+      {/* Named for what it is for, not for what it guarantees. */}
+      <p className='dsp-note'>
+        The same node as the compressor, welded to a 20:1 ratio and a 1 ms
+        attack. It has no true-peak detection, so it cannot promise 0 dBFS.
+      </p>
 
       <KnobRow
         specs={ limiterKnobs(dsp) }
