@@ -4,9 +4,23 @@ import {
   AnalysisReadout,
   chordAt,
   firstAfter,
+  meterOf,
   queuedChords,
 } from '../../../src/app/components/composite/AnalysisReadout'
-import type { ChordSegment, TrackAnalysis } from '../../../src/app/services/types'
+import type { BeatMarker, ChordSegment, TrackAnalysis } from '../../../src/app/services/types'
+
+
+/** `count` beats in `meter`-beat bars, as the resolver reports them. */
+function beatGrid (count: number, meter: number): BeatMarker[] {
+  return Array.from({ length: count }, (_, i) => ({
+    time:     i * 0.5,
+    strength: 1,
+    source:   'beat' as const,
+    downbeat: i % meter === 0,
+    bar:      Math.floor(i / meter),
+    beat:     i % meter,
+  }))
+}
 
 
 const chords: readonly ChordSegment[] = [
@@ -76,6 +90,26 @@ describe('queuedChords', () => {
   })
 })
 
+describe('meterOf', () => {
+  it('reads the meter off the beat numbering', () => {
+    expect(meterOf(beatGrid(16, 4))).toBe(4)
+    expect(meterOf(beatGrid(12, 3))).toBe(3)
+    expect(meterOf(beatGrid(14, 7))).toBe(7)
+  })
+
+  // Too few beats is a failed detection, not a short song.
+  it('refuses a grid too short to be sure about', () => {
+    expect(meterOf(beatGrid(4, 4))).toBeNull()
+    expect(meterOf([])).toBeNull()
+  })
+
+  // A meter outside 2-12 is the resolver having lost the downbeat.
+  it('refuses an implausible meter', () => {
+    expect(meterOf(beatGrid(40, 20))).toBeNull()
+    expect(meterOf(beatGrid(16, 1))).toBeNull()
+  })
+})
+
 describe('AnalysisReadout', () => {
   it('stays out of the accessibility tree until the analysis view is open', () => {
     render(<AnalysisReadout open={ false } currentTime={ 6 } { ...READY } />)
@@ -88,6 +122,43 @@ describe('AnalysisReadout', () => {
 
     expect(screen.getByText('A minor')).toBeInTheDocument()
     expect(screen.getByText(/120\.0/)).toBeInTheDocument()
+  })
+
+  /*
+   * The caption line is a caption, not a table: `Key` and `Tempo` are there for
+   * a screen reader and nowhere on screen, which is what let the four-em label
+   * gutter go.
+   */
+  it('keeps the labels for assistive technology and off the page', () => {
+    const { container } = render(<AnalysisReadout open currentTime={ 6 } { ...READY } />)
+
+    const terms = [ ...container.querySelectorAll('.track-meta dt') ]
+
+    expect(terms.map(el =>
+      el.textContent)).toEqual([ 'Key', 'Tempo' ])
+    expect(terms.every(el =>
+      el.classList.contains('sr-only'))).toBe(true)
+  })
+
+  it('adds the meter when the beat grid carries one', () => {
+    const { container } = render(
+      <AnalysisReadout
+        open
+        currentTime={ 6 }
+        { ...READY }
+        analysis={{ ...analysis, beats: beatGrid(16, 4) }} />
+    )
+
+    expect(container.querySelector('.track-meta')).toHaveTextContent('4/4')
+  })
+
+  // The lane is the largest thing on the page; a caption over it was the last
+  // thing holding the label gutter up.
+  it('does not caption the chord lane', () => {
+    const { container } = render(<AnalysisReadout open currentTime={ 6 } { ...READY } />)
+
+    expect(container.querySelector('.chord-ribbon figcaption')).toBeNull()
+    expect(screen.getByRole('figure', { name: 'Chords' })).toBeInTheDocument()
   })
 
   it('pins the sounding chord and queues what is coming', () => {

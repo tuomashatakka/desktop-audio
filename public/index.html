@@ -158,6 +158,17 @@
           <p>Narrow the window and the cover stops being a card beside the type — it becomes the top of the page, dissolving into a gradient that the title sits inside. The rest of the layout responds the same way.</p>
         </div>
       </div>
+
+      <div class="split-layout" style="margin-top: var(--sp-8);">
+        <div class="split-text fade-blur">
+          <h3>Read Along, In Either Theme</h3>
+          <p>Lyrics hang off the trailing edge and follow the playhead, and the column steps aside to meet them rather than being replaced by them — so the cover, the seek bar and the transport are all still there while you read. The same layer, dark and light.</p>
+        </div>
+        <div class="split-image fade-blur delay-2 stack-pair">
+          <img src="screenshots/now-playing-lyrics.png" alt="Lyrics scrolling down the right edge over the frequency mesh" loading="lazy">
+          <img src="screenshots/now-playing-lyrics-light.png" alt="The same view under a light theme derived from the album artwork" loading="lazy">
+        </div>
+      </div>
     </section>
 
     <!-- ════════ SECTION 4: AUDIO PROCESSING ════════ -->
@@ -169,7 +180,7 @@
         <div class="split-text fade-blur delay-2">
           <h2>Shape The Sound, Not Just The Volume</h2>
           <p>A <strong>sixteen-band equaliser</strong>, a <strong>compressor</strong> and a <strong>limiter</strong>, each switchable on its own. The equaliser is <strong>one line you draw on</strong>, laid over the sound it is shaping: the curve is the filter cascade's real response, and the filled shape underneath is the analyser — which sits <em>after</em> the chain, so a band you lift lifts the ground under the bump you just drew.</p>
-          <p>Bypassing a module sets neutral parameters instead of unplugging it: splicing a node in or out of a live graph shifts the sample stream in time and clicks, while a flat band and a 1:1 compressor are already transparent. Everything is a native range input underneath — the curve keeps sixteen of them for the keyboard, and each knob is one under a drawn face. Hover the curve and a ruler of the band frequencies rises under it, calling out the one beneath your pointer.</p>
+          <p>Bypassing a module sets neutral parameters instead of unplugging it: splicing a node in or out of a live graph shifts the sample stream in time and clicks, while a flat band and a 1:1 compressor are already transparent. Everything is a native range input underneath — the curve keeps sixteen of them for the keyboard, and each knob is one under a drawn face. Hover the curve and a ruler of the band frequencies rises under it, calling out the one beneath your pointer. Press to pick a band and the drag stays on <em>that</em> band however far sideways it wanders; right-click steps the pick to the next one, which is the only reliable way to land on the low bands, where two per cent of the axis holds four of them.</p>
         </div>
       </div>
     </section>
@@ -180,11 +191,12 @@
         <div class="split-text fade-blur">
           <h2>It Knows What It's Playing</h2>
           <p>Every track is analysed <strong>once</strong>, in the background, on its own thread — chord regions, main key, tempo and a steady beat grid — then cached against the file's modification time so it never happens twice.</p>
-          <p>The <strong>chord ribbon</strong> turns distance into time: the sounding chord is pinned at the left and flashes as it takes over, the ones ahead slide in from the right exactly as far away as they are seconds away, and the outgoing one scrolls off and fades. <strong>Key and tempo</strong> sit above it. <strong>Beat and downbeat markers</strong> are drawn into the waveform. Behind all of it a live FFT wireframe names the dominant partials by pitch — on a logarithmic axis, because a linear one buries five octaves in the leftmost tenth of the screen.</p>
+          <p>The view is built for someone holding an instrument, so the <strong>chords lead</strong>. The sounding chord is pinned and flashes as it takes over, the ones ahead slide in from the right exactly as far away as they are seconds away, and the outgoing one scrolls off and fades — distance <em>is</em> time until you play it. <strong>Key, tempo and meter</strong> are one caption line under the album. <strong>Beat and downbeat markers</strong> are drawn into the waveform.</p>
+          <p>Behind all of it a live FFT wireframe runs as <strong>wallpaper</strong> — on a logarithmic axis, because a linear one buries five octaves in the leftmost tenth of the screen. It is decoration, and it is lit to say so; if you want the dominant partials named by pitch on top of it, that is a switch in preferences.</p>
           <p>While a track is being analysed you get a progress bar and an estimate learned from how long previous ones took, and whatever you are listening to is analysed first. If a file <em>can't</em> be read, it says so instead of spinning — and remembers.</p>
         </div>
         <div class="split-image fade-blur delay-2">
-          <img src="screenshots/now-playing-harmony.png" alt="Now playing in the analysis view, with the frequency mesh, the chord ribbon, key and tempo" loading="lazy">
+          <img src="screenshots/now-playing-harmony.png" alt="Now playing in the analysis view, with the chord lane, key and tempo over the frequency mesh" loading="lazy">
         </div>
       </div>
 
@@ -243,6 +255,17 @@
         <div class="split-text fade-blur delay-2">
           <h2>Your Library, Your Way</h2>
           <p>Even a music library with few to no metadata looks and feels perfectly fine — tracks are organized, searchable, and browsable regardless. But when you have metadata? It feels <strong>incredible AF</strong>. Album art, artists, genres — everything snaps into place beautifully.</p>
+        </div>
+      </div>
+
+      <div class="split-layout" style="margin-top: var(--sp-8);">
+        <div class="split-text fade-blur">
+          <h3>Group It, Scroll It, Keep Your Place</h3>
+          <p>Group by album and every heading brings its cover with it. Scroll and the toolbar collapses out of the way while the column header stays pinned, so you never lose which column you are reading. The table runs edge to edge — the window is the margin.</p>
+        </div>
+        <div class="split-image fade-blur delay-2 stack-pair">
+          <img src="screenshots/library-album-groups.png" alt="Library grouped by album with cover art beside each group" loading="lazy">
+          <img src="screenshots/library-sticky-header.png" alt="Library scrolled down, column header pinned to the top" loading="lazy">
         </div>
       </div>
     </section>

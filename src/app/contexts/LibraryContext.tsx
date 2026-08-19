@@ -56,6 +56,7 @@ interface LibraryContextValue extends Omit<LibraryState, 'storedPlaylists'> {
   readonly setSearchQuery: (query: string) => void
   readonly selectTrack:    (index: number | null) => void
   readonly toggleFolder:   (path: string) => void
+  readonly revealFolder:   (path: string) => void
   readonly setLoading:     (loading: boolean) => void
   readonly filteredTracks: Track[]
 
@@ -183,6 +184,43 @@ function toggleFolderBranch (folder: FolderEntry, path: string): FolderEntry {
   })
 }
 
+/**
+ * Expands every ancestor of `path`, so a folder selected from somewhere else —
+ * a breadcrumb, a track-table folder row, a restored session — is a row you can
+ * actually see rather than one buried in a collapsed branch.
+ *
+ * Ancestry is a path prefix, which is the whole test: a node is on the chain
+ * when `path` starts with its own path plus a separator. Branches off the chain
+ * are returned by reference, so React re-renders the spine and nothing else,
+ * and a node already open is left alone — which is what makes this idempotent
+ * and safe to run on every selection change.
+ */
+function revealFolderBranch (folder: FolderEntry, path: string): FolderEntry {
+  const onChain = path === folder.path ||
+    path.startsWith(`${folder.path}/`) ||
+    path.startsWith(`${folder.path}\\`)
+
+  if (!onChain)
+    return folder
+
+  const children = folder.children.map(child =>
+    revealFolderBranch(child, path))
+
+  const unchanged = folder.expanded && children.every((child, index) =>
+    child === folder.children[index])
+
+  if (unchanged)
+    return folder
+
+  return FolderEntry.fromFolderNode({
+    id:       folder.id,
+    name:     folder.name,
+    path:     folder.path,
+    children,
+    expanded: true,
+  })
+}
+
 /** Every folder id at or below `id`, so removing a folder takes its subtree. */
 function folderSubtree (folders: readonly PlaylistFolder[], id: string): ReadonlySet<string> {
   const ids = new Set([ id ])
@@ -242,6 +280,20 @@ export function LibraryProvider ({ children }: LibraryProviderProps) {
       ({ ...s,
         folders: s.folders.map(folder =>
           toggleFolderBranch(folder, path)) }))
+  }, [])
+
+  const revealFolder = useCallback((path: string) => {
+    setState(s => {
+      const folders = s.folders.map(folder =>
+        revealFolderBranch(folder, path))
+
+      const unchanged = folders.every((folder, index) =>
+        folder === s.folders[index])
+
+      return unchanged
+        ? s
+        : { ...s, folders }
+    })
   }, [])
 
   const setLoading = useCallback((loading: boolean) => {
@@ -465,6 +517,7 @@ export function LibraryProvider ({ children }: LibraryProviderProps) {
       setSearchQuery,
       selectTrack,
       toggleFolder,
+      revealFolder,
       setLoading,
       filteredTracks,
       addPlaylist,
@@ -487,6 +540,7 @@ export function LibraryProvider ({ children }: LibraryProviderProps) {
     setSearchQuery,
     selectTrack,
     toggleFolder,
+    revealFolder,
     setLoading,
     filteredTracks,
     addPlaylist,

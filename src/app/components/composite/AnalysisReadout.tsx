@@ -1,6 +1,13 @@
 /**
  * The track's resolved harmony, read as type under its own title.
  *
+ * The chords lead. Someone reading this is holding an instrument, so the lane
+ * of what is sounding and what is next is the largest thing on the page, and
+ * key, tempo and meter are a caption line under the album — three facts you
+ * check once, not three rows of a table. The label gutter that used to line
+ * `Chord`, `Key` and `Tempo` up went with them: a page with one graphic on it
+ * does not need the graphic captioned.
+ *
  * This used to live inside {@link FrequencyMatrix}, which made the track's
  * musical data a sub-detail of a spectrum widget. It is the other way round:
  * the mesh is the backdrop, and this is what the analysis view is *for*. So it
@@ -13,7 +20,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import type { TrackAnalysis, ChordSegment } from '../../services/types'
+import type { TrackAnalysis, ChordSegment, BeatMarker } from '../../services/types'
 import type { AnalysisStatus } from '../../hooks/useTrackAnalysis'
 
 
@@ -24,7 +31,7 @@ import type { AnalysisStatus } from '../../hooks/useTrackAnalysis'
  * than on what is visible: how far ahead you can *see* is `--chord-pps` against
  * the queue's width, and that belongs in CSS with the rest of the geometry.
  */
-const QUEUE_LENGTH = 10
+const QUEUE_LENGTH = 16
 
 /** The index of the chord sounding at `time`, or `-1` between or before them. */
 export function chordAt (chords: readonly ChordSegment[], time: number): number {
@@ -56,6 +63,25 @@ export function queuedChords (
   from: number
 ): readonly ChordSegment[] {
   return from < 0 ? [] : chords.slice(from, from + QUEUE_LENGTH)
+}
+
+/**
+ * Beats per bar, from the highest beat index the analyser reported.
+ *
+ * The resolver already numbers every beat within its bar (`BeatMarker.beat`),
+ * so the meter is the maximum of that plus one — no second pass over the audio
+ * and no guess. `null` when there is not enough to be sure: a handful of beats
+ * is a failed detection rather than a short song, and a meter outside 2–12 is
+ * the resolver having lost the downbeat. The caption simply drops the pair.
+ */
+export function meterOf (beats: readonly BeatMarker[]): number | null {
+  if (beats.length < 8)
+    return null
+
+  const meter = beats.reduce((highest, marker) =>
+    Math.max(highest, marker.beat), 0) + 1
+
+  return meter >= 2 && meter <= 12 ? meter : null
 }
 
 interface ChordRibbonProps {
@@ -134,15 +160,16 @@ function ChordRibbon ({ chords, currentTime, isPlaying }: ChordRibbonProps) {
       cancelAnimationFrame(frame)
   }, [ currentTime, isPlaying ])
 
-  // A figure with a caption, not a labelled div: the ribbon is one graphic
-  // about the track, and `Chord` captions it. The queue is a real `<ol>`
+  // A figure, not a labelled div: the ribbon is one graphic about the track.
+  // It carries an `aria-label` rather than a `figcaption` — the caption was
+  // visible type in a gutter that no longer exists, and the lane is now the
+  // largest thing on the page, which captions it well enough. The queue is a
+  // real `<ol>`
   // because it is one — the chords in the order they will play — even though
   // only sighted readers ever see it move; the pinned pair beside it is what
   // announces, so the queue stays out of the accessibility tree rather than
   // reading a list of futures over the top of it.
-  return <figure className='chord-ribbon'>
-    <figcaption className='readout-label'>Chord</figcaption>
-
+  return <figure className='chord-ribbon' aria-label='Chords'>
     <p className='chord-now' aria-live='polite' aria-atomic='true'>
       {previous &&
         <span key={ previous.start } className='chord' data-state='past'>{previous.label}</span>}
@@ -171,15 +198,26 @@ interface KeyTempoProps {
   readonly analysis: TrackAnalysis
 }
 
+/**
+ * `B minor · 87.5 bpm · 4/4` — one line, read once.
+ *
+ * A description list still, because that is what it is, but the terms are for
+ * screen readers only: `Key` beside `B minor` is a caption on a caption, and
+ * the three used to occupy three rows and a four-em label gutter for it. The
+ * separators are generated, so the line has no punctuation to strip when a
+ * pair is missing.
+ */
 function KeyTempo ({ analysis }: KeyTempoProps) {
-  return <dl className='key-tempo-summary'>
+  const meter = meterOf(analysis.beats)
+
+  return <dl className='track-meta'>
     <div>
-      <dt>Key</dt>
+      <dt className='sr-only'>Key</dt>
       <dd>{analysis.key.label}</dd>
     </div>
 
     <div>
-      <dt>Tempo</dt>
+      <dt className='sr-only'>Tempo</dt>
 
       <dd>
         {analysis.tempo.bpm.toFixed(1)}
@@ -187,6 +225,13 @@ function KeyTempo ({ analysis }: KeyTempoProps) {
         <abbr title='beats per minute'>bpm</abbr>
       </dd>
     </div>
+
+    {meter !== null &&
+      <div>
+        <dt className='sr-only'>Meter</dt>
+        <dd>{meter}/4</dd>
+      </div>
+    }
   </dl>
 }
 

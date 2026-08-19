@@ -73,8 +73,13 @@ const PEAK_LIMIT = 3
  */
 const LABEL_TTL_MS = 2400
 
-/** Labels held at once. The least recently heard are dropped first. */
-const LABEL_MAX = 8
+/**
+ * Labels held at once. The least recently heard are dropped first.
+ *
+ * Deliberately few: the mesh is a backdrop to the chord lane now, and a row of
+ * eight names across it competed with the type it sits behind.
+ */
+const LABEL_MAX = 5
 
 /**
  * Labels closer than this (in viewBox units) are pushed apart along the row.
@@ -90,6 +95,15 @@ interface FrequencyMatrixProps {
 
   /** Drives the rAF loop. The mesh stays mounted while it fades out. */
   readonly active: boolean
+
+  /**
+   * Name the loudest partials over the mesh.
+   *
+   * Off by default (see `showSpectrumNotes` in `SettingsContext`). When it is
+   * off the peak search does not run at all, so this saves the `findPeaks`
+   * pass as well as the labels.
+   */
+  readonly showNotes?: boolean
 }
 
 interface PeakLabel {
@@ -219,7 +233,7 @@ function buildGeometry (): Geometry {
  * (`AnalysisReadout`) — the track's key, tempo and chords are what the analysis
  * view is *for*, and this is the backdrop they are read against.
  */
-export function FrequencyMatrix ({ analyzer, active }: FrequencyMatrixProps) {
+export function FrequencyMatrix ({ analyzer, active, showNotes = false }: FrequencyMatrixProps) {
   const freqPathRef    = useRef<SVGPathElement>(null)
   const timePathRef    = useRef<SVGPathElement>(null)
   const currentPathRef = useRef<SVGPathElement>(null)
@@ -337,7 +351,7 @@ export function FrequencyMatrix ({ analyzer, active }: FrequencyMatrixProps) {
     }
 
     const updateLabels = (now: number) => {
-      if (!analyzer || !bins || now - lastLabelAt < LABEL_INTERVAL_MS)
+      if (!showNotes || !analyzer || !bins || now - lastLabelAt < LABEL_INTERVAL_MS)
         return
       lastLabelAt = now
 
@@ -393,7 +407,9 @@ export function FrequencyMatrix ({ analyzer, active }: FrequencyMatrixProps) {
       cancelAnimationFrame(frame)
       setPeaks([])
     }
-  }, [ analyzer, active, geometry ])
+    // `showNotes` is in the dependency list, so turning it off re-runs this and
+    // the cleanup above clears whatever row was on screen.
+  }, [ analyzer, active, geometry, showNotes ])
 
   return <section
     className='frequency-matrix'

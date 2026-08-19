@@ -200,4 +200,27 @@ describe('FolderTree keyboard navigation', () => {
 
     expect(onSelect).toHaveBeenCalledWith('/music/jazz')
   })
+
+  // Selecting a folder and looking inside it are the same intent, so one click
+  // does both — the chevron above stays the way to open a branch *without*
+  // moving the selection.
+  it('clicking a row with children also expands it', () => {
+    const onSelect = vi.fn()
+    render(<Harness onSelect={ onSelect } />)
+
+    fireEvent.click(item(/Rock/))
+
+    expect(onSelect).toHaveBeenCalledWith('/music/rock')
+    expect(item(/Rock/)).toHaveAttribute('aria-expanded', 'true')
+    expect(names()).toContain('Live')
+  })
+
+  it('clicking a leaf selects it without toggling anything', () => {
+    render(<Harness />)
+
+    fireEvent.click(item(/Jazz/))
+
+    expect(item(/Jazz/)).not.toHaveAttribute('aria-expanded')
+    expect(names()).not.toContain('Live')
+  })
 })

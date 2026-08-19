@@ -88,6 +88,7 @@
     --text-xl: 1.25rem;
     --text-2xl: 1.5rem;
     --text-3xl: 2rem;
+    --text-4xl: 3rem;
     /* Montserrat ships a hairline face, so 100 is a real weight here and not a
        synthesised one. The full player's chord strip is drawn in it. */
     --weight-hairline: 100;
@@ -205,11 +206,26 @@
     --analysis-rise: calc(var(--shift-md) * 2);
 
     /*
-     * Pixels per second of chord lookahead. It lives here, not in JS, because it
-     * is half of a pair: this against `.chord-queue`'s width is how far ahead the
-     * ribbon can see, and only CSS knows the width.
+     * Chord lookahead: how far one second of the future is, on screen. It lives
+     * here, not in JS, because it is half of a pair — this against
+     * `.chord-queue`'s width is how far ahead the ribbon can see, and only CSS
+     * knows the width.
+     *
+     * A length rather than a bare number, so it can ramp with the container: a
+     * `clamp()` cannot mix a unitless value with `cqi`, and the multiplication
+     * that positions a chord takes `seconds × length` either way.
      */
-    --chord-pps: 34;
+    --chord-pps: clamp(28px, 6cqi, 64px);
+
+    /*
+     * How far back the mesh sits once the chords lead.
+     *
+     * The spectrum is decoration on a page about harmony, so it is wallpaper:
+     * present, moving, and never competing with type for the same attention.
+     * The newest row is deliberately left out of this — see `.matrix-current`,
+     * which is the one line that still has to read as live.
+     */
+    --matrix-wallpaper: 0.38;
 
     /* The full-bleed cover on a narrow now-playing window. */
     --art-banner-h: min(58cqh, 96cqw);

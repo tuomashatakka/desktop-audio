@@ -328,7 +328,8 @@ export function Player ({ expanded = false }: PlayerProps) {
     pause, resume, seek, playNext, playPrevious,
   }                                                        = useAudio()
   const { shuffle, setShuffle, repeatMode, setRepeatMode,
-    showBeatMarkers, showChordAnalysis, showKeyAnalysis } = useSettings()
+    showBeatMarkers, showChordAnalysis, showKeyAnalysis,
+    showSpectrumNotes }                                   = useSettings()
   const analysis                                          = useTrackAnalysis(currentTrack)
   const toggleWindowScale                                 = useWindowScale()
 
@@ -391,7 +392,7 @@ export function Player ({ expanded = false }: PlayerProps) {
           reason: their arrival and departure are `display` transitions, and an
           unmounted element has nothing to animate. */}
       {expanded && <>
-        <FrequencyMatrix analyzer={ analyzer } active={ analysing } />
+        <FrequencyMatrix analyzer={ analyzer } active={ analysing } showNotes={ showSpectrumNotes } />
 
         <AnalysisReadout
           open={ analysing }

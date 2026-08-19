@@ -62,8 +62,15 @@ function FolderTreeItem ({ entry, selected, focused, onSelect, onToggle, onFocus
     role='treeitem'
     draggable
     tabIndex={ focused ? 0 : -1 }
-    onClick={ () =>
-      onSelect(node.path) }
+    onClick={ () => {
+      // One click does both. Selecting a folder and looking at what is inside
+      // it are the same intent here, and a chevron is a small target to have
+      // to hit for the second half of it.
+      onSelect(node.path)
+
+      if (hasChildren)
+        onToggle(node.path)
+    } }
     onDragStart={ event => {
       event.stopPropagation()
       setDragPayload(event.dataTransfer, { kind: 'folder', path: node.path, label: node.name })
@@ -75,7 +82,10 @@ function FolderTreeItem ({ entry, selected, focused, onSelect, onToggle, onFocus
         className={ `disclosure ${node.expanded ? 'open' : ''}` }
         aria-hidden='true'
         onClick={ event => {
-          // The row's own click selects; the chevron only ever toggles.
+          // The row selects and toggles; the chevron only ever toggles — so it
+          // stays the way to open a branch without moving the selection off
+          // wherever it is. Stopping propagation is also what keeps a chevron
+          // click from toggling twice.
           event.stopPropagation()
           onToggle(node.path)
         } }>

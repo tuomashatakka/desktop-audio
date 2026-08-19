@@ -69,7 +69,7 @@
     outline-offset: 2px;
   }
 
-  :where(.track-scroll, .library-sidebar, .view-content) {
+  :where(.track-scroll, .library-sidebar, .sidebar-scroll, .view-content) {
     scrollbar-color: var(--bg-hover) transparent;
     scrollbar-width: thin;
   }

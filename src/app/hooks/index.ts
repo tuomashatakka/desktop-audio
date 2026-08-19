@@ -23,3 +23,5 @@ export * from './useAppearance'
 export * from './useTrackAnalysis'
 
 export * from './useLyricsScroll'
+
+export * from './useAutoNowPlaying'

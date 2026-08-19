@@ -483,6 +483,19 @@
   border-radius: 12px;
 }
 
+/* Two shots of the same thing, stacked and slightly overlapped — a pair, not
+   a gallery. The second slides out from under the first so both read as one
+   figure about one feature. */
+.stack-pair {
+  display: grid;
+  gap: clamp(0.5rem, 1.4vw, 1rem);
+}
+
+.stack-pair img:nth-child(2) {
+  width: 88%;
+  margin-inline-start: auto;
+}
+
 /* ── Mini Player Showcase ────────────────────── */
 .mini-showcase {
   display: grid;

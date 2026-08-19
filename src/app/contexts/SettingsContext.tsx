@@ -210,6 +210,16 @@ interface Settings {
 
   /** Show key and tempo in the now-playing analysis view. */
   readonly showKeyAnalysis: boolean
+
+  /**
+   * Name the loudest partials over the frequency mesh.
+   *
+   * Off by default. The analysis view is about chords, and the mesh behind
+   * them is decoration — eight note names floating over it are the clutter
+   * that made the page hard to read. Anyone chasing a partial can switch them
+   * back on.
+   */
+  readonly showSpectrumNotes: boolean
 }
 
 /** Settings plus the action handlers exposed to consumers. */
@@ -247,6 +257,7 @@ interface SettingsContextValue extends Settings {
 
   readonly setShowSubfolders:    (show: boolean) => void
   readonly setShowBeatMarkers:   (show: boolean) => void
+  readonly setShowSpectrumNotes: (show: boolean) => void
   readonly setShowChordAnalysis: (show: boolean) => void
   readonly setShowKeyAnalysis:   (show: boolean) => void
 
@@ -348,6 +359,7 @@ const defaultSettings: Settings = {
   showBeatMarkers:   false,
   showChordAnalysis: true,
   showKeyAnalysis:   true,
+  showSpectrumNotes: false,
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
@@ -544,6 +556,11 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
       ({ ...s, showBeatMarkers }))
   }, [])
 
+  const setShowSpectrumNotes = useCallback((showSpectrumNotes: boolean) => {
+    update(s =>
+      ({ ...s, showSpectrumNotes }))
+  }, [])
+
   const setShowChordAnalysis = useCallback((showChordAnalysis: boolean) => {
     update(s =>
       ({ ...s, showChordAnalysis }))
@@ -595,6 +612,7 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
       updateDsp,
       setShowSubfolders,
       setShowBeatMarkers,
+      setShowSpectrumNotes,
       setShowChordAnalysis,
       setShowKeyAnalysis,
     }), [
@@ -624,6 +642,7 @@ export function SettingsProvider ({ children }: SettingsProviderProps) {
     updateDsp,
     setShowSubfolders,
     setShowBeatMarkers,
+    setShowSpectrumNotes,
     setShowChordAnalysis,
     setShowKeyAnalysis,
   ])

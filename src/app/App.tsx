@@ -3,7 +3,7 @@ import { UIProvider, SettingsProvider, LibraryProvider, AudioProvider, useSettin
 import { LibraryView } from './views/LibraryView'
 import { LibrarySearch } from './views/LibrarySearch'
 import { Player } from './components/composite/Player'
-import { useKeyboardShortcuts, useAmbientPalette, useAppearance, useThemeApply } from './hooks'
+import { useKeyboardShortcuts, useAmbientPalette, useAppearance, useThemeApply, useAutoNowPlaying } from './hooks'
 import { AppLayout, Titlebar, LibrarySidebar, OverlayHost } from './layout'
 
 
@@ -23,6 +23,7 @@ function AppContent () {
 
   // All hooks must be called unconditionally before any early return
   useKeyboardShortcuts()
+  useAutoNowPlaying()
 
   // The palette is *returned* rather than written straight to `--accent`:
   // `useAppearance` is the single writer of that property, so the artwork feeds

@@ -50,8 +50,19 @@ input under a drawn face — pointer, wheel and keyboard all work, dragging is
 vertical and relative so a full sweep takes real travel rather than 52 pixels,
 and holding <kbd>Shift</kbd>, <kbd>⌘</kbd> or <kbd>Ctrl</kbd> drops it to fine
 mode. Hovering the curve raises a ruler of the sixteen band frequencies and
-calls out the one under your pointer with its current gain. The page needs a
-wide window and is not offered in a narrow one.
+calls out the one under your pointer with its current gain.
+
+Pressing on the curve *picks* a band, and the drag then belongs to that band
+however far sideways it wanders — pulling one to +12 dB used to smear the gain
+across every band the pointer crossed on the way up. A right-click steps the
+pick to the next band without touching a gain (<kbd>Shift</kbd> for the
+previous one), which is the only reliable way onto the low bands, where four of
+them share two per cent of a logarithmic axis. The picked band stays named and
+called out with the pointer away.
+
+Every control in the page is sized against the window's own height, so the
+whole chain stays on one page instead of hiding its low bands behind a
+scrollbar that was not drawn.
 
 ## Chords, key and tempo
 
@@ -64,20 +75,24 @@ of every song through the renderer.
 
 ![Lyrics laid over the spectrum, with the chord ribbon and key and tempo readout](assets/screenshots/now-playing-lyrics.png)
 
-What you get on screen:
+The view is laid out for someone holding an instrument, so the chords lead and
+everything else is sized against them:
 
-- a **chord ribbon** where distance is time. The sounding chord is pinned at the
-  left and flashes as it takes over; the ones ahead slide in from the right, each
-  one exactly as far away as it is *seconds* away. The outgoing chord scrolls off
+- a **chord lane** where distance is time, set in the largest type in the app.
+  The sounding chord is pinned behind an accent rule and flashes as it takes
+  over; the ones ahead slide in from the right, each one standing on a tick
+  exactly as far away as it is *seconds* away. The outgoing chord scrolls off
   and fades.
-- the **key and tempo** of the track, read straight off the analysis
+- **key, tempo and meter** as one caption line under the album — `B minor ·
+  87.5 bpm · 4/4`. The meter comes off the beat grid, so it costs nothing extra.
 - **beat and downbeat markers** drawn into the full now-playing waveform
-- a **live FFT wireframe** — this one is real-time, not cached — with the
-  dominant partials named by pitch and frequency, on a logarithmic axis, because
-  pitch is logarithmic and a linear one buries five octaves in the left tenth.
-  The current instant is drawn like the EQ's own curve, in front, with the
-  history receding behind it; named partials hold their place in a clean row and
-  fade out over a couple of seconds instead of flickering.
+- a **live FFT wireframe** — this one is real-time, not cached — running behind
+  all of it as wallpaper, on a logarithmic axis, because pitch is logarithmic
+  and a linear one buries five octaves in the left tenth. The current instant is
+  drawn like the EQ's own curve, in front and at full strength, with the history
+  receding and dimmed behind it. Naming the dominant partials by pitch over the
+  top is a switch in preferences, off by default: it is decoration on a page
+  about harmony.
 
 ![A custom theme derived from the album artwork, over the analysis view](assets/screenshots/now-playing-harmony-derived.png)
 

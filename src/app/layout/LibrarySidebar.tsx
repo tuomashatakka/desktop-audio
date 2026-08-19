@@ -28,7 +28,7 @@ import type { PlaylistMenuSubject } from '../components/composite/PlaylistMenu'
 import { Icon, PromptDialog } from '../components/atomic'
 import type { PopoverPoint } from '../components/atomic/Popover'
 import type { IconName } from '../services/types'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { listenAll } from '../utils/events'
 import { isMediaDrag, tracksForPayload } from '../utils/dnd'
 import type { DragPayload, MediaDrag } from '../utils/dnd'
@@ -84,7 +84,7 @@ const PROMPT_TITLES: Record<Prompt['kind'], string> = {
 export function LibrarySidebar () {
   const {
     tracks, folders, playlists, playlistFolders,
-    toggleFolder, addPlaylist, removePlaylist, renamePlaylist, setPlaylistIcon,
+    toggleFolder, revealFolder, addPlaylist, removePlaylist, renamePlaylist, setPlaylistIcon,
     movePlaylist, addTracksToPlaylist,
     addPlaylistFolder, removePlaylistFolder, renamePlaylistFolder,
     movePlaylistFolder, togglePlaylistFolder,
@@ -102,6 +102,19 @@ export function LibrarySidebar () {
     openOverlay,
     setDspOpen,
   } = useUI()
+
+  // The selected folder is always a row you can see.
+  //
+  // The selection is not this component's to intercept — it arrives from
+  // breadcrumbs, from a folder row in the track table, and from whatever the
+  // last session was left on — so the tree answers to it rather than every
+  // caller remembering to open the branch first. `revealFolder` returns the
+  // same state when there was nothing to open, so this settles in one pass.
+  // eslint-disable-next-line react-strict/prefer-no-use-effect -- Reacts to a selection made outside this component; no render can derive that the branch needs opening.
+  useEffect(() => {
+    if (selectedFolderPath)
+      revealFolder(selectedFolderPath)
+  }, [ selectedFolderPath, revealFolder ])
 
   const [ menu, setMenu ]     = useState<{ target: PlaylistTarget; point: PopoverPoint } | null>(null)
   const [ prompt, setPrompt ] = useState<Prompt | null>(null)
@@ -251,90 +264,100 @@ export function LibrarySidebar () {
       onMouseDown={ handleResizeStart }
       onKeyDown={ handleResizeKeyDown } />
 
-    {/* The two lists playback itself produces. They sit above the folder tree
-        because they answer "what am I listening to", which is a question one
-        asks far more often than "where is this file". */}
-    <details open>
-      <summary>
-        <Icon name='chevron-right' />
-        Playback
-      </summary>
+    {/* The three sections scroll as one region.
 
-      <ul className='playlist-list'>
-        {PLAYBACK_LISTS.map(entry =>
-          <li key={ entry.list }>
+        The sidebar itself cannot be the scroller: it has to stay the
+        positioning context for the resize handle, and the footer is pinned
+        to its bottom edge rather than parked after the content. `min-height:
+        0` on this box is the load-bearing half — a flex item defaults to
+        `min-height: auto` and refuses to shrink below its content, which is
+        why a deep tree used to be clipped with no way to reach the rest. */}
+    <div className='sidebar-scroll'>
+      {/* The two lists playback itself produces. They sit above the folder tree
+          because they answer "what am I listening to", which is a question one
+          asks far more often than "where is this file". */}
+      <details open>
+        <summary>
+          <Icon name='chevron-right' />
+          Playback
+        </summary>
+
+        <ul className='playlist-list'>
+          {PLAYBACK_LISTS.map(entry =>
+            <li key={ entry.list }>
+              <button
+                className={ selectedList === entry.list ? 'active' : '' }
+                aria-current={ selectedList === entry.list || undefined }
+                type='button'
+                onClick={ () =>
+                  selectList(entry.list) }>
+                <Icon name={ entry.icon } />
+                <span className='name'>{entry.label}</span>
+                <small>{listCounts[entry.list]}</small>
+              </button>
+            </li>
+          )}
+        </ul>
+      </details>
+
+      <details open>
+        <summary>
+          <Icon name='chevron-right' />
+          Folders
+        </summary>
+
+        <FolderTree
+          folders={ folders }
+          selectedPath={ selectedFolderPath }
+          onSelect={ selectFolder }
+          onToggle={ toggleFolder }
+          onDrop={ handleFolderTreeDrop } />
+      </details>
+
+      <details open>
+        {/* The "new playlist" controls are the last list items rather than
+              buttons inside <summary> — nesting a button in a summary nests
+              two buttons in the a11y tree. */}
+        <summary>
+          <Icon name='chevron-right' />
+          Playlists
+        </summary>
+
+        <PlaylistTree
+          playlists={ playlists }
+          folders={ playlistFolders }
+          selectedId={ selectedPlaylistId }
+          onSelect={ selectPlaylist }
+          onToggle={ togglePlaylistFolder }
+          onDrop={ handleDrop }
+          onContextMenu={ (target, point) =>
+            setMenu({ target, point }) } />
+
+        <ul className='playlist-list'>
+          <li>
             <button
-              className={ selectedList === entry.list ? 'active' : '' }
-              aria-current={ selectedList === entry.list || undefined }
+              className='add-playlist'
               type='button'
               onClick={ () =>
-                selectList(entry.list) }>
-              <Icon name={ entry.icon } />
-              <span className='name'>{entry.label}</span>
-              <small>{listCounts[entry.list]}</small>
+                setPrompt({ kind: 'new-playlist', folderId: null }) }>
+              <Icon name='add' />
+              <span className='name'>New playlist</span>
             </button>
           </li>
-        )}
-      </ul>
-    </details>
 
-    <details open>
-      <summary>
-        <Icon name='chevron-right' />
-        Folders
-      </summary>
-
-      <FolderTree
-        folders={ folders }
-        selectedPath={ selectedFolderPath }
-        onSelect={ selectFolder }
-        onToggle={ toggleFolder }
-        onDrop={ handleFolderTreeDrop } />
-    </details>
-
-    <details open>
-      {/* The "new playlist" controls are the last list items rather than
-            buttons inside <summary> — nesting a button in a summary nests
-            two buttons in the a11y tree. */}
-      <summary>
-        <Icon name='chevron-right' />
-        Playlists
-      </summary>
-
-      <PlaylistTree
-        playlists={ playlists }
-        folders={ playlistFolders }
-        selectedId={ selectedPlaylistId }
-        onSelect={ selectPlaylist }
-        onToggle={ togglePlaylistFolder }
-        onDrop={ handleDrop }
-        onContextMenu={ (target, point) =>
-          setMenu({ target, point }) } />
-
-      <ul className='playlist-list'>
-        <li>
-          <button
-            className='add-playlist'
-            type='button'
-            onClick={ () =>
-              setPrompt({ kind: 'new-playlist', folderId: null }) }>
-            <Icon name='add' />
-            <span className='name'>New playlist</span>
-          </button>
-        </li>
-
-        <li>
-          <button
-            className='add-playlist'
-            type='button'
-            onClick={ () =>
-              setPrompt({ kind: 'new-folder', parentId: null }) }>
-            <Icon name='folder' />
-            <span className='name'>New folder</span>
-          </button>
-        </li>
-      </ul>
-    </details>
+          <li>
+            <button
+              className='add-playlist'
+              type='button'
+              onClick={ () =>
+                setPrompt({ kind: 'new-folder', parentId: null }) }>
+              <Icon name='folder' />
+              <span className='name'>New folder</span>
+            </button>
+          </li>
+        </ul>
+      </details>
+    </div>
 
     {/* Settings used to be a titlebar tab. It sits here now because it is the
         one destination left, and this is where the rest of the library's

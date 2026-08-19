@@ -36,8 +36,8 @@ const exts = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
  */
 const captions = {
   'now-playing-harmony': {
-    caption: 'Now Playing — The analysis view: spectrum, chords, key & tempo',
-    alt: 'Now playing in the analysis view, with the frequency mesh, the chord ribbon, key and tempo',
+    caption: 'Now Playing — The analysis view: chords, key & tempo',
+    alt: 'Now playing in the analysis view, with the chord lane, key and tempo over the frequency mesh',
     order: 0,
   },
   'now-playing-lyrics': {

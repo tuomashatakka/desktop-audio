@@ -63,9 +63,15 @@ row holds either a result or the reason there will never be one.
 
 ## renderer behavior
 
-- the **analysis view** — one of the two now-playing views — shows key, tempo
-  and a moving chord ribbon under the track title, over the frequency mesh. see
-  `AnalysisReadout` and the CLAUDE.md section it is documented in.
+- the **analysis view** — one of the two now-playing views — is laid out as a
+  chord chart for someone playing along. the chord lane leads at the largest
+  type in the app; key, tempo and **meter** are one caption line under the album
+  (`.track-meta`), the meter read off the beat grid's own numbering by
+  `meterOf`; the frequency mesh runs behind all of it as wallpaper at
+  `--matrix-wallpaper`, with `.matrix-current` deliberately left at full
+  strength. naming the dominant partials over the mesh is `showSpectrumNotes`,
+  **off by default** — with it off the `findPeaks` pass does not run at all. see
+  `AnalysisReadout` and the Now Playing section of AGENTS.md.
 - the full now-playing waveform gets ordinary beat and accented downbeat paths.
   the footer player receives no marker data or marker nodes.
 - while an analysis runs, a native `<progress>` shows a bar against a learned

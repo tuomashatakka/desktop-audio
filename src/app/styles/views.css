@@ -252,7 +252,11 @@
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding-inline: var(--sp-4);
+
+  /* No inline padding: the cells carry their own `--pad-x`, so the table meets
+     the window edge without any text touching it — and the sticky header spans
+     the full width rather than floating in a gutter. */
+  padding-inline: 0;
 
   &[data-density='compact'] { --art: 20px; --pad-y: var(--sp-1); }
   &[data-density='relaxed'] { --art: 44px; --pad-y: var(--sp-3); }
@@ -537,7 +541,6 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
 }
 
 @media (max-width: 620px) {
-  .track-table { padding-inline: var(--sp-2); }
   .library-toolbar .segmented:not([data-icon-only]) label { padding-inline: var(--sp-2); }
 }
 

@@ -40,13 +40,14 @@ export function SettingsView () {
     uiFont, monoFont, fontScale,
     accentDark, accentLight, accentSource, ambientStrength,
     uiDensity, cornerStyle,
-    showSubfolders, showBeatMarkers, showChordAnalysis, showKeyAnalysis,
+    showSubfolders, showBeatMarkers, showChordAnalysis, showKeyAnalysis, showSpectrumNotes,
     addLibraryPath, removeLibraryPath,
     setTheme, setCustomTheme, exportTheme, importTheme, setDefaultDensity,
     setVolume, setRepeatMode, setShuffle,
     setUiFont, setMonoFont, setFontScale, setAccent,
     setAccentSource, setAmbientStrength, setUiDensity, setCornerStyle,
     setShowSubfolders, setShowBeatMarkers, setShowChordAnalysis, setShowKeyAnalysis,
+    setShowSpectrumNotes,
   }                                                   = useSettings()
   const data                                          = useData()
   const themeFileRef                                  = useRef<HTMLInputElement>(null)
@@ -569,6 +570,18 @@ export function SettingsView () {
               setShowKeyAnalysis(event.target.checked) } />
 
           <span>Key and tempo analysis</span>
+        </label>
+
+        {/* Off by default: the analysis view is about chords, and the mesh
+            behind them is decoration. */}
+        <label className='field checkbox-field'>
+          <input
+            type='checkbox'
+            checked={ showSpectrumNotes }
+            onChange={ event =>
+              setShowSpectrumNotes(event.target.checked) } />
+
+          <span>Note names over the spectrum</span>
         </label>
       </section>
 

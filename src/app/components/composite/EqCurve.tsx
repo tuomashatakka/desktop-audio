@@ -16,6 +16,12 @@
  * screen-reader users operate, and they are the reason this is a control and
  * not a picture.
  *
+ * The band the pointer presses on is the band the drag edits, and the
+ * secondary button steps that choice to the next band without touching a gain
+ * (Shift for the previous one). Both buttons therefore move the focus; only one
+ * of them writes. Without that, a drag re-picked the nearest band on every
+ * move and smeared one gesture across half the spectrum.
+ *
  * Their *labels* are no longer clipped with them. The band frequencies were in
  * the accessibility tree and nowhere on screen, so the curve was a picture with
  * three unlabelled decade lines on it; they surface as a ruler along the bottom
@@ -125,6 +131,20 @@ export function EqCurve ({ gains, enabled, analyzer, onGain }: EqCurveProps) {
   const [ hovered, setHovered ] = useState<number | null>(null)
 
   /**
+   * The band the pointer *picked*, as opposed to the one it is merely over.
+   *
+   * A drag used to re-run `bandAtX` on every move, so pulling sideways while
+   * pushing a band up smeared the gain across every band it crossed. The press
+   * chooses one band and the drag edits that one, which is how a fader behaves
+   * and what makes a twelve-decibel bump land where it was aimed.
+   *
+   * It also survives the pointer leaving, which is what gives the ruler
+   * something to keep showing — the frequency and the gain of the band you are
+   * working on, rather than of whatever the mouse happens to be near.
+   */
+  const [ focused, setFocused ] = useState(0)
+
+  /**
    * The curve is pure render — it only moves when a gain does.
    *
    * The device's own rate, not a nominal one: a 44.1 kHz output warps the top
@@ -183,39 +203,68 @@ export function EqCurve ({ gains, enabled, analyzer, onGain }: EqCurveProps) {
       cancelAnimationFrame(frame)
   }, [ analyzer ])
 
-  const applyAt = (event: ReactPointerEvent<SVGSVGElement>) => {
+  /** The band nearest this event's x, or `null` if the box has no width yet. */
+  const bandAtEvent = (event: ReactPointerEvent<SVGSVGElement>): number | null => {
     const box = svgRef.current?.getBoundingClientRect()
-    if (!box || box.width === 0)
+
+    return box && box.width > 0
+      ? bandAtX((event.clientX - box.left) / box.width * VIEW_W)
+      : null
+  }
+
+  /** Sets `index`'s gain from the pointer's height. The band is given, not found. */
+  const applyAt = (event: ReactPointerEvent<SVGSVGElement>, index: number) => {
+    const box = svgRef.current?.getBoundingClientRect()
+    if (!box || box.height === 0)
       return
 
-    const x     = (event.clientX - box.left) / box.width
-    const y     = (event.clientY - box.top) / box.height
-    const index = bandAtX(x * VIEW_W)
-    const raw   = (HALF - y * VIEW_H) / SCALE * DSP_RANGES.eqGain.max
-    const step  = DSP_RANGES.eqGain.step
+    const y    = (event.clientY - box.top) / box.height
+    const raw  = (HALF - y * VIEW_H) / SCALE * DSP_RANGES.eqGain.max
+    const step = DSP_RANGES.eqGain.step
 
     onGain(index, clamp(Math.round(raw / step) * step, DSP_RANGES.eqGain.min, DSP_RANGES.eqGain.max))
   }
 
+  /**
+   * Both buttons move the focus; only the primary one edits.
+   *
+   * The primary button picks the band under the pointer and starts a drag on
+   * it. The secondary button steps to the neighbouring band and changes
+   * nothing — the low bands are two per cent of the axis apart down there, and
+   * stepping is the only way to land on one of them reliably. Shift reverses
+   * the direction, and both wrap, so sixteen presses is a full tour.
+   */
   const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!enabled)
+    if (event.button === 2) {
+      const step = event.shiftKey ? -1 : 1
+      setFocused(index =>
+        (index + step + EQ_BANDS.length) % EQ_BANDS.length)
+      return
+    }
+
+    if (!enabled || event.button !== 0)
       return
 
+    const index = bandAtEvent(event)
+    if (index === null)
+      return
+
+    setFocused(index)
     event.currentTarget.setPointerCapture(event.pointerId)
-    applyAt(event)
+    applyAt(event, index)
   }
 
   const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
-    const box = svgRef.current?.getBoundingClientRect()
+    const index = bandAtEvent(event)
 
-    if (box && box.width > 0) {
-      const next = bandAtX((event.clientX - box.left) / box.width * VIEW_W)
+    if (index !== null)
       setHovered(current =>
-        current === next ? current : next)
-    }
+        current === index ? current : index)
 
+    // The band the press chose, not the one the pointer has since wandered
+    // over — see `focused`.
     if (enabled && event.currentTarget.hasPointerCapture(event.pointerId))
-      applyAt(event)
+      applyAt(event, focused)
   }
 
   const onPointerLeave = () =>
@@ -228,6 +277,8 @@ export function EqCurve ({ gains, enabled, analyzer, onGain }: EqCurveProps) {
       viewBox={ `0 0 ${VIEW_W} ${VIEW_H}` }
       preserveAspectRatio='none'
       focusable='false'
+      onContextMenu={ event =>
+        event.preventDefault() }
       onPointerDown={ onPointerDown }
       onPointerMove={ onPointerMove }
       onPointerLeave={ onPointerLeave }>
@@ -267,6 +318,7 @@ export function EqCurve ({ gains, enabled, analyzer, onGain }: EqCurveProps) {
           key={ band.hz }
           /* eslint-disable-next-line react-strict/no-style-prop -- The band's position on the log axis is measured data, shared with the curve it labels. */
           style={{ '--at': ((BAND_X[index] ?? 0) / VIEW_W).toFixed(4) } as CSSProperties}
+          data-focus={ focused === index || undefined }
           data-hover={ hovered === index || undefined }>
           <label>
             <span className='eq-band-hz'>{band.label} Hz</span>

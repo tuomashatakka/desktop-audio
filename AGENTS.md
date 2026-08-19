@@ -85,6 +85,55 @@ ordering.
 
 ---
 
+## Now Playing
+
+`Player.tsx` is the whole thing, rendered twice from one component: the footer
+bar's copy lives inside `.app-shell`, the overlay's is portaled to `body` by
+`Overlay` and so escapes every descendant tier rule. There is no route state —
+Now Playing is an overlay, like Settings and the Tag Editor.
+
+### Invariant: Two Views, Two Layers
+
+**Two views**, mutually exclusive, `PlayerMode` in `UIContext`:
+
+| | |
+|---|---|
+| `default` | the album art |
+| `analysis` | chords, key and tempo; the cover fades upward out of frame |
+
+**Two layers**, each composable with either view and with each other:
+
+| | |
+|---|---|
+| `lyricsOpen` | hangs off the trailing edge; `.player-content` translates to meet it |
+| `dspOpen` | opens between the type and the transport; `grid-template-rows: 0fr→1fr` rides the blocks apart |
+
+**The title, the seek bar and the transport are always mounted and always
+visible**, in every view, under every layer, at every tier. A change that hides
+any of them behind a mode is the thing this section exists to stop.
+
+Enter and exit are both CSS — `display` with `allow-discrete` plus
+`@starting-style` — so everything that appears is *mounted* whether or not it is
+showing. Unmounting on close animates one direction only.
+
+### Invariant: The Class Hooks Are a Contract
+
+`.player-view`, `.player-content`, `.player-art`, `.player-info`,
+`.progress-section`, `.playback-controls` are addressed by the height-tier
+system (`data-height-tier` on `.app-shell`, written from JS) and by ten
+`@container player` blocks in `layout.css`. Renaming one means rewriting that
+system.
+
+### The analysis view is a chord chart
+
+The reader is holding an instrument. The chord lane is the largest type in the
+app; key, tempo and meter are one caption line (`.track-meta`); the FFT mesh is
+wallpaper at `--matrix-wallpaper` and its note labels are off by default
+(`showSpectrumNotes`). `.matrix-current` is deliberately excluded from the
+dimming — it is the one line that still has to read as live.
+
+---
+
 ## Drag and Drop
 
 ### Invariant: One Drag Vocabulary
@@ -151,3 +200,4 @@ custom properties or `data-*` attributes on `document.documentElement`:
 | `uiDensity` | `UiDensity` | `'compact'` `'comfortable'` | `[data-ui-density]` → remaps `--sp-unit` |
 | `cornerStyle` | `CornerStyle` | `'sharp'` `'soft'` | `[data-corners]` → remaps radius trio |
 | `fontScale` | `number` | `0.8`–`1.4` | root `font-size` (rem-based type scale follows) |
+| `showSpectrumNotes` | `boolean` | default `false` | `showNotes` on `FrequencyMatrix`; off skips the `findPeaks` pass entirely |

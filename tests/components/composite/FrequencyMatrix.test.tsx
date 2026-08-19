@@ -53,6 +53,16 @@ describe('FrequencyMatrix', () => {
     vi.unstubAllGlobals()
   })
 
+  // Off by default: the mesh is wallpaper behind the chord lane, and a row of
+  // note names over it was the clutter being removed.
+  it('names nothing unless the notes are switched on', async () => {
+    await act(async () => {
+      render(<FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active />)
+    })
+
+    expect(document.querySelectorAll('.matrix-peak')).toHaveLength(0)
+  })
+
   it('names the notes under the loudest partials', async () => {
     // An A major triad: A4 440, C#5 554.37, E5 659.26.
     await act(async () => {
@@ -63,7 +73,7 @@ describe('FrequencyMatrix', () => {
             { hz: 554.37, level: 230 },
             { hz: 659.26, level: 210 },
           ]) }
-          active />
+          active showNotes />
       )
     })
 
@@ -75,7 +85,7 @@ describe('FrequencyMatrix', () => {
 
   it('shows the frequency beside the note', async () => {
     await act(async () => {
-      render(<FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active />)
+      render(<FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active showNotes />)
     })
 
     const readout = screen.getByRole('region', { name: 'Frequency spectrum' })
@@ -93,7 +103,7 @@ describe('FrequencyMatrix', () => {
       render(
         <FrequencyMatrix
           analyzer={ analyserFor([{ hz: 82.4069, level: 255 }, { hz: 123.4708, level: 220 }]) }
-          active />
+          active showNotes />
       )
     })
 
@@ -109,7 +119,7 @@ describe('FrequencyMatrix', () => {
       0)
 
     const { container } = render(
-      <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active />
+      <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active showNotes />
     )
 
     // The frequency geometry lives on the shared `<path>`; the two `<use>`s
@@ -119,7 +129,7 @@ describe('FrequencyMatrix', () => {
   })
 
   it('renders a resting mesh with no analyser at all', () => {
-    const { container } = render(<FrequencyMatrix analyzer={ null } active />)
+    const { container } = render(<FrequencyMatrix analyzer={ null } active showNotes />)
 
     expect(container.querySelector('#matrix-freq')?.getAttribute('d')).toBeTruthy()
     expect(screen.queryByText(/Hz$/)).toBeNull()
@@ -136,7 +146,7 @@ describe('FrequencyMatrix', () => {
 
   it('keeps the mesh to three paths regardless of grid size', () => {
     const { container } = render(
-      <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active />
+      <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active showNotes />
     )
 
     // The whole point of the rewrite: one path per direction, not one per row.
@@ -156,7 +166,7 @@ describe('FrequencyMatrix', () => {
 
     await act(async () => {
       ({ container } = render(
-        <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active />
+        <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active showNotes />
       ))
     })
 
@@ -180,7 +190,7 @@ describe('FrequencyMatrix', () => {
 
     await act(async () => {
       ({ container } = render(
-        <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active />
+        <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active showNotes />
       ))
     })
 
@@ -193,7 +203,7 @@ describe('FrequencyMatrix', () => {
       const view = render(
         <FrequencyMatrix
           analyzer={ analyserFor([{ hz: low, level: 255 }, { hz: high, level: 240 }]) }
-          active />
+          active showNotes />
       )
 
       await act(async () => {})
@@ -224,7 +234,7 @@ describe('FrequencyMatrix', () => {
             { hz: 554.37, level: 230 },
             { hz: 659.26, level: 210 },
           ]) }
-          active />
+          active showNotes />
       )
     })
 
@@ -258,7 +268,7 @@ describe('FrequencyMatrix', () => {
             { hz: 554.37, level: 230 },
             { hz: 659.26, level: 210 },
           ]) }
-          active />
+          active showNotes />
       )
     })
 
@@ -282,7 +292,7 @@ describe('FrequencyMatrix', () => {
       render(
         <FrequencyMatrix
           analyzer={ analyserFor([{ hz: 110, level: 255 }, { hz: 3520, level: 240 }]) }
-          active />
+          active showNotes />
       )
     })
 
@@ -300,10 +310,10 @@ describe('FrequencyMatrix', () => {
    */
   it('holds a label after its peak stops being one of the loudest', async () => {
     const loud = analyserFor([{ hz: 440, level: 255 }, { hz: 880, level: 240 }])
-    const { rerender } = render(<FrequencyMatrix analyzer={ loud } active />)
+    const { rerender } = render(<FrequencyMatrix analyzer={ loud } active showNotes />)
 
     await act(async () => {
-      rerender(<FrequencyMatrix analyzer={ loud } active />)
+      rerender(<FrequencyMatrix analyzer={ loud } active showNotes />)
     })
 
     const named = [ ...document.querySelectorAll('.matrix-peak dt') ]

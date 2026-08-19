@@ -72,6 +72,91 @@ function SnapshotHarness () {
   </>
 }
 
+/**
+ * `revealFolder` against a tree with a branch beside the chain, so the
+ * "off-chain branches keep their identity" claim has something to be true of.
+ *
+ * ```
+ * /music  (open)
+ * ├─ /music/child        (closed)  ← the chain
+ * │  └─ /music/child/grandchild
+ * └─ /music/other        (closed)  ← must not be touched
+ * ```
+ */
+const other = folder('other', 'Other', '/music/other')
+const wide  = folder('root', 'Music', '/music', [ child, other ], true)
+
+function RevealHarness () {
+  const { folders, setFolders, revealFolder } = useLibrary()
+
+  useEffect(() => {
+    setFolders([ wide ])
+  }, [ setFolders ])
+
+  /** The paths of every folder currently expanded, flattened. */
+  const expanded = (nodes: readonly FolderEntry[]): string[] =>
+    nodes.flatMap(node =>
+      [ ...node.expanded ? [ node.path ] : [], ...expanded(node.children as FolderEntry[]) ])
+
+  return <>
+    <output data-testid='expanded'>{expanded(folders).join(' ')}</output>
+    <output data-testid='other-same'>{String(folders[0]?.children[1] === other)}</output>
+
+    <button type='button' onClick={ () =>
+      revealFolder('/music/child/grandchild') }>
+      Reveal
+    </button>
+  </>
+}
+
+describe('LibraryContext revealFolder', () => {
+  it('expands every ancestor of the selected folder', async () => {
+    render(
+      <LibraryProvider>
+        <RevealHarness />
+      </LibraryProvider>
+    )
+
+    expect(await screen.findByTestId('expanded')).toHaveTextContent('/music')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal' }))
+
+    expect(screen.getByTestId('expanded')).toHaveTextContent('/music /music/child')
+  })
+
+  // Rebuilding a branch that did not need opening would re-render the whole
+  // subtree under it on every selection change.
+  it('leaves branches off the chain referentially unchanged', async () => {
+    render(
+      <LibraryProvider>
+        <RevealHarness />
+      </LibraryProvider>
+    )
+
+    await screen.findByTestId('expanded')
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal' }))
+
+    expect(screen.getByTestId('other-same')).toHaveTextContent('true')
+  })
+
+  it('is a no-op once the branch is already open', async () => {
+    render(
+      <LibraryProvider>
+        <RevealHarness />
+      </LibraryProvider>
+    )
+
+    await screen.findByTestId('expanded')
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal' }))
+    const once = screen.getByTestId('expanded').textContent
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal' }))
+
+    expect(screen.getByTestId('expanded')).toHaveTextContent(once!)
+    expect(screen.getByTestId('other-same')).toHaveTextContent('true')
+  })
+})
+
 describe('LibraryContext folder tree', () => {
   it('replaces track and folder snapshots independently', async () => {
     render(
