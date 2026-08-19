@@ -13,14 +13,19 @@
  * was counted inside it. Picking a different folder drops the drill-in, since
  * the bucket may not exist there.
  *
- * Presentation preferences (density, grouping, sidebar width) are persisted;
- * everything else is session-only.
+ * Presentation preferences (density, grouping, sidebar width, the track
+ * table's columns) are persisted, each under its own key; everything else is
+ * session-only. The columns live here rather than in the table because
+ * Settings offers the same toggles, and two owners of one persisted list is
+ * two lists.
  *
  * Does NOT own library data, audio playback, or user settings — see
  * {@link LibraryContext}, {@link AudioContext}, {@link SettingsContext}.
  */
 import type { ReactNode, SetStateAction } from 'react'
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
+import { useColumnConfig } from '../hooks/useColumnConfig'
+import type { ColumnConfigApi } from '../hooks/useColumnConfig'
 
 
 /** The dialogs that can sit over the library. Only one at a time. */
@@ -114,7 +119,7 @@ interface UIState {
 }
 
 /** UI state plus the actions that mutate it. */
-interface UIContextValue extends UIState {
+interface UIContextValue extends UIState, ColumnConfigApi {
   readonly openOverlay:     (name: OverlayName) => void
   readonly closeOverlay:    () => void
   readonly setPlayerMode:   (mode: PlayerMode) => void
@@ -209,7 +214,7 @@ const NO_SCOPE = {
  * Wraps the app and provides {@link UIContextValue}. Pass `value` to inject
  * pre-built state for tests; otherwise local state is used.
  */
-type UIProviderProps = { readonly children: ReactNode; value?: UIContextValue }
+type UIProviderProps = { readonly children: ReactNode; value?: Partial<UIContextValue> }
 
 export function UIProvider ({ children, value }: UIProviderProps) {
   const [ state, setState ] = useState<UIState>(() =>
@@ -224,6 +229,8 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       grouping:       loadGrouping(),
       sidebarWidth:   loadSidebarWidth(),
     }))
+
+  const columnConfig = useColumnConfig()
 
   const openOverlay = useCallback((name: OverlayName) => {
     setState(s =>
@@ -318,11 +325,13 @@ export function UIProvider ({ children, value }: UIProviderProps) {
     writeSetting(SIDEBAR_WIDTH_KEY, String(state.sidebarWidth))
   }, [ state.sidebarWidth ])
 
-  // `value` is the test-injection escape hatch; otherwise memoise, so
+  // `value` is the test-injection escape hatch — spread last so a test can
+  // override any slice of this without having to build all of it. Memoised so
   // consumers don't re-render on every provider render.
   const contextValue = useMemo(() =>
-    value ?? {
+    ({
       ...state,
+      ...columnConfig,
       openOverlay,
       closeOverlay,
       setPlayerMode,
@@ -336,9 +345,11 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       setDensity,
       setGrouping,
       setSidebarWidth,
-    }, [
+      ...value,
+    }), [
     value,
     state,
+    columnConfig,
     openOverlay,
     closeOverlay,
     setPlayerMode,

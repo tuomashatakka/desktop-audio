@@ -843,8 +843,13 @@ interface ContextMenuSelection {
 }
 
 ipcMain.on('contextmenu:show', (_event, payload: ContextMenuRequest) => {
-  if (!popoverWindow)
+  // Every context menu in the app is a four-hop round trip through this second
+  // window. Returning quietly here is what made a missing one look like "the
+  // right-click does nothing", with no way to tell which hop dropped it.
+  if (!popoverWindow) {
+    log.error('⊘ contextmenu:show — no popover window; the menu cannot be shown')
     return
+  }
   popoverWindow.setBounds({
     x:      Math.round(payload.x),
     y:      Math.round(payload.y),

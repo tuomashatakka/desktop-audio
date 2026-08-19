@@ -5,6 +5,7 @@ import { useLibraryScanner } from '../hooks'
 import { Button, PromptDialog } from '../components/atomic'
 import { TrackTable } from '../components/composite/TrackTable'
 import { LibraryGrid } from '../components/composite/LibraryGrid'
+import type { GridMenuTarget } from '../components/composite/LibraryGrid'
 import { LibraryToolbar } from './LibraryToolbar'
 import { bucketKey } from '../utils/grouping'
 import { subfolderRows } from '../utils/folders'
@@ -19,15 +20,30 @@ const CONTEXT_MENU_ITEMS: SerializableMenuItem[] = [
   { label: 'Edit Tags', icon: 'edit' },
 ]
 
+/**
+ * An album or artist card stands for a bucket, not a file, so it drops the two
+ * entries that only mean something for one track. A selection reports an index
+ * into *the list that was shown*, which is why the action handler branches on
+ * the target's kind before reading it.
+ */
+const GROUP_CONTEXT_MENU_ITEMS: SerializableMenuItem[] = [
+  { label: 'Play', icon: 'play' },
+  { label: 'Add to Playlist', icon: 'music' },
+]
+
 const ITEM_HEIGHT      = 32
 const SEPARATOR_HEIGHT = 9
 const PADDING          = 8
 const MENU_WIDTH       = 200
-const MENU_HEIGHT      = CONTEXT_MENU_ITEMS.filter(item =>
-  !item.separator).length * ITEM_HEIGHT +
-                       CONTEXT_MENU_ITEMS.filter(item =>
-                         item.separator).length * SEPARATOR_HEIGHT +
-                       PADDING * 2
+
+/** The window has to be sized before it is shown; the menu never scrolls. */
+function menuHeight (items: readonly SerializableMenuItem[]): number {
+  return items.filter(item =>
+    !item.separator).length * ITEM_HEIGHT +
+    items.filter(item =>
+      item.separator).length * SEPARATOR_HEIGHT +
+    PADDING * 2
+}
 
 /** Why the list in front of the user is empty, in its own words. */
 function emptyHint (list: PlaybackList | null, hasPlaylist: boolean): string {
@@ -62,9 +78,9 @@ export function LibraryView () {
 
   const { isInitialLoading } = useLibraryScanner()
 
-  /** The track "Add to Playlist" was invoked on, held while the prompt is up. */
-  const [ playlistFor, setPlaylistFor ] = useState<Track | null>(null)
-  const contextTrackRef                 = useRef<Track | null>(null)
+  /** The tracks "Add to Playlist" was invoked on, held while the prompt is up. */
+  const [ playlistFor, setPlaylistFor ] = useState<readonly Track[] | null>(null)
+  const contextTargetRef                = useRef<GridMenuTarget | null>(null)
 
   const goToLibrarySettings = useCallback(() => {
     openOverlay('settings')
@@ -138,9 +154,7 @@ export function LibraryView () {
     selectGroup(scope)
   }, [ selectGroup ])
 
-  const handleContextMenu = useCallback((track: Track, point: ContextMenuPoint) => {
-    contextTrackRef.current = track
-
+  const showMenu = useCallback((items: SerializableMenuItem[], point: ContextMenuPoint) => {
     // The menu renders in its own window with its own document, so the theme
     // has to be handed to it. The accent is read back off the root rather
     // than from settings: that way a custom theme's accent comes along too.
@@ -149,30 +163,52 @@ export function LibraryView () {
       .trim()
 
     host.showContextMenu(
-      CONTEXT_MENU_ITEMS,
+      items,
       point.x,
       point.y,
       MENU_WIDTH,
-      MENU_HEIGHT,
+      menuHeight(items),
       theme,
       accent || undefined,
     )
   }, [ host, theme ])
 
+  /** A track row, or an ungrouped grid card — both stand for one file. */
+  const handleContextMenu = useCallback((track: Track, point: ContextMenuPoint) => {
+    contextTargetRef.current = { kind: 'track', track }
+    showMenu(CONTEXT_MENU_ITEMS, point)
+  }, [ showMenu ])
+
+  /** A grid card, which is a track or a bucket depending on the grouping. */
+  const handleCardContextMenu = useCallback((target: GridMenuTarget, point: ContextMenuPoint) => {
+    contextTargetRef.current = target
+    showMenu(target.kind === 'group' ? GROUP_CONTEXT_MENU_ITEMS : CONTEXT_MENU_ITEMS, point)
+  }, [ showMenu ])
+
   // eslint-disable-next-line react-strict/prefer-no-use-effect -- Subscribes to the host's context-menu action channel.
   useEffect(() =>
     host.onContextMenuAction((index: number) => {
-      const track = contextTrackRef.current
-      if (!track)
+      const target = contextTargetRef.current
+      if (!target)
         return
-      switch (index) {
-        case 0: handleTrackPlay(track, 0); break
-        case 1: setPlaylistFor(track); break
-        // index 2 is the separator — no action
-        case 3: setEditingTrack(track.id); break
-      }
-      contextTrackRef.current = null
-    }), [ handleTrackPlay, setEditingTrack, host ])
+
+      // Two item sets share this one channel, so an index only means what the
+      // menu that was actually opened says it means.
+      if (target.kind === 'group')
+        switch (index) {
+          case 0: handleQueue(target.tracks, 0); break
+          case 1: setPlaylistFor(target.tracks); break
+        }
+      else
+        switch (index) {
+          case 0: handleTrackPlay(target.track, 0); break
+          case 1: setPlaylistFor([ target.track ]); break
+          // index 2 is the separator — no action
+          case 3: setEditingTrack(target.track.id); break
+        }
+
+      contextTargetRef.current = null
+    }), [ handleTrackPlay, handleQueue, setEditingTrack, host ])
 
   const scoped   = Boolean(selectedGroup || activePlaylist || selectedList)
   const showGrid = isGridDensity(density) && !scoped
@@ -183,7 +219,8 @@ export function LibraryView () {
       grouping={ grouping }
       density={ density }
       onOpen={ handleOpenGroup }
-      onPlay={ handleQueue } />
+      onPlay={ handleQueue }
+      onContextMenu={ handleCardContextMenu } />
     : <TrackTable
       tracks={ displayTracks }
       isLoading={ isLoading }
@@ -232,7 +269,7 @@ export function LibraryView () {
       title='New Playlist'
       placeholder='Playlist name...'
       onConfirm={ name =>
-        addPlaylist(name, { tracks: playlistFor ? [ playlistFor ] : []}) }
+        addPlaylist(name, { tracks: playlistFor ?? []}) }
       onClose={ () =>
         setPlaylistFor(null) } />
   </section>

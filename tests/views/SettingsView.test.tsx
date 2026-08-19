@@ -53,4 +53,24 @@ describe('SettingsView', () => {
     expect(screen.getByRole('slider', { name: /hover intensity/i })).toHaveValue('0.45')
     expect(screen.getByRole('slider', { name: /focus intensity/i })).toHaveValue('0.6')
   })
+  it('offers the track table columns, sharing one config with the header menu', () => {
+    localStorage.removeItem('desktop-audio-column-config')
+    renderWithProviders(<SettingsView />)
+
+    const columns = screen.getByRole('group', { name: 'Track list columns' })
+
+    // Title is `fixed`: it is listed so the set reads as complete, but the
+    // table has to keep a column that names the row.
+    expect(within(columns).getByRole('checkbox', { name: 'Title' })).toBeDisabled()
+
+    const year = within(columns).getByRole('checkbox', { name: 'Year' })
+    expect(year).not.toBeChecked()
+
+    fireEvent.click(year)
+    expect(year).toBeChecked()
+    expect(localStorage.getItem('desktop-audio-column-config')).toContain('"year"')
+
+    fireEvent.click(within(columns).getByRole('button', { name: 'Reset Columns' }))
+    expect(within(columns).getByRole('checkbox', { name: 'Year' })).not.toBeChecked()
+  })
 })

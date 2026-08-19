@@ -5,6 +5,7 @@ import type { DragPayload } from '../../utils/dnd'
 import { hasDragPayload, readDragPayload, setDragPayload } from '../../utils/dnd'
 import type { PopoverPoint } from '../atomic/Popover'
 import { Icon } from '../atomic/Icon'
+import { afterPointerRelease } from '../../utils/events'
 
 
 /**
@@ -84,7 +85,10 @@ export function PlaylistTree ({
           onSelect(playlist.id) }
         onContextMenu={ event => {
           event.preventDefault()
-          onContextMenu({ kind: 'playlist', id: playlist.id }, { x: event.clientX, y: event.clientY })
+
+          const point = { x: event.clientX, y: event.clientY }
+          afterPointerRelease(event.buttons, () =>
+            onContextMenu({ kind: 'playlist', id: playlist.id }, point))
         } }
         onDragStart={ event =>
           setDragPayload(event.dataTransfer, {
@@ -124,7 +128,10 @@ export function PlaylistTree ({
           }) }
         onContextMenu={ event => {
           event.preventDefault()
-          onContextMenu({ kind: 'folder', id: folder.id }, { x: event.clientX, y: event.clientY })
+
+          const point = { x: event.clientX, y: event.clientY }
+          afterPointerRelease(event.buttons, () =>
+            onContextMenu({ kind: 'folder', id: folder.id }, point))
         } }
         onDragOver={ event =>
           handleDragOver(folder.id, event) }

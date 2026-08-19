@@ -8,7 +8,17 @@ import type { GroupBlock } from '../../utils/grouping'
 import { setDragPayload } from '../../utils/dnd'
 import { basename } from './Breadcrumbs'
 import { MediaCard } from './MediaCard'
+import type { ContextMenuPoint } from '../../services/types'
 
+
+/**
+ * What a right-clicked card stands for. A bucket card has no single track, so
+ * the two cannot share one menu: the caller reads the kind and shows the item
+ * set that actually applies.
+ */
+export type GridMenuTarget =
+  | { readonly kind: 'track'; readonly track: Track } |
+  { readonly kind: 'group'; readonly tracks: readonly Track[] }
 
 interface LibraryGridProps {
   readonly tracks:   readonly Track[]
@@ -18,6 +28,13 @@ interface LibraryGridProps {
   /** Drill into a bucket. Never called when `grouping` is `none`. */
   readonly onOpen: (scope: GroupScope) => void
   readonly onPlay: (tracks: readonly Track[], startIndex: number) => void
+
+  /**
+   * Right-click on a card. Without it the grid has no context menu at all,
+   * which is what once left the tag editor unreachable in every grid density —
+   * the track row's menu is the only other way to open it.
+   */
+  readonly onContextMenu?: (target: GridMenuTarget, point: ContextMenuPoint) => void
 }
 
 interface GridLayout {
@@ -119,16 +136,27 @@ interface VirtualCardProps {
   readonly measureElement: (node: HTMLLIElement | null) => void
   readonly onOpen:         (scope: GroupScope) => void
   readonly onPlay:         (tracks: readonly Track[], startIndex: number) => void
+  readonly onContextMenu?: (target: GridMenuTarget, point: ContextMenuPoint) => void
 }
 
 /** One mounted card from the virtual list; track and bucket variants share the list item. */
 function VirtualCard ({
-  item, itemCount, layout, grouping, tracks, groups, measureElement, onOpen, onPlay,
+  item, itemCount, layout, grouping, tracks, groups, measureElement, onOpen, onPlay, onContextMenu,
 }: VirtualCardProps) {
   const style = {
     width:     layout.cardWidth,
     transform: `translate3d(${item.lane * (layout.cardWidth + layout.gap)}px, ${item.start}px, 0)`,
   }
+
+  /** Screen coordinates, like the track table's: the menu is its own window. */
+  const openMenu = (target: GridMenuTarget) =>
+    (event: React.MouseEvent) => {
+      if (!onContextMenu)
+        return
+
+      event.preventDefault()
+      onContextMenu(target, { x: event.screenX, y: event.screenY })
+    }
 
   let card: React.ReactNode
 
@@ -149,7 +177,8 @@ function VirtualCard ({
           kind:     'tracks',
           trackIds: [ track.id ],
           label:    track.title,
-        }) } />
+        }) }
+      onContextMenu={ openMenu({ kind: 'track', track }) } />
   }
   else {
     const group = groups[item.index]
@@ -172,7 +201,8 @@ function VirtualCard ({
           grouping: grouping as BucketGrouping,
           key:      group.key,
           label:    group.label,
-        }) } />
+        }) }
+      onContextMenu={ openMenu({ kind: 'group', tracks: group.tracks }) } />
   }
 
   return <li
@@ -194,7 +224,7 @@ function VirtualCard ({
  * so a 6000-track grid mounts only the cards around the viewport and therefore
  * requests artwork only for those cards.
  */
-export function LibraryGrid ({ tracks, grouping, density, onOpen, onPlay }: LibraryGridProps) {
+export function LibraryGrid ({ tracks, grouping, density, onOpen, onPlay, onContextMenu }: LibraryGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const groups    = useMemo(() =>
     buildGroups(tracks, grouping), [ tracks, grouping ])
@@ -244,7 +274,8 @@ export function LibraryGrid ({ tracks, grouping, density, onOpen, onPlay }: Libr
           groups={ groups }
           measureElement={ virtualizer.measureElement }
           onOpen={ onOpen }
-          onPlay={ onPlay } />)}
+          onPlay={ onPlay }
+          onContextMenu={ onContextMenu } />)}
     </ul>
   </div>
 }

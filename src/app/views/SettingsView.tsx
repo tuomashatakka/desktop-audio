@@ -7,6 +7,7 @@ import {
 } from '../contexts/SettingsContext'
 import type { RepeatMode, Theme, CustomTheme, UiFont, MonoFont, AccentSource, UiDensity, CornerStyle } from '../contexts/SettingsContext'
 import { useData } from '../data'
+import { useUI } from '../contexts'
 import { useKeybindings } from '../hooks'
 import { formatShortcut, shortcutFromEvent } from '../../keybindings'
 import { Button, Icon } from '../components/atomic'
@@ -52,6 +53,7 @@ export function SettingsView () {
   const data                                          = useData()
   const themeFileRef                                  = useRef<HTMLInputElement>(null)
   const { bindings, updateBinding, resetKeybindings } = useKeybindings()
+  const { columns, toggleColumn, resetColumns }       = useUI()
   const [ shortcutStatus, setShortcutStatus ]         = useState('Select a shortcut field, then press the new keys.')
   const isMac                                         = typeof navigator !== 'undefined' && (/mac/i).test(navigator.userAgent)
 
@@ -191,6 +193,30 @@ export function SettingsView () {
 
           <span>Show subfolders in the track list</span>
         </label>
+
+        <fieldset className='field settings-columns'>
+          <legend>Track list columns</legend>
+
+          <p className='section-description'>
+            The same list the track table&apos;s header offers on right-click.
+            Title, artwork and the row number are always shown.
+          </p>
+
+          {columns.map(column =>
+            <label key={ column.key } className='field checkbox-field'>
+              <input
+                type='checkbox'
+                checked={ column.visible }
+                disabled={ column.fixed }
+                onChange={ () =>
+                  toggleColumn(column.key) } />
+
+              <span>{column.label || column.key}</span>
+            </label>
+          )}
+
+          <Button type='button' variant='secondary' onClick={ resetColumns }>Reset Columns</Button>
+        </fieldset>
 
         <label className='field default-density'>
           <span>Default Row Density</span>

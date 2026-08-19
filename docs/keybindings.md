@@ -16,6 +16,7 @@ adapter; `useKeyboardShortcuts` maps resolved actions onto app services.
 | `Cmd/Ctrl + L` | Open library |
 | `Cmd/Ctrl + P` | Open now playing |
 | `Cmd/Ctrl + E` | Toggle the side menu |
+| `Cmd/Ctrl + I` | Edit tags for the focused track |
 | `Cmd/Ctrl + Up/Down` | Change volume |
 
 Bindings are customizable under **Settings → Hotkeys** and update immediately.

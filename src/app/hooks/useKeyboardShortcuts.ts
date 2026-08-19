@@ -25,6 +25,19 @@ function isEditableTarget (target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(EDITABLE_TARGETS) !== null
 }
 
+/**
+ * The track the keyboard is on.
+ *
+ * Read off the DOM because focus is the only place that answer lives: the
+ * table's selection index counts rows in *sorted* order, which nothing outside
+ * the table can resolve back to a track. The titlebar focus below is reached
+ * the same way, for the same reason.
+ */
+function focusedTrackId (): string | null {
+  const row = document.activeElement?.closest('[data-track-id]')
+  return row?.getAttribute('data-track-id') ?? null
+}
+
 function isNativeActivationTarget (target: EventTarget | null): boolean {
   return target instanceof Element &&
     target.closest('button, a[href], summary') !== null
@@ -43,7 +56,7 @@ function shouldIgnoreEvent (
 
 export function useKeyboardShortcuts () {
   const { isPlaying, currentTrack, volume, pause, resume, setVolume, playNext, playPrevious } = useAudio()
-  const { openOverlay, closeOverlay, toggleSidebar }                                          = useUI()
+  const { openOverlay, closeOverlay, toggleSidebar, setEditingTrack }                         = useUI()
   const { bindings }                                                                          = useKeybindings()
   const host                                                                                  = useHost()
 
@@ -66,6 +79,14 @@ export function useKeyboardShortcuts () {
       'open-library': closeOverlay,
       'open-player':  () =>
         openOverlay('player'),
+      // The row context menu is the only other way into the tag editor, and it
+      // is a round trip through a second window — this one reaches it with no
+      // IPC at all. Falls back to what is playing when nothing has focus.
+      'edit-tags': () => {
+        const id = focusedTrackId() ?? currentTrack?.id
+        if (id)
+          setEditingTrack(id)
+      },
       'toggle-sidebar': toggleSidebar,
     }), [
     currentTrack,
@@ -76,6 +97,7 @@ export function useKeyboardShortcuts () {
     resume,
     openOverlay,
     closeOverlay,
+    setEditingTrack,
     setVolume,
     toggleSidebar,
     volume,

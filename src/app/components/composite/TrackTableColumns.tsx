@@ -17,7 +17,7 @@ import type { PopoverPoint } from '../atomic/Popover'
 import { Button } from '../atomic/Button'
 import { Icon } from '../atomic/Icon'
 import { formatTime, isoDuration } from '../../utils/time'
-import { listenAll } from '../../utils/events'
+import { afterPointerRelease, listenAll } from '../../utils/events'
 
 
 /** List densities only — a grid density renders `LibraryGrid`, not this. */
@@ -173,8 +173,12 @@ export function HeaderCell ({ col, sortKey, sortDir, toggleSort, onResize, onReo
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
-    if (onContextMenu)
-      onContextMenu(col.key, { x: e.clientX, y: e.clientY })
+    if (!onContextMenu)
+      return
+
+    const point = { x: e.clientX, y: e.clientY }
+    afterPointerRelease(e.buttons, () =>
+      onContextMenu(col.key, point))
   }
 
   return <div

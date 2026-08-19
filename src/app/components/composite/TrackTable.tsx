@@ -36,7 +36,6 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { VirtualItem } from '@tanstack/react-virtual'
 import { useSortableTable } from '../../hooks/useSortableTable'
 import { useRowSelection } from '../../hooks/useRowSelection'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
 import type { ColumnConfig } from '../../hooks/useColumnConfig'
 import { useUI } from '../../contexts'
 import type { Grouping, Track } from '../../contexts'
@@ -313,18 +312,12 @@ export function TrackTable ({
   folders,
   naturalOrder,
 }: TrackTableProps) {
-  const scrollRef             = useRef<HTMLDivElement>(null)
-  const { density, grouping } = useUI()
-  const rowDensity            = rowDensityOf(density)
+  const scrollRef  = useRef<HTMLDivElement>(null)
   const {
-    columns,
-    visible,
-    gridTemplate,
-    toggleColumn,
-    resizeColumn,
-    reorderColumn,
-    resetColumns,
-  }                                              = useColumnConfig()
+    density, grouping,
+    columns, visible, gridTemplate, toggleColumn, resizeColumn, reorderColumn, resetColumns,
+  }                = useUI()
+  const rowDensity = rowDensityOf(density)
   const { sorted, sortKey, sortDir, toggleSort } = useSortableTable(tracks, naturalOrder)
   const selection                                = useRowSelection()
 
@@ -598,6 +591,7 @@ export function TrackTable ({
         style={ rowStyle }
         className={ `track-row ${active ? 'active' : ''}` }
         data-track-index={ index }
+        data-track-id={ track.id }
         data-selected={ selected || undefined }
         aria-current={ active ? 'true' : undefined }
         aria-pressed={ selected }
@@ -621,6 +615,7 @@ export function TrackTable ({
       className={ `track-row ${active ? 'active' : ''}` }
       aria-rowindex={ index + ARIA_BODY_ROW_OFFSET }
       data-track-index={ index }
+      data-track-id={ track.id }
       data-selected={ selected || undefined }
       aria-current={ active ? 'true' : undefined }
       aria-selected={ selected }

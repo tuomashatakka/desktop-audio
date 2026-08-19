@@ -21,6 +21,13 @@ interface MediaCardProps {
    * user actually grabs.
    */
   readonly onDragStart?: (event: React.DragEvent) => void
+
+  /**
+   * Right-click on the tile. It sits on the `<article>` for the same reason
+   * `onDragStart` does — the cover is most of the card, and a menu the cover
+   * does not answer to is a menu the user cannot find.
+   */
+  readonly onContextMenu?: (event: React.MouseEvent) => void
 }
 
 /**
@@ -36,7 +43,7 @@ interface MediaCardProps {
  * button is invalid too, and the browser unnests it silently.
  */
 export function MediaCard ({
-  title, subtitle, trackId, color, onOpen, onPlay, playLabel, onDragStart,
+  title, subtitle, trackId, color, onOpen, onPlay, playLabel, onDragStart, onContextMenu,
 }: MediaCardProps) {
   const titleId = useId()
 
@@ -44,7 +51,8 @@ export function MediaCard ({
     className='media-card'
     aria-labelledby={ titleId }
     draggable={ onDragStart !== undefined }
-    onDragStart={ onDragStart }>
+    onDragStart={ onDragStart }
+    onContextMenu={ onContextMenu }>
     <AlbumArt className='card-cover' trackId={ trackId } color={ color } />
 
     <h3 className='card-title' id={ titleId }>

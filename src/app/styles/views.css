@@ -707,6 +707,30 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
   }
 }
 
+/* Thirteen checkboxes read as a wall in one column; the grid keeps the set
+   scannable without needing its own scroll area. */
+.settings-columns {
+  border: 0;
+
+  legend {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    margin-bottom: var(--sp-2);
+  }
+
+  .section-description { margin-bottom: var(--sp-2); }
+
+  .checkbox-field {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--sp-2);
+    align-items: center;
+  }
+
+  > .button { margin-top: var(--sp-2); justify-self: start; }
+}
+
 .radio-option {
   display: flex;
   align-items: center;

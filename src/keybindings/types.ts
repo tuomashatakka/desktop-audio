@@ -1,6 +1,7 @@
 export type KeybindingAction =
   | 'next-track' |
   'previous-track' |
+  'edit-tags' |
   'open-library' |
   'open-player' |
   'open-settings' |

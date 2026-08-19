@@ -156,4 +156,45 @@ describe('LibraryGrid', () => {
 
     expect(container.querySelector('.library-grid')).toHaveAttribute('data-size', 'lg')
   })
+  it('reports a bucket card as a group, so its menu is not a track menu', () => {
+    const onContextMenu = vi.fn()
+
+    render(
+      <LibraryGrid
+        tracks={ TRACKS }
+        grouping='album'
+        density='grid-sm'
+        onOpen={ vi.fn() }
+        onPlay={ vi.fn() }
+        onContextMenu={ onContextMenu } />
+    )
+
+    fireEvent.contextMenu(screen.getByRole('article', { name: 'Kid A' }), { screenX: 40, screenY: 60 })
+
+    expect(onContextMenu).toHaveBeenCalledWith(
+      { kind: 'group', tracks: expect.arrayContaining([ expect.objectContaining({ id: 'a' }) ]) },
+      { x: 40, y: 60 }
+    )
+  })
+
+  it('reports an ungrouped card as its track — the grid\'s only way to the tag editor', () => {
+    const onContextMenu = vi.fn()
+
+    render(
+      <LibraryGrid
+        tracks={ TRACKS }
+        grouping='none'
+        density='grid-sm'
+        onOpen={ vi.fn() }
+        onPlay={ vi.fn() }
+        onContextMenu={ onContextMenu } />
+    )
+
+    fireEvent.contextMenu(screen.getByRole('article', { name: 'a' }), { screenX: 5, screenY: 7 })
+
+    expect(onContextMenu).toHaveBeenCalledWith(
+      { kind: 'track', track: expect.objectContaining({ id: 'a' }) },
+      { x: 5, y: 7 }
+    )
+  })
 })

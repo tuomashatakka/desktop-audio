@@ -208,6 +208,57 @@ dimming — it is the one line that still has to read as live.
 
 ---
 
+## Context Menus
+
+There are **two** menu mechanisms, and they fail in different ways.
+
+**The native menu** is a second `BrowserWindow` (`popoverWindow` in `main.ts`,
+rendered by `src/app/context-menu/ContextMenuApp.tsx`). Opening one is a
+four-hop round trip — renderer → main → menu window → main → renderer — so a
+dropped hop looks exactly like "the right-click does nothing". `contextmenu:show`
+logs when it has no window to show; keep it that way. Track rows and grid cards
+use this one. Both item sets ride one `contextmenu:action` channel, so an index
+only means what the menu that was actually opened says it means — `LibraryView`
+branches on the target kind before reading it.
+
+**The in-renderer menu** is `MenuList` or a `<fieldset>` inside `Popover`
+(`popover='auto'`). Column header, playlists and folders use this one.
+
+### Invariant: A Pointer-Opened Popover Waits for `pointerup`
+
+**Never call `showPopover()` straight out of a `contextmenu` handler.** Route it
+through `afterPointerRelease` (`src/app/utils/events.ts`).
+
+Light dismiss records the clicked-popover target at `pointerdown` — when
+nothing is open yet, so it records `null` — and at the `pointerup` ending the
+same right-click the target outside the popover resolves to `null` too. The two
+match, and everything open is hidden. The menu opens and closes before it ever
+paints. Verified in Chrome 151: `showPopover()` → `toggle:closed`,
+`:popover-open === false`.
+
+**jsdom implements no light dismiss**, so a component test passes against a
+menu that is dead in the app — which is how both the column menu and the
+playlist menu shipped that way. A change here needs a real window.
+
+The keyboard path (Shift+F10, the Menu key) reports `buttons === 0` and has no
+gesture to wait for; `afterPointerRelease` shows it immediately.
+
+---
+
+## Track Table Columns
+
+`useColumnConfig` owns order, width and visibility, persisted to
+`desktop-audio-column-config` and reconciled against `DEFAULT_COLUMNS` on load
+so a newly added column still appears for anyone who ever touched their layout.
+
+**`UIProvider` is the only caller of the hook.** The API reaches the table and
+Settings → Library through `useUI()`, because both offer the same toggles and
+two owners of one persisted list is two lists. `UIProvider`'s `value` prop is a
+`Partial`, spread last, so a test can override one slice without building all
+of it.
+
+---
+
 ## Drag and Drop
 
 ### Invariant: One Drag Vocabulary
@@ -256,6 +307,30 @@ comment where an effect is unavoidable — follow the same pattern:
 
 Common valid justifications: DOM writes outside React's render, event listener
 subscriptions, async operations, media query listeners, canvas sampling.
+
+---
+
+## Tag Editor
+
+Saving writes to the app's **own SQLite database**, never into the audio file —
+`music-metadata` reads only, and nothing in the dependency tree can write
+ID3/Vorbis frames. The scanner cooperates: an edit leaves `mtime_ms` alone, so
+the next scan sees an unchanged file, serves the stored row, and the edit
+survives. See the module docstring on `TagEditorView`.
+
+`setEditingTrack` is the only way to open it. It has **three** doors, and that
+is deliberate: it used to have one, the track row's context menu, which meant no
+menu meant no tag editor — grid densities had no context menu at all, so it was
+simply unreachable there.
+
+| Door | Reaches it via |
+|---|---|
+| Track row → *Edit Tags* | the native menu round trip |
+| Grid card → *Edit Tags* | the native menu round trip (ungrouped cards only) |
+| `mod+i` | no IPC at all — `useKeyboardShortcuts`, resolved from `[data-track-id]` under focus, falling back to the playing track |
+
+Adding a fourth is cheap; removing one is not. The keyboard door in particular
+is the only one that does not depend on a second window existing.
 
 ---
 
