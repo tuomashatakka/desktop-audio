@@ -1,17 +1,24 @@
 /**
- * OverlayHost — the three dialogs that sit over the library.
+ * OverlayHost — the dialogs that sit over the library.
  *
- * Now Playing, Settings and the Tag Editor used to be routes, which meant
- * opening one unmounted the library and collapsed the sidebar. They are modal
- * `<dialog>`s now: the library keeps its scroll position, its selection and
- * its place on screen behind them.
+ * Now Playing, Audio processing, Settings and the Tag Editor used to be routes,
+ * which meant opening one unmounted the library and collapsed the sidebar. They
+ * are modal `<dialog>`s now: the library keeps its scroll position, its
+ * selection and its place on screen behind them.
  *
- * Only the active one is mounted. `Overlay`'s exit transition keeps it painted
- * while it leaves, so unmounting on close is not the same as snapping away.
+ * The sheets mount only while they are the active overlay; `Overlay`'s exit
+ * transition keeps one painted while it leaves, so unmounting on close is not
+ * the same as snapping away.
+ *
+ * The player is the exception: it is **always mounted**, in both places it
+ * appears, and only ever shown or hidden by CSS. Its two copies are one
+ * component rendering one DOM, so nothing about the now-playing view can differ
+ * between them — see the module docstring on `Player`.
  */
 import { useUI } from '../contexts'
 import { Overlay } from '../components/atomic'
 import { Player } from '../components/composite/Player'
+import { DspView } from '../views/DspView'
 import { SettingsView } from '../views/SettingsView'
 import { TagEditorView } from '../views/TagEditorView'
 
@@ -30,7 +37,16 @@ export function OverlayHost () {
       label='Now playing'
       variant='full'
       onClose={ closeOverlay }>
-      {overlay === 'player' && <Player expanded />}
+      <Player expanded />
+    </Overlay>
+
+    <Overlay
+      open={ overlay === 'dsp' }
+      label='Audio processing'
+      variant='sheet'
+      closeButton
+      onClose={ closeOverlay }>
+      {overlay === 'dsp' && <DspView />}
     </Overlay>
 
     <Overlay

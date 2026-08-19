@@ -189,18 +189,30 @@ function toggleFolderBranch (folder: FolderEntry, path: string): FolderEntry {
  * a breadcrumb, a track-table folder row, a restored session — is a row you can
  * actually see rather than one buried in a collapsed branch.
  *
- * Ancestry is a path prefix, which is the whole test: a node is on the chain
- * when `path` starts with its own path plus a separator. Branches off the chain
- * are returned by reference, so React re-renders the spine and nothing else,
- * and a node already open is left alone — which is what makes this idempotent
- * and safe to run on every selection change.
+ * **Ancestors only.** The target keeps whatever expansion state it had, and
+ * that is the whole correctness argument: a row click both selects a folder and
+ * toggles it, so a version of this that also opened the target undid every
+ * collapse the same click had just performed — and only when the click *also*
+ * changed the selection, which made the tree take one click to close sometimes
+ * and two others.
+ *
+ * Ancestry is a path prefix. `buildFolderTree` joins segments with `/` even on
+ * Windows, where the root itself can still be a backslash path, so both
+ * separators are tested; a trailing one on the parent is dropped first, or a
+ * root of `/` would test for `//` and match nothing.
+ *
+ * Branches off the chain are returned by reference, so React re-renders the
+ * spine and nothing else, and a node already open is left alone — which is what
+ * makes this idempotent and safe to run on every selection change.
  */
 function revealFolderBranch (folder: FolderEntry, path: string): FolderEntry {
-  const onChain = path === folder.path ||
-    path.startsWith(`${folder.path}/`) ||
-    path.startsWith(`${folder.path}\\`)
+  if (path === folder.path)
+    return folder
 
-  if (!onChain)
+  const base       = folder.path.replace(/[/\\]+$/, '')
+  const isAncestor = path.startsWith(`${base}/`) || path.startsWith(`${base}\\`)
+
+  if (!isAncestor)
     return folder
 
   const children = folder.children.map(child =>

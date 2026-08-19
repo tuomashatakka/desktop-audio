@@ -24,16 +24,18 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 
 
 /** The dialogs that can sit over the library. Only one at a time. */
-export type OverlayName = 'player' | 'settings' | 'tag-editor'
+export type OverlayName = 'player' | 'dsp' | 'settings' | 'tag-editor'
 
 /**
  * Which of the two now-playing views is showing. Exactly two, because exactly
  * two things claim the space above the title: the album artwork, and the
  * spectrum mesh the analysis readout belongs to.
  *
- * Neither lyrics nor the DSP page are in this union — they are *layers*
- * (`lyricsOpen`, `dspOpen` below), composable with either view and with each
- * other. A mode replaces what you were looking at; a layer arrives beside it.
+ * Lyrics are not in this union — they are a *layer* (`lyricsOpen` below),
+ * composable with either view. A mode replaces what you were looking at; a
+ * layer arrives beside it. The DSP page is neither: it is its own overlay
+ * (`openOverlay('dsp')`), because sixteen faders and a transport cannot share
+ * one window without one of them being unusable.
  *
  * It lives here rather than inside `Player` because the sidebar has to be able
  * to open the overlay *on* a view. Session-only, like `overlay` — which panel
@@ -100,15 +102,6 @@ interface UIState {
    */
   readonly lyricsOpen: boolean
 
-  /**
-   * The audio-processing page, layered over either view for the same reason.
-   *
-   * It was a third `playerMode` until that meant an EQ you could not set while
-   * looking at what you were setting it against. As a layer it opens *between*
-   * the type column and the transport: the blocks above ride up, the transport
-   * rides down, and nothing on screen is lost.
-   */
-  readonly dspOpen:            boolean
   readonly sidebarOpen:        boolean
   readonly selectedFolderPath: string | null
   readonly selectedPlaylistId: string | null
@@ -126,8 +119,6 @@ interface UIContextValue extends UIState {
   readonly closeOverlay:    () => void
   readonly setPlayerMode:   (mode: PlayerMode) => void
   readonly toggleLyrics:    () => void
-  readonly toggleDsp:       () => void
-  readonly setDspOpen:      (open: boolean) => void
   readonly toggleSidebar:   () => void
   readonly selectFolder:    (path: string | null) => void
   readonly selectPlaylist:  (id: string | null) => void
@@ -226,7 +217,6 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       overlay:        null,
       playerMode:     'default',
       lyricsOpen:     false,
-      dspOpen:        false,
       sidebarOpen:    false,
       ...NO_SCOPE,
       editingTrackId: null,
@@ -253,21 +243,6 @@ export function UIProvider ({ children, value }: UIProviderProps) {
   const toggleLyrics = useCallback(() => {
     setState(s =>
       ({ ...s, lyricsOpen: !s.lyricsOpen }))
-  }, [])
-
-  const toggleDsp = useCallback(() => {
-    setState(s =>
-      ({ ...s, dspOpen: !s.dspOpen }))
-  }, [])
-
-  /**
-   * Set rather than toggled, because the sidebar's DSP entry has to *arrive* on
-   * the page whatever state the overlay was left in — a toggle there would
-   * close it half the time.
-   */
-  const setDspOpen = useCallback((open: boolean) => {
-    setState(s =>
-      s.dspOpen === open ? s : { ...s, dspOpen: open })
   }, [])
 
   const toggleSidebar = useCallback(() => {
@@ -352,8 +327,6 @@ export function UIProvider ({ children, value }: UIProviderProps) {
       closeOverlay,
       setPlayerMode,
       toggleLyrics,
-      toggleDsp,
-      setDspOpen,
       toggleSidebar,
       selectFolder,
       selectPlaylist,
@@ -370,8 +343,6 @@ export function UIProvider ({ children, value }: UIProviderProps) {
     closeOverlay,
     setPlayerMode,
     toggleLyrics,
-    toggleDsp,
-    setDspOpen,
     toggleSidebar,
     selectFolder,
     selectPlaylist,

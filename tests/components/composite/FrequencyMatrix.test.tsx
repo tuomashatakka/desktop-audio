@@ -170,8 +170,10 @@ describe('FrequencyMatrix', () => {
       ))
     })
 
-    // Rows recede downward, so a row's baseline Y grows with its age. Reading
-    // the first Y of each subpath therefore has to come out descending.
+    // Rows recede *upward*, so a row's baseline Y shrinks with its age. Emitting
+    // oldest first therefore has to come out ascending — and because later
+    // subpaths paint over earlier ones, that is also what puts the near rows in
+    // front of the far ones.
     const history = container.querySelector('#matrix-freq')?.getAttribute('d') ?? ''
 
     const baselines = history
@@ -182,7 +184,39 @@ describe('FrequencyMatrix', () => {
 
     expect(baselines.length).toBeGreaterThan(1)
     expect([ ...baselines ].sort((a, b) =>
-      b - a)).toEqual(baselines)
+      a - b)).toEqual(baselines)
+  })
+
+  /*
+   * The whole point of the flip: the live edge is the nearest thing on screen,
+   * with every older slice behind and above it. It used to be the other way
+   * round, which put the faintest, oldest data closest to the viewer.
+   */
+  it('draws the current row in front of, and below, all its history', async () => {
+    let container!: HTMLElement
+
+    await act(async () => {
+      ({ container } = render(
+        <FrequencyMatrix analyzer={ analyserFor([{ hz: 440, level: 255 }]) } active showNotes />
+      ))
+    })
+
+    const firstY = (selector: string) => {
+      const d = container.querySelector(selector)?.getAttribute('d') ?? ''
+      return Number(d.split('M')[1]?.split(',')[1]?.split('L')[0])
+    }
+
+    const history = (container.querySelector('#matrix-freq')?.getAttribute('d') ?? '')
+      .split('M')
+      .slice(1)
+      .map(subpath =>
+        Number(subpath.split(',')[1]?.split('L')[0]))
+
+    expect(firstY('.matrix-current')).toBeGreaterThan(Math.max(...history))
+
+    // …and it is the last element painted, so nothing covers it.
+    const painted = [ ...container.querySelectorAll('svg > *') ]
+    expect(painted.at(-1)).toHaveClass('matrix-current')
   })
 
   it('closes the current row so it can carry a fill, like the EQ curve', async () => {

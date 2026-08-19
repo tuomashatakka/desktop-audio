@@ -86,11 +86,16 @@ function SnapshotHarness () {
 const other = folder('other', 'Other', '/music/other')
 const wide  = folder('root', 'Music', '/music', [ child, other ], true)
 
+/* A library rooted at the filesystem root: `'/' + '/'` is `'//'`, which is a
+   prefix of nothing, so the trailing separator has to be stripped first. */
+const slashDeep = folder('deep', 'Deep', '/root-slash/deep')
+const slashRoot = folder('slash', '/', '/', [ slashDeep ])
+
 function RevealHarness () {
   const { folders, setFolders, revealFolder } = useLibrary()
 
   useEffect(() => {
-    setFolders([ wide ])
+    setFolders([ wide, slashRoot ])
   }, [ setFolders ])
 
   /** The paths of every folder currently expanded, flattened. */
@@ -105,6 +110,16 @@ function RevealHarness () {
     <button type='button' onClick={ () =>
       revealFolder('/music/child/grandchild') }>
       Reveal
+    </button>
+
+    <button type='button' onClick={ () =>
+      revealFolder('/music/child') }>
+      Reveal child
+    </button>
+
+    <button type='button' onClick={ () =>
+      revealFolder('/root-slash/deep') }>
+      Reveal under slash root
     </button>
   </>
 }
@@ -137,6 +152,43 @@ describe('LibraryContext revealFolder', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reveal' }))
 
     expect(screen.getByTestId('other-same')).toHaveTextContent('true')
+  })
+
+  /*
+   * The bug this replaced: `revealFolderBranch` treated the target as on-chain
+   * and forced it open, so a row click that both selected a folder *and*
+   * collapsed it had the collapse silently undone — but only when the click
+   * also changed the selection, which made the tree take one click to close
+   * sometimes and two others.
+   */
+  it('leaves the target folder\'s own expansion alone', async () => {
+    render(
+      <LibraryProvider>
+        <RevealHarness />
+      </LibraryProvider>
+    )
+
+    await screen.findByTestId('expanded')
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal child' }))
+
+    // `/music/child` is the target: its ancestor opens, it does not.
+    expect(screen.getByTestId('expanded')).toHaveTextContent('/music')
+    expect(screen.getByTestId('expanded')).not.toHaveTextContent('/music/child')
+  })
+
+  it('reveals under a root whose path is a bare separator', async () => {
+    render(
+      <LibraryProvider>
+        <RevealHarness />
+      </LibraryProvider>
+    )
+
+    await screen.findByTestId('expanded')
+    expect(screen.getByTestId('expanded')).not.toHaveTextContent('/ ')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal under slash root' }))
+
+    expect(screen.getByTestId('expanded').textContent?.split(' ')).toContain('/')
   })
 
   it('is a no-op once the branch is already open', async () => {

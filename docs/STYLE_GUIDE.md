@@ -19,9 +19,9 @@ belongs to exactly one layer:
 | `tokens` | `tokens.css` | Every CSS custom property, the `@property` registrations, and the single `:root` / `[data-theme=…]` / `[data-ui-density]` / `[data-corners]` selectors |
 | `reset` | `base.css` (imports reset) | Normalize / zero-out browser defaults |
 | `base` | `base.css` | Element-level typography and defaults |
-| `components` | `components.css` | Named component styles (`.album-art-bg`, `.chord-ribbon`, etc.) |
-| `layout` | `layout.css` | Page-level structural layout (player grid, sidebar, views) |
-| `views` | `views.css` | View-specific rules (library, settings, now-playing) |
+| `components` | `components.css` | Every named component — buttons, inputs, the overlay, sidebar rows, and all of the player's own parts (`.album-art-bg`, `.chord-ribbon`, `.frequency-matrix`, `.eq-*`, `.dsp-*`, `.waveform-*`) |
+| `layout` | `layout.css` | Structure only: the app shell, titlebar, sidebar box, `.player-view` / `.player-content`, and every `@container player` / `[data-height-tier]` block |
+| `views` | `views.css` | One screen's rules: library, settings, tag editor, audio processing |
 | `utilities` | `utilities.css` | Shared recipes: `.surface`, `.fade-y` / `.fade-x`, `.sr-only`, text-overflow helpers |
 
 **Invariant:** no `:root` or `[data-theme=…]` selector exists in any stylesheet
@@ -31,6 +31,18 @@ other than `tokens.css`. This is enforced by a test in `tests/`.
 
 Font faces are resource declarations, not style rules. Placing them first means a
 token override can never catch a `@font-face` — a face is a URL, not a colour.
+
+### Why components sit below layout
+
+A component's own rules and the rules that *resize it for a given window* are
+different jobs, and they live in different layers on purpose. `.chord-ribbon`
+declares its type scale in `components`; the `@container player` block that
+retunes that scale at 480px lives in `layout`, one layer up, and therefore wins
+without having to be more specific than the default it is overriding.
+
+Putting a component's base rules in `layout.css` breaks that: the two end up in
+one layer, and every tier override has to win on specificity or source order
+instead — which is what a layer system exists to avoid.
 
 ### The `utilities` layer gotcha
 
@@ -162,6 +174,12 @@ MONO is deliberately sharp. The defaults are:
 --control-radius: 999px;
 ```
 
+`--control-radius` is for things that *look* like buttons — it is set by
+`.button` in `components.css`, not by the `button` element reset, which uses
+`--radius`. Plenty of elements are `<button>` only because they are activatable
+(folder rows, track rows, group headings), and a pill reset made each of them a
+lozenge the moment it took a background.
+
 **Corner remap** — one attribute changes the trio:
 
 ```css
@@ -214,6 +232,14 @@ DSP controls:
 
 ```
 --dsp-fader-h: 104px     --dsp-knob-size: 52px    --dsp-track-w: 4px
+```
+
+Pointer targets — the floor on an icon button, stated rather than left to fall
+out of the type scale — and the height `content-visibility` reserves for an
+off-screen sidebar tree row:
+
+```
+--hit-target: 32px       --hit-target-sm: 26px      --tree-row-h: 28px
 ```
 
 ### Z-Index Scale
@@ -302,8 +328,9 @@ the name.
 | `--player-h` | `@property`-registered `<length-percentage>`, initial `72px` — the collapsed/expanded player height |
 | `--matrix-blend` | `color-burn` — the frequency mesh blend |
 | `--controls-blend` | `color-dodge` (dark) / `normal` (light) — transport controls blend |
-| `--analysis-rise` | `calc(var(--shift-md) * 2)` — how far analysis content rises when artwork leaves |
-| `--chord-pps` | `34` — pixels per second of chord lookahead |
+| `--analysis-rise` | `calc(var(--shift-md) * 2)` — how far analysis content rises, and how far the cover travels upward as it leaves |
+| `--chord-pps` | `clamp(28px, 6cqi, 64px)` — how far one second of chord lookahead is on screen. A **length**, not a bare number: `clamp()` cannot mix unitless values with `cqi`, and `seconds × length` is a length either way |
+| `--matrix-wallpaper` | `0.38` — how far back the frequency mesh sits behind the chord lane. Applied to the history and time lines only; `.matrix-current` stays at full strength |
 | `--art-banner-h` | `min(58cqh, 96cqw)` — full-bleed cover height on narrow now-playing |
 | `--lyrics-nudge` | `6vw` — horizontal nudge for the lyrics column |
 | `--lyrics-inset-inline` | `10vw` |

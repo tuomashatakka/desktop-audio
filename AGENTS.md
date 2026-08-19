@@ -68,6 +68,32 @@ Declared in `src/app/styles/main.css`. Every stylesheet belongs to exactly
 one layer. The `fonts` layer is imported first so `@font-face` rules can never
 be caught by a token override.
 
+### Invariant: A File Per Layer, And Nothing Else In It
+
+| File | What belongs in it |
+|---|---|
+| `base.css` | reset, then element-level defaults — `button`, `input`, headings, `<kbd>`. No class ever. |
+| `components.css` | every **named component**: buttons, inputs, the overlay, the player's own parts (`.chord-ribbon`, `.frequency-matrix`, `.eq-*`, `.dsp-*`, `.waveform-*`, sidebar rows). |
+| `layout.css` | **structure only** — the app shell, the titlebar, the sidebar box, `.player-view` / `.player-content`, and every `@container player` / `data-height-tier` block. |
+| `views.css` | one screen's rules: library, settings, tag editor, DSP. |
+
+`base.css`'s `button` reset uses `--radius`, **not** `--control-radius`. Many
+elements here are `<button>` because they are *activatable* — a folder row, a
+track row, a group heading — and the 999px control radius turned every one of
+them into a lozenge as soon as it took a background. `.button` sets the pill for
+things that actually look like buttons.
+
+The order is load-bearing, not cosmetic. Component defaults sit one layer
+*below* layout, so a tier or container-query override in `layout.css` wins
+without having to out-specify anything. Put a component's base rules in
+`layout.css` and that stops being true.
+
+### Conventions
+
+Simple class names plus **native nesting**, never BEM: `.button { &.primary {} }`,
+not `.button--primary`. Style state with attributes the component already sets
+(`[data-open]`, `[aria-pressed]`, `[data-mode]`) rather than toggled classes.
+
 ### Invariant: One Token Contract
 
 All CSS custom properties and all theme-dependent selectors (`:root`,
@@ -92,7 +118,50 @@ bar's copy lives inside `.app-shell`, the overlay's is portaled to `body` by
 `Overlay` and so escapes every descendant tier rule. There is no route state —
 Now Playing is an overlay, like Settings and the Tag Editor.
 
-### Invariant: Two Views, Two Layers
+### Invariant: One DOM
+
+**`Player` renders exactly one markup, always.** Nothing in it is conditionally
+rendered — not the mode panels, not the lyrics layer, not the bar's promote
+button. Every state change is a `data-*` attribute that CSS animates.
+
+Two reasons, both load-bearing:
+
+1. An element that unmounts has nothing left to animate, so a `display`
+   transition (`allow-discrete` + `@starting-style`) only works when the element
+   is always there.
+2. The player is rendered **twice** — once in the footer bar inside
+   `.app-shell`, once portaled to `body` by the overlay. If either copy could
+   branch, the two would drift into two components with one name. A test in
+   `tests/components/composite/Player.test.tsx` compares their `innerHTML`
+   byte-for-byte.
+
+`expanded` is a prop, but it only ever selects **values** — which copy owns the
+analyser's `requestAnimationFrame` loop, and whether the lyrics layer may open.
+It must never gate an element.
+
+Where the two copies look different, **the place is what selects it**: the
+overlay's copy is outside `.app-shell`, so height-tier rules cannot reach it,
+and the analysis layout is scoped `.player-overlay &[data-mode='analysis']`.
+
+#### Two traps this invariant sets
+
+**Collapsed is not hidden.** `.player-content` is a `display: grid` with named
+areas in every height tier. Anything always-mounted that has *no* grid area
+there must be `display: none` — a merely collapsed element (`height: 0`) is
+still a grid item, auto-places into an implicit row and adds the grid's `gap`,
+which is what once pushed the transport out of a 72px bar. See
+`.app-shell :is(.frequency-matrix, .analysis-readout, .player-lyrics)` in
+`layout.css`.
+
+**Hiding a control can strand a whole layout.** `useWindowScale` is the only
+thing that resizes the window, and `.player-promote` exists only at the `normal`
+tier — so the window-size button in `.player-actions` is the sole way in and out
+of the compact and mini players. `.player-actions` is hidden outside the
+overlay, so the shell shows exactly that one item (`> li:not(.size)`). jsdom
+does not load the cascade, so **no component test can catch this class of bug**;
+it needs a real window.
+
+### Invariant: Two Views, One Layer
 
 **Two views**, mutually exclusive, `PlayerMode` in `UIContext`:
 
@@ -101,26 +170,31 @@ Now Playing is an overlay, like Settings and the Tag Editor.
 | `default` | the album art |
 | `analysis` | chords, key and tempo; the cover fades upward out of frame |
 
-**Two layers**, each composable with either view and with each other:
+**One layer**, composable with either view:
 
 | | |
 |---|---|
 | `lyricsOpen` | hangs off the trailing edge; `.player-content` translates to meet it |
-| `dspOpen` | opens between the type and the transport; `grid-template-rows: 0fr→1fr` rides the blocks apart |
+
+Audio processing is **not** here. It is its own overlay (`openOverlay('dsp')` →
+`DspView`), because sixteen faders, six knobs and a transport that has to stay
+on screen never fitted one window: the panel either clipped its own low bands or
+shrank until they were unusable.
 
 **The title, the seek bar and the transport are always mounted and always
-visible**, in every view, under every layer, at every tier. A change that hides
+visible**, in every view, under the layer, at every tier. A change that hides
 any of them behind a mode is the thing this section exists to stop.
 
-Enter and exit are both CSS — `display` with `allow-discrete` plus
-`@starting-style` — so everything that appears is *mounted* whether or not it is
-showing. Unmounting on close animates one direction only.
+The album art is a `<figure>`, not a control. It used to be a button that
+resized the window, which made the now-playing view rearrange itself when you
+clicked the cover. The window-size toggle is its own labelled button in
+`.player-actions`.
 
 ### Invariant: The Class Hooks Are a Contract
 
 `.player-view`, `.player-content`, `.player-art`, `.player-info`,
 `.progress-section`, `.playback-controls` are addressed by the height-tier
-system (`data-height-tier` on `.app-shell`, written from JS) and by ten
+system (`data-height-tier` on `.app-shell`, written from JS) and by the
 `@container player` blocks in `layout.css`. Renaming one means rewriting that
 system.
 

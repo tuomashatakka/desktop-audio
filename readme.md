@@ -52,6 +52,12 @@ and holding <kbd>Shift</kbd>, <kbd>⌘</kbd> or <kbd>Ctrl</kbd> drops it to fine
 mode. Hovering the curve raises a ruler of the sixteen band frequencies and
 calls out the one under your pointer with its current gain.
 
+The page has the window to itself, reached from the sidebar. It used to be a
+layer inside Now Playing, where sixteen faders and six knobs had to share the
+screen with a transport that could not move — so it clipped its own low bands
+behind a scrollbar that was not drawn. Playback carries on behind it either way;
+the chain is live.
+
 Pressing on the curve *picks* a band, and the drag then belongs to that band
 however far sideways it wanders — pulling one to +12 dB used to smear the gain
 across every band the pointer crossed on the way up. A right-click steps the
@@ -59,10 +65,6 @@ pick to the next band without touching a gain (<kbd>Shift</kbd> for the
 previous one), which is the only reliable way onto the low bands, where four of
 them share two per cent of a logarithmic axis. The picked band stays named and
 called out with the pointer away.
-
-Every control in the page is sized against the window's own height, so the
-whole chain stays on one page instead of hiding its low bands behind a
-scrollbar that was not drawn.
 
 ## Chords, key and tempo
 
@@ -83,14 +85,18 @@ everything else is sized against them:
   over; the ones ahead slide in from the right, each one standing on a tick
   exactly as far away as it is *seconds* away. The outgoing chord scrolls off
   and fades.
-- **key, tempo and meter** as one caption line under the album — `B minor ·
-  87.5 bpm · 4/4`. The meter comes off the beat grid, so it costs nothing extra.
+- **key, tempo and meter**, each labelled, in the same gutter the chord caption
+  uses — so `Key`, `Tempo`, `Meter` and `Chord` line up down one column and
+  every value starts on the next. The meter comes off the beat grid, so it
+  costs nothing extra.
 - **beat and downbeat markers** drawn into the full now-playing waveform
 - a **live FFT wireframe** — this one is real-time, not cached — running behind
   all of it as wallpaper, on a logarithmic axis, because pitch is logarithmic
-  and a linear one buries five octaves in the left tenth. The current instant is
-  drawn like the EQ's own curve, in front and at full strength, with the history
-  receding and dimmed behind it. Naming the dominant partials by pitch over the
+  and a linear one buries five octaves in the left tenth. It runs as a
+  *waterfall*: the live edge is the nearest row, along the bottom, drawn like
+  the EQ's own curve at full strength, and every older slice falls away behind
+  and above it toward a vanishing point, narrowing, dimming and defocusing as
+  it goes. Naming the dominant partials by pitch over the
   top is a switch in preferences, off by default: it is decoration on a page
   about harmony.
 

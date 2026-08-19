@@ -1,11 +1,10 @@
 import { useUI, useAudio, useSettings } from '../../contexts'
 import { FrequencyMatrix } from './FrequencyMatrix'
 import { AnalysisReadout } from './AnalysisReadout'
-import { DspPanel } from './DspPanel'
 import type { Track, RepeatMode, PlayerMode } from '../../contexts'
 import { Icon, IconButton, Button } from '../atomic'
 import { WaveformProgress } from '../atomic/WaveformProgress'
-import { useTrackAnalysis, useWindowScale, useLyricsScroll } from '../../hooks'
+import { useTrackAnalysis, useWindowScale, useLyricsScroll, useHeightTier } from '../../hooks'
 import type { TrackAnalysisState } from '../../hooks'
 import { useArtwork } from '../../hooks/useArtwork'
 import { formatTime, isoDuration } from '../../utils/time'
@@ -26,30 +25,30 @@ const REPEAT_LABEL: Record<RepeatMode, string> = {
 }
 
 
-type PlayerArtworkProps = {
-  readonly track:    Track | null
-  readonly onToggle: () => void
-}
+type PlayerArtworkProps = { readonly track: Track | null }
 
-function PlayerArtwork ({ track, onToggle }: PlayerArtworkProps) {
+/**
+ * The cover. A picture, and only a picture.
+ *
+ * It used to be a `<button>` that resized the window, which meant the
+ * now-playing view rearranged itself when you clicked the artwork — the same
+ * gesture doing two unrelated things depending on how big the window already
+ * was. The window-size toggle is its own labelled control in `.player-actions`
+ * now, and this is a `<figure>` with an `<img>` in it, which is what it always
+ * was.
+ */
+function PlayerArtwork ({ track }: PlayerArtworkProps) {
   // Full resolution, not the list thumbnail — this is the largest the artwork
   // is ever shown, and there is only ever one current track to pay for it.
   const art = useArtwork(track?.id, 'full')
 
   return <figure className='player-art'>
-    {/* Album art doubles as the compact/expanded window toggle, so the
-          figure contains a real button rather than becoming clickable. */}
-    <button
-      className='album-art-card'
-      aria-label='Toggle compact player size'
-      type='button'
-      disabled={ !track }
-      onClick={ onToggle }>
+    <span className='album-art-card'>
       {art
         ? <img src={ art } alt='' />
         : <Icon className='art-fallback' name='music' />
       }
-    </button>
+    </span>
   </figure>
 }
 
@@ -189,31 +188,40 @@ function PlayerInfo ({ track }: PlayerInfoProps) {
 type PlayerActionsProps = {
   readonly mode:       PlayerMode
   readonly lyricsOpen: boolean
-  readonly dspOpen:    boolean
   readonly hasTrack:   boolean
+  readonly compact:    boolean
   readonly onMode:     () => void
   readonly onLyrics:   () => void
-  readonly onDsp:      () => void
+  readonly onResize:   () => void
   readonly onClose:    () => void
 }
 
 /**
- * The overlay's top-right controls: switch the view, add a layer to it, or
- * leave.
+ * Switch the view, add the lyrics layer to it, resize the window, or leave.
  *
  * A menu of controls, like `.playback-controls` — same shape, so the two read
- * alike and neither is a bare `<div>`. Only the first button changes the
- * *view*; lyrics and audio processing are layers that arrive beside whichever
- * view is showing, which is why all three are `aria-pressed` toggles and none
- * of them is a radio in a group.
+ * alike and neither is a bare `<div>`. The first two are `aria-pressed`
+ * toggles because each has an on state you can see; the last two act once and
+ * are plain buttons.
+ *
+ * **Every item carries a class**, the way `PlayerTransport`'s do, because the
+ * footer bar and the mini window show *one* of them — the window-size toggle —
+ * and hide the rest. That is not cosmetic: `useWindowScale` is the only thing
+ * that can resize the window, and below the `normal` height tier there is no
+ * other control on screen at all (`.player-promote` is `normal`-only), so
+ * without this button in the bar the small player is a room with no door.
+ *
+ * Audio processing is no longer here. It is its own overlay, reached from the
+ * sidebar, because it never fitted above a transport that also had to stay on
+ * screen.
  */
 function PlayerActions ({
-  mode, lyricsOpen, dspOpen, hasTrack, onMode, onLyrics, onDsp, onClose,
+  mode, lyricsOpen, hasTrack, compact, onMode, onLyrics, onResize, onClose,
 }: PlayerActionsProps) {
   const analysing = mode === 'analysis'
 
   return <menu className='player-actions' aria-label='Player'>
-    <li>
+    <li className='view'>
       <IconButton
         className='analysis-toggle'
         aria-pressed={ analysing }
@@ -225,7 +233,7 @@ function PlayerActions ({
       </IconButton>
     </li>
 
-    <li>
+    <li className='lyrics'>
       <IconButton
         className='lyrics-toggle'
         aria-pressed={ lyricsOpen }
@@ -237,21 +245,20 @@ function PlayerActions ({
       </IconButton>
     </li>
 
-    {/* No `disabled` here, unlike the two above: the analysis and the lyrics
-        need a track to have anything to show, but an EQ curve is editable in
-        silence — which is exactly when you might want to set one up. */}
-    <li>
+    {/* No `disabled`, unlike the two above: the analysis and the lyrics need a
+        track to have anything to show, and a window is resizable regardless —
+        which is exactly why this is the one that survives into the bar. */}
+    <li className='size'>
       <IconButton
-        className='dsp-toggle'
-        aria-pressed={ dspOpen }
-        label={ dspOpen ? 'Hide audio processing' : 'Show audio processing' }
+        className='window-size-toggle'
+        label={ compact ? 'Restore window size' : 'Shrink to compact player' }
         type='button'
-        onClick={ onDsp }>
-        <Icon name='dsp' />
+        onClick={ onResize }>
+        <Icon name={ compact ? 'maximize' : 'minimize' } />
       </IconButton>
     </li>
 
-    <li>
+    <li className='close'>
       <IconButton className='player-close' label='Close player' type='button' onClick={ onClose }>
         <Icon name='close' />
       </IconButton>
@@ -261,19 +268,6 @@ function PlayerActions ({
 
 function playerAriaLabel (track: Track | null): string {
   return track ? `Now playing: ${track.title}` : 'Player'
-}
-
-/**
- * `true` when the lyrics layer is showing, `undefined` when it is not — the
- * shape `data-lyrics` wants, since a `data-*` attribute is present or absent
- * rather than true or false.
- *
- * Only the overlay has room for it, so `expanded` gates it here rather than at
- * the call site: the layer is always mounted (its exit animation needs it to
- * be), and this is the one place that decides whether it is open.
- */
-function lyricsShowing (expanded: boolean, lyricsOpen: boolean): true | undefined {
-  return expanded && lyricsOpen ? true : undefined
 }
 
 /**
@@ -288,30 +282,44 @@ function emptyFlag (track: Track | null): '' | undefined {
 
 type PlayerProps = {
 
-  /** True for the now-playing overlay's copy; false for the footer bar's. */
+  /**
+   * True for the now-playing overlay's copy; false for the footer bar's.
+   *
+   * It selects *values*, never markup — see the component docstring. The two
+   * copies render byte-identical DOM.
+   */
   readonly expanded?: boolean
 }
 
 function visibleBeatMarkers (
-  expanded: boolean,
   analysis: TrackAnalysisState,
   showBeatMarkers: boolean
 ): readonly BeatMarker[] | undefined {
-  return expanded && showBeatMarkers ? analysis.analysis?.beats : undefined
+  return showBeatMarkers ? analysis.analysis?.beats : undefined
 }
 
 /**
- * The one and only player — rendered twice, from one component.
+ * The one and only player — one component, one DOM, rendered twice.
  *
- * The footer bar's copy lives inside `.app-shell`, so the height-tier and
- * footer-bar rules in `layout.css` reach it. The now-playing overlay's copy is
- * portaled to `document.body` by {@link Overlay}, *outside* the shell, so none
- * of those descendant selectors match and it falls through to the full-window
- * layout by default. That is the whole mechanism — there is no bar/full switch
- * in CSS beyond where the element happens to sit.
+ * **Nothing here is conditionally rendered.** Every element is always in the
+ * tree, in both copies, and every state change is a `data-*` attribute that CSS
+ * animates: `data-mode`, `data-lyrics`, `data-empty`. That is not a style
+ * preference — it is the only way the enter *and* the exit of a panel can both
+ * be animated, because an element that unmounts has nothing left to animate
+ * with, and it is what stops the two copies from drifting into two different
+ * components with one name.
  *
- * `expanded` therefore only drives the things CSS cannot decide: which chrome
- * is in the DOM at all.
+ * The two copies differ only in where they sit. The footer bar's is inside
+ * `.app-shell`, so the height-tier and footer-bar rules in `layout.css` reach
+ * it. The overlay's is portaled to `document.body` by {@link Overlay},
+ * *outside* the shell, so none of those descendant selectors match and it falls
+ * through to the full-window layout by default. There is no bar/full switch in
+ * CSS beyond where the element happens to be.
+ *
+ * `expanded` therefore never branches the markup. It feeds *values* — which
+ * copy owns the analyser's animation frame, and whether the lyrics layer is
+ * open — so that two mounted copies do not both run a `requestAnimationFrame`
+ * loop over the same `AnalyserNode`.
  *
  * The class hooks here (`.player-view`, `.player-content`, `.album-art-card`,
  * `.player-info`, `.progress-section`, `.playback-controls`) are a deliberate
@@ -321,17 +329,23 @@ function visibleBeatMarkers (
 export function Player ({ expanded = false }: PlayerProps) {
   const {
     openOverlay, closeOverlay, playerMode, setPlayerMode,
-    lyricsOpen, toggleLyrics, dspOpen, toggleDsp,
+    lyricsOpen, toggleLyrics,
   } = useUI()
   const {
     currentTrack, isPlaying, currentTime, duration, waveformBars, analyzer,
     pause, resume, seek, playNext, playPrevious,
   }                                                        = useAudio()
-  const { shuffle, setShuffle, repeatMode, setRepeatMode,
-    showBeatMarkers, showChordAnalysis, showKeyAnalysis,
-    showSpectrumNotes }                                   = useSettings()
-  const analysis                                          = useTrackAnalysis(currentTrack)
-  const toggleWindowScale                                 = useWindowScale()
+  const {
+    shuffle, setShuffle, repeatMode, setRepeatMode,
+    showBeatMarkers, showChordAnalysis, showKeyAnalysis, showSpectrumNotes,
+  }                       = useSettings()
+  const analysis          = useTrackAnalysis(currentTrack)
+  const toggleWindowScale = useWindowScale()
+
+  // Which way the size button points. The tier is already measured for the
+  // shell's `data-height-tier`, so this reuses that rather than re-reading
+  // `window.innerHeight` for the same answer.
+  const compactWindow = useHeightTier() !== 'normal'
 
   /**
    * One button, two views. The value lives in `UIContext` so the sidebar can
@@ -340,98 +354,82 @@ export function Player ({ expanded = false }: PlayerProps) {
   const toggleMode = () =>
     setPlayerMode(playerMode === 'analysis' ? 'default' : 'analysis')
 
-  // These layers only make sense in the full-window player; the footer bar and
-  // the mini tiers have nowhere to put them, so they aren't in their DOM at
-  // all rather than being hidden after the fact.
-  const activeMode = expanded ? playerMode : 'default'
-  const showLyrics = lyricsShowing(expanded, lyricsOpen)
-  const analysing  = activeMode === 'analysis'
-  const showDsp    = expanded && dspOpen ? true : undefined
+  // Only the overlay's copy runs the analysis view. Both are mounted and both
+  // render the mesh and the readout, but two rAF loops reading one
+  // `AnalyserNode` is twice the work for one picture, and the bar has nowhere
+  // to put either of them. `data-mode` still reports the honest mode on both —
+  // the CSS that rearranges the page for it is scoped to `.player-overlay`.
+  const analysing  = playerMode === 'analysis'
+  const animating  = expanded && analysing
+  const showLyrics = expanded && lyricsOpen ? true : undefined
 
-  // Shares the cache entry `PlayerArt` above already warmed for this track.
+  // Shares the cache entry `PlayerArtwork` above already warmed for this track.
   const currentArt = useArtwork(currentTrack?.id, 'full')
 
   return <article
     className='player-view'
     data-empty={ emptyFlag(currentTrack) }
-    data-mode={ analysing ? activeMode : undefined }
+    data-mode={ analysing ? 'analysis' : 'default' }
     data-lyrics={ showLyrics }
-    data-dsp={ showDsp }
     aria-label={ playerAriaLabel(currentTrack) }>
-    {currentArt &&
-        <div key={ currentTrack?.id } className='album-art-bg' aria-hidden='true'>
-          <img src={ currentArt } alt='' />
-        </div>
-    }
+    {/* Keyed by track so the fade-in keyframe re-runs on a change. `src` is
+        empty rather than the element being absent when there is no cover — a
+        missing `<img>` cannot fade out. */}
+    <div key={ currentTrack?.id } className='album-art-bg' aria-hidden='true'>
+      {currentArt && <img src={ currentArt } alt='' />}
+    </div>
 
-    {/* The bar's whole surface is the "open now playing" affordance; the
-          overlay it opens obviously doesn't need one. */}
-    {!expanded &&
-      <button
-        className='player-promote'
-        aria-label='Open now playing'
-        type='button'
-        disabled={ !currentTrack }
-        onClick={ () =>
-          openOverlay('player') } />
-    }
+    {/* The bar's whole surface is the "open now playing" affordance. The
+        overlay hides it in CSS rather than dropping it from the tree — this is
+        the same DOM in both copies. */}
+    <button
+      className='player-promote'
+      aria-label='Open now playing'
+      type='button'
+      disabled={ !currentTrack }
+      onClick={ () =>
+        openOverlay('player') } />
 
     <div className='player-content'>
-      <PlayerArtwork track={ currentTrack } onToggle={ toggleWindowScale } />
+      <PlayerArtwork track={ currentTrack } />
       <PlayerInfo track={ currentTrack } />
-
-      {/* Everything the overlay adds, in one branch: the footer bar and the
-          mini tiers have nowhere to put any of it, so none of it is in their
-          DOM rather than being hidden after the fact.
-
-          The mesh is the page's backdrop rather than a block in this column,
+      {/* The mesh is the page's backdrop rather than a block in this column,
           but it is absolutely positioned against `.player-content`, so it has
           to live inside it. `active` is what drives its rAF loop — the loop
           stops the moment the view changes, while the element stays behind for
-          its fade-out. The readout and the DSP layer are mounted for the same
-          reason: their arrival and departure are `display` transitions, and an
-          unmounted element has nothing to animate. */}
-      {expanded && <>
-        <FrequencyMatrix analyzer={ analyzer } active={ analysing } showNotes={ showSpectrumNotes } />
+          its fade-out. */}
+      <FrequencyMatrix analyzer={ analyzer } active={ animating } showNotes={ showSpectrumNotes } />
 
-        <AnalysisReadout
-          open={ analysing }
-          analysis={ analysis.analysis }
-          status={ analysis.status }
-          error={ analysis.error }
-          currentTime={ currentTime }
-          isPlaying={ isPlaying }
-          showChord={ showChordAnalysis }
-          showKey={ showKeyAnalysis }
-          startedAt={ analysis.startedAt }
-          estimateMs={ analysis.estimateMs } />
+      <AnalysisReadout
+        open={ animating }
+        analysis={ analysis.analysis }
+        status={ analysis.status }
+        error={ analysis.error }
+        currentTime={ currentTime }
+        isPlaying={ isPlaying }
+        showChord={ showChordAnalysis }
+        showKey={ showKeyAnalysis }
+        startedAt={ analysis.startedAt }
+        estimateMs={ analysis.estimateMs } />
 
-        {/* A menu of controls, like `.playback-controls` below — same shape so
-            the two read alike and neither is a bare <div>. */}
-        <PlayerActions
-          mode={ activeMode }
-          lyricsOpen={ lyricsOpen }
-          dspOpen={ dspOpen }
-          hasTrack={ Boolean(currentTrack) }
-          onMode={ toggleMode }
-          onLyrics={ toggleLyrics }
-          onDsp={ toggleDsp }
-          onClose={ closeOverlay } />
-
-        {/* The wrapper is what animates: `grid-template-rows` interpolates
-            between `0fr` and `1fr` where `height: auto` cannot, so the blocks
-            above ride up and the transport rides down rather than jumping. */}
-        <div className='dsp-layer' data-open={ showDsp } aria-hidden={ showDsp ? undefined : true }>
-          <DspPanel />
-        </div>
-      </>}
+      {/* A menu of controls, like `.playback-controls` below — same shape so
+          the two read alike and neither is a bare <div>. */}
+      <PlayerActions
+        mode={ playerMode }
+        lyricsOpen={ lyricsOpen }
+        hasTrack={ Boolean(currentTrack) }
+        compact={ compactWindow }
+        onMode={ toggleMode }
+        onLyrics={ toggleLyrics }
+        onResize={ toggleWindowScale }
+        onClose={ closeOverlay } />
 
       <section className='progress-section' aria-label='Playback position'>
         <WaveformProgress
           currentTime={ currentTime }
           duration={ duration }
           bars={ waveformBars }
-          markers={ visibleBeatMarkers(expanded, analysis, showBeatMarkers) }
+          markers={ visibleBeatMarkers(analysis, showBeatMarkers) }
           onSeek={ seek } />
 
         <div className='time-row'>
@@ -461,11 +459,7 @@ export function Player ({ expanded = false }: PlayerProps) {
 
     {/* Outside `.player-content`, because it is a layer over the whole view
         rather than another block in its column — and because the nudge that
-        makes room for it is applied to `.player-content` itself.
-
-        Always mounted, unlike `PlayerActions`: `display` is what animates it
-        in and out, and an unmounted element has nothing to animate. The bar's
-        copy never shows it, since `data-open` can only be set when expanded. */}
+        makes room for it is applied to `.player-content` itself. */}
     <PlayerLyrics
       track={ currentTrack }
       open={ Boolean(showLyrics) }

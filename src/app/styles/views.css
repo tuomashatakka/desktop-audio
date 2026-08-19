@@ -940,3 +940,39 @@ button.track-row { width: 100%; color: inherit; text-align: start; }
   .artwork-field { flex-basis: auto; width: min(200px, 100%); }
   .art-preview { flex-basis: auto; width: min(200px, 100%); }
 }
+
+/* ─── audio processing ─────────────────────────────────────────────────── */
+
+/*
+ * The DSP page, as its own destination.
+ *
+ * It used to be a layer inside the now-playing overlay, sharing a window with
+ * a transport that could not move — which is why every control in it was on a
+ * height ramp and the low bands still ended up behind a hidden scrollbar. Here
+ * it has the whole sheet: nothing is capped, and if a window really is too
+ * short the sheet scrolls, which is at least an answer you can see.
+ */
+.dsp-view {
+  display: grid;
+  gap: var(--sp-6);
+  padding: var(--sp-6);
+
+  > header {
+    display: grid;
+    gap: var(--sp-2);
+
+    h1 {
+      color: var(--text);
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: var(--font-semibold);
+    }
+
+    p {
+      max-width: 60ch;
+      color: var(--text-muted);
+      font-size: var(--text-sm);
+      line-height: 1.6;
+    }
+  }
+}

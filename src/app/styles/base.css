@@ -15,12 +15,31 @@
   :where(ul, ol, menu) { list-style: none; }
   a { color: inherit; text-decoration: none; }
 
+  /*
+   * Every button starts borderless and transparent; `.button` in the
+   * components layer adds the variants back. A `<button>` here that never
+   * reaches for a class is still a real, keyboard-operable control rather than
+   * a platform-grey box in the middle of a dark app.
+   *
+   * `--radius`, not `--control-radius`. The pill belongs to things that look
+   * like buttons; plenty of elements here are `<button>` because they are
+   * *activatable*, not because they are buttons — a folder row, a track row, a
+   * group heading — and a 999px reset turned every one of them into a lozenge
+   * the moment it took a background. `--radius` is `0` in the default theme and
+   * follows `[data-corners='soft']`, so these agree with the app either way.
+   */
   button {
     border: 0;
-    border-radius: var(--control-radius);
+    border-radius: var(--radius);
     background: none;
     color: inherit;
+    font-family: inherit;
     cursor: pointer;
+    transition:
+      color var(--duration-fast) var(--ease),
+      background-color var(--duration-fast) var(--ease);
+
+    &:disabled { cursor: not-allowed; }
   }
 
   textarea { border-radius: var(--control-radius); }
@@ -62,6 +81,17 @@
 
   p { color: var(--text-dim); }
   small { color: var(--text-muted); font-size: var(--text-sm); }
+
+  /* Text-level semantics, styled once rather than per view. */
+  abbr[title] { text-decoration: none; cursor: help; }
+  :is(code, kbd, samp) { font-family: var(--font-mono); font-size: 0.95em; }
+
+  kbd {
+    padding: 0.1em var(--sp-1);
+    border-radius: var(--radius);
+    background: var(--bg-input);
+    color: var(--text-dim);
+  }
   ::selection { color: var(--text); background: var(--accent-muted); }
 
   :focus-visible {

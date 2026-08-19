@@ -17,6 +17,11 @@ vi.mock('../../src/app/components/composite/Player', () => ({
     <div data-testid='player' data-expanded={ expanded ? '' : undefined } />,
 }))
 
+vi.mock('../../src/app/views/DspView', () => ({
+  DspView: () =>
+    <div data-testid='dsp' />,
+}))
+
 vi.mock('../../src/app/views/SettingsView', () => ({
   SettingsView: () =>
     <div data-testid='settings' />,
@@ -28,13 +33,31 @@ vi.mock('../../src/app/views/TagEditorView', () => ({
 }))
 
 describe('OverlayHost', () => {
-  it('mounts nothing while no overlay is open', () => {
+  /*
+   * The player is the exception to "only the active overlay is mounted": it is
+   * one component rendering one DOM in both the bar and the overlay, and it is
+   * CSS that shows or hides it. The sheets stay conditional.
+   */
+  it('mounts no sheet while no overlay is open', () => {
     mocks.ui.overlay = null
     render(<OverlayHost />)
 
-    expect(screen.queryByTestId('player')).toBeNull()
+    expect(screen.queryByTestId('dsp')).toBeNull()
     expect(screen.queryByTestId('settings')).toBeNull()
     expect(screen.queryByTestId('tag-editor')).toBeNull()
+  })
+
+  it('keeps the player mounted whether or not its overlay is open', () => {
+    mocks.ui.overlay = null
+    const view = render(<OverlayHost />)
+
+    expect(screen.getByTestId('player')).toBeInTheDocument()
+    expect(document.querySelector('.player-overlay')).not.toHaveAttribute('open')
+
+    mocks.ui.overlay = 'player'
+    view.rerender(<OverlayHost />)
+
+    expect(screen.getByTestId('player')).toBeInTheDocument()
   })
 
   it('renders the now-playing player expanded, in a full-bleed dialog', () => {
@@ -61,13 +84,24 @@ describe('OverlayHost', () => {
     expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
   })
 
-  it('shows one overlay at a time', () => {
+  it('shows one sheet at a time', () => {
     mocks.ui.overlay = 'settings'
     render(<OverlayHost />)
 
     expect(screen.getByTestId('settings')).toBeInTheDocument()
-    expect(screen.queryByTestId('player')).toBeNull()
+    expect(screen.queryByTestId('dsp')).toBeNull()
     expect(screen.queryByTestId('tag-editor')).toBeNull()
+  })
+
+  // Audio processing is its own destination, not a layer over now playing:
+  // sixteen faders never fitted above a transport that also had to stay put.
+  it('gives audio processing its own sheet', () => {
+    mocks.ui.overlay = 'dsp'
+    render(<OverlayHost />)
+
+    expect(screen.getByTestId('dsp')).toBeInTheDocument()
+    expect(screen.queryByTestId('settings')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
   })
 
   it('closes from its own close button', () => {

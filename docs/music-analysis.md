@@ -65,9 +65,11 @@ row holds either a result or the reason there will never be one.
 
 - the **analysis view** — one of the two now-playing views — is laid out as a
   chord chart for someone playing along. the chord lane leads at the largest
-  type in the app; key, tempo and **meter** are one caption line under the album
-  (`.track-meta`), the meter read off the beat grid's own numbering by
-  `meterOf`; the frequency mesh runs behind all of it as wallpaper at
+  type in the app; `Key`, `Tempo`, `Meter` and `Chord` share one label gutter
+  (`--readout-label-w`) so all four values start on one column, the meter read
+  off the beat grid's own numbering by `meterOf`; the frequency mesh runs behind
+  all of it as a waterfall wallpaper — newest row at the bottom in front, older
+  slices receding upward — at
   `--matrix-wallpaper`, with `.matrix-current` deliberately left at full
   strength. naming the dominant partials over the mesh is `showSpectrumNotes`,
   **off by default** — with it off the `findPeaks` pass does not run at all. see

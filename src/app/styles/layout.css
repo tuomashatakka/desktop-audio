@@ -107,7 +107,7 @@
   .player-view { -webkit-app-region: drag; }
 
   /* Drag regions swallow clicks, so every interactive player area opts out. */
-  :is(.album-art-card, .playback-controls, .progress-section) { -webkit-app-region: no-drag; }
+  :is(.playback-controls, .progress-section, .player-actions) { -webkit-app-region: no-drag; }
 }
 
 /* ─── titlebar ─────────────────────────────────────────────────────────── */
@@ -316,142 +316,6 @@
   details[open] > summary > .icon { transform: rotate(90deg); }
 }
 
-.playlist-list {
-  padding-bottom: var(--sp-2);
-
-  button {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--sp-2);
-    width: 100%;
-    padding: var(--sp-2) var(--sp-3);
-    color: var(--text-dim);
-    font-size: var(--text-sm);
-    text-align: start;
-    transition:
-      color var(--duration-fast) var(--ease),
-      background-color var(--duration-fast) var(--ease);
-
-    &:hover { color: var(--text); background: var(--bg-hover); }
-    &.active { color: var(--accent); background: var(--accent-muted); }
-  }
-
-  .name { flex: 1; }
-  small { font-size: var(--text-xs); }
-  .add-playlist { color: var(--text-muted); }
-}
-
-/*
- * Playlists, filed into folders. Depth is `--level`, written inline by
- * `PlaylistTree`, for the same reason the folder tree does it: no fixed set of
- * classes can express an arbitrarily deep tree.
- *
- * `[data-drop-target]` is the drag affordance shared by every droppable
- * surface in the sidebar — a playlist, a playlist folder, the empty space
- * under the tree, and the folder tree itself.
- */
-.playlist-tree {
-  display: block;
-  min-height: var(--sp-6);
-  padding-bottom: var(--sp-2);
-}
-
-.playlist-level { display: grid; }
-
-.playlist-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--sp-2);
-  width: 100%;
-  padding: var(--sp-2) var(--sp-3);
-  padding-left: calc(var(--sp-3) + var(--level, 0) * var(--sp-3));
-  color: var(--text-dim);
-  font-size: var(--text-sm);
-  text-align: start;
-  transition:
-    color var(--duration-fast) var(--ease),
-    background-color var(--duration-fast) var(--ease);
-
-  &:hover { color: var(--text); background: var(--bg-hover); }
-  &.active { color: var(--accent); background: var(--accent-muted); }
-
-  &.folder {
-    grid-template-columns: auto auto minmax(0, 1fr);
-    color: var(--text-muted);
-
-    > .disclosure { transition: transform var(--duration-fast) var(--ease-emphasis); }
-    > .disclosure.open { transform: rotate(90deg); }
-  }
-
-  .name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  small { color: var(--text-muted); font-size: var(--text-xs); }
-}
-
-:is(.playlist-tree, .playlist-row, .folder-tree)[data-drop-target] {
-  background: var(--accent-muted);
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-/*
- * The folder tree is the WAI-ARIA tree pattern: one tab stop, arrow-key
- * roaming, and a single focusable row at a time. It renders flat — depth is
- * `--level`, written inline by `FolderTree`, because no fixed set of classes
- * can express an arbitrarily deep tree — so the DOM order matches the
- * traversal order the arrow keys walk.
- */
-.folder-tree { display: grid; }
-
-/* The row itself is the treeitem, so it is what focuses and what hovers. */
-.folder-row {
-  display: grid;
-  grid-template-columns: var(--sp-4) minmax(0, 1fr);
-  align-items: center;
-  gap: var(--sp-1);
-  padding-left: calc(var(--sp-2) + var(--level, 0) * var(--sp-3));
-  cursor: pointer;
-  transition: background-color var(--duration-fast) var(--ease);
-
-  &:hover { background: var(--bg-hover); }
-  &:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
-
-  &:hover .folder-name { color: var(--text); }
-
-  &.active {
-    background: var(--accent-muted);
-
-    .folder-name { color: var(--accent); }
-  }
-
-  /*
-   * Decorative: `aria-expanded` lives on the row, so a nested button here
-   * would duplicate the same affordance in the accessibility tree.
-   */
-  .disclosure {
-    display: grid;
-    flex: 0 0 auto;
-    width: var(--sp-4);
-    padding: 0;
-    place-items: center;
-    color: var(--text-muted);
-    font-size: var(--text-xs);
-    line-height: 1;
-    transition: transform var(--duration-fast) var(--ease-emphasis);
-
-    &.open { transform: rotate(90deg); }
-  }
-
-  .folder-name {
-    grid-column: 2;
-    padding: var(--sp-2) var(--sp-1);
-    color: var(--text-dim);
-    font-size: var(--text-sm);
-    text-align: start;
-    transition: color var(--duration-fast) var(--ease);
-  }
-}
-
 /* ─── ambient album-art wash ───────────────────────────────────────────── */
 
 /*
@@ -580,6 +444,11 @@ body::after {
   /*
    * The analysis view is an editorial page, not a denser artwork view.
    *
+   * Scoped to the overlay. Both copies of the player carry `data-mode` — they
+   * are one component rendering one DOM — and the footer bar has no room for
+   * any of this, so the *place* is what selects it, exactly as it does for the
+   * height tiers.
+   *
    * The cover leaves rather than shrinking. A thumbnail reads as "the same
    * screen, smaller"; an empty inline start reads as a different kind of page —
    * which is what this is. What you are looking at here is the *sound*, and the
@@ -590,7 +459,7 @@ body::after {
    *
    * Nothing here is a `display` switch, so both directions still interpolate.
    */
-  &[data-mode='analysis'] {
+  .player-overlay &[data-mode='analysis'] {
     .player-content {
       align-items: flex-start;
 
@@ -648,47 +517,6 @@ body::after {
    * the mesh and the transport all move as one thing.
    */
   &[data-lyrics] .player-content { translate: calc(-1 * var(--lyrics-nudge)) 0; }
-}
-
-.album-art-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  contain: paint;
-  animation: player-background-in var(--duration-slow) var(--ease-emphasis) both;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    filter: blur(var(--art-blur)) brightness(0.2);
-    transform: scale(1.2);
-    transition: filter var(--duration-slow) var(--ease);
-
-    [data-theme='light'] & { filter: blur(var(--art-blur)) brightness(1.1) saturate(1.05); }
-  }
-
-  /*
-   * A contrast floor for the chrome on top. The light theme *brightens* the
-   * cover rather than dimming it, so the backdrop's luminance is the
-   * artwork's: a dark cover left `--text` (#111) on a dark field. The scrim
-   * pushes it back toward the theme's own surface.
-   *
-   * Symmetric because chrome sits at both edges — the mode buttons at the
-   * top, progress and transport at the bottom — while the middle is the
-   * artwork or whichever panel the mode selected.
-   */
-  &::after {
-    position: absolute;
-    inset: 0;
-    content: '';
-    background: linear-gradient(
-      var(--art-scrim-strong),
-      var(--art-scrim-soft) 45%,
-      var(--art-scrim-strong)
-    );
-  }
 }
 
 /*
@@ -762,1118 +590,16 @@ body::after {
   .playback-controls { order: 3; }
 }
 
+/*
+ * The bar's "open now playing" affordance: a button covering its whole surface.
+ *
+ * It is in the DOM of both copies — the player renders one markup — so the
+ * overlay is where it is switched off, rather than the bar being where it is
+ * switched on. Same for `.player-actions` and the lyrics layer, in reverse:
+ * everything is always mounted, and each context hides what it has no room for.
+ */
 .player-promote { display: none; }
 
-/*
- * The artwork is never taken away — it recedes.
- *
- * The analysis view used to `display: none` it, which left the top of the page
- * empty and made the switch read as two different screens rather than one
- * screen looking at itself differently. It moves to the inline start and shrinks
- * to a thumbnail instead: still the fastest way to see what is playing, and now
- * the whole change is two interpolable properties rather than a discrete one.
- */
-.player-art {
-  display: flex;
-  flex: 0 0 auto;
-  align-self: center;
-  opacity: 1;
-  translate: 0 0;
-
-  /* `align-self` is not an interpolable property — the *size* is what carries
-     the change, and `.album-art-card` already transitions its width. */
-  transition:
-    opacity var(--duration) var(--ease-emphasis),
-    translate var(--duration) var(--ease-emphasis);
-
-  @starting-style {
-    opacity: 0;
-    translate: 0 calc(-1 * var(--analysis-rise));
-  }
-}
-
-.album-art-card {
-  display: grid;
-  flex: 0 0 auto;
-  width: var(--art-size);
-  aspect-ratio: 1;
-  overflow: hidden;
-  padding: 0;
-  border-radius: var(--radius-lg);
-  background: var(--bg-raised);
-  box-shadow: var(--shadow-card);
-  place-items: center;
-  appearance: none;
-  transition:
-    width var(--duration) var(--ease-emphasis),
-    box-shadow var(--duration-fast) var(--ease);
-
-  &:disabled { cursor: default; }
-  &:focus-visible { outline: 0; box-shadow: var(--shadow-card), var(--focus-ring); }
-
-  img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
-}
-
-.art-fallback {
-  width: clamp(var(--text-xl), 20cqi, 64px);
-  height: clamp(var(--text-xl), 20cqi, 64px);
-  opacity: 0.35;
-}
-
-/*
- * Centred over the artwork, ragged-left in the analysis view.
- *
- * The two views set the type differently because they are read differently: one
- * is a cover with a caption under it, the other is a page of data whose labels
- * line up down a gutter (see `--readout-label-w`). The title has to agree with
- * whichever it is sitting on.
- */
-.player-info {
-  width: 100%;
-  min-width: 0;
-  line-height: 1.5;
-  text-align: center;
-  text-transform: lowercase;
-
-  /*
-   * The hgroup sets the leading for the whole block, so its children are lines
-   * in one column rather than three separately spaced paragraphs. Unitless, or
-   * the title's own size would fix the leading in px for the two lines under it.
-   */
-  > * { margin: 0; padding: 0; }
-
-  .track-title {
-    overflow: hidden;
-    color: var(--text);
-    font-size: var(--title-size);
-    font-weight: var(--font-semibold);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    transition: font-size var(--duration) var(--ease-emphasis);
-  }
-
-  .track-artist { color: var(--text-dim); font-size: var(--text-sm); }
-  .track-album { color: var(--text-muted); font-size: var(--text-sm); }
-}
-
-.progress-section { width: 100%; }
-.time-row { display: flex; justify-content: space-between; margin-top: var(--sp-2); }
-.time-label { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); }
-
-.playback-controls {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-6);
-  mix-blend-mode: var(--controls-blend);
-  transition: gap var(--duration) var(--ease-emphasis);
-
-  .play-pause-btn {
-    width: var(--play-size);
-    height: var(--play-size);
-    border-radius: 50%;
-    font-size: var(--play-glyph-size);
-    transition:
-      width var(--duration) var(--ease-emphasis),
-      height var(--duration) var(--ease-emphasis),
-      background-color var(--duration-fast) var(--ease),
-      box-shadow var(--duration-fast) var(--ease);
-  }
-
-  /* One step brighter than shuffle/repeat: transport outranks the modes. */
-  :is(.prev, .next) > button {
-    border-color: transparent;
-    color: var(--text-dim);
-    transition:
-      color var(--duration-fast) var(--ease),
-      background-color var(--duration-fast) var(--ease),
-      border-color var(--duration-fast) var(--ease);
-
-    &:hover:not(:disabled) { border-color: var(--border-hover); color: var(--text); }
-  }
-
-  /* Shuffle/repeat read as off until they're on — colour is the whole signal. */
-  .mode > button {
-    position: relative;
-    color: var(--text-muted);
-    font-size: var(--text-lg);
-    transition: color var(--duration-fast) var(--ease);
-
-    &:hover:not(:disabled) { color: var(--text); }
-    &[data-active] { color: var(--accent); }
-  }
-}
-
-.mode-badge {
-  position: absolute;
-  right: var(--sp-0-5);
-  bottom: var(--sp-0-5);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  line-height: 1;
-}
-
-/*
- * Pick what fills the middle, lay the lyrics alongside it, or leave. Only the
- * full-window player has anywhere to put any of it — the footer bar and the
- * mini tiers have no room for a panel or a column of text, so these are hidden
- * there rather than being controls that do nothing.
- */
-.player-actions {
-  display: none;
-
-  .player-overlay & {
-    position: absolute;
-    z-index: var(--z-sticky);
-    top: var(--sp-4);
-    right: var(--sp-4);
-    display: flex;
-    gap: var(--sp-2);
-  }
-
-  :is(.analysis-toggle, .lyrics-toggle, .dsp-toggle, .player-close) {
-    color: var(--text-muted);
-    transition: color var(--duration-fast) var(--ease);
-
-    &:hover:not(:disabled) { color: var(--text); }
-  }
-
-  :is(.analysis-toggle, .lyrics-toggle, .dsp-toggle)[aria-pressed='true'] { color: var(--accent); }
-}
-
-/*
- * The track's resolved harmony, read as type under its own title.
- *
- * A plain block, not a grid: every row inside it is a term and its value on one
- * line, and they line up because they share a label gutter — not because a grid
- * is holding them in columns. That is why `--readout-label-w` lives on this
- * element and every label in here is exactly that wide.
- *
- * Always mounted, shown by `data-open` — `display` is what animates it, so it
- * needs `allow-discrete` on the way out and `@starting-style` on the way in.
- * Same pairing as the lyrics layer and every dialog here.
- */
-.analysis-readout {
-  display: none;
-  width: 100%;
-  min-width: 0;
-  opacity: 0;
-  translate: 0 var(--analysis-rise);
-  transition:
-    opacity var(--duration) var(--ease-exit),
-    translate var(--duration) var(--ease-exit),
-    display var(--duration) allow-discrete;
-
-  &[data-open] {
-    display: block;
-    padding-block: var(--sp-4);
-    opacity: 1;
-    translate: 0 0;
-    transition:
-      opacity var(--duration) var(--ease-emphasis),
-      translate var(--duration) var(--ease-emphasis),
-      display var(--duration) allow-discrete;
-
-    @starting-style {
-      opacity: 0;
-      translate: 0 var(--analysis-rise);
-    }
-  }
-}
-
-/*
- * The chord timeline. Distance from the anchor *is* time until the chord
- * plays: every queued chord sits at its own start (`--at`, in seconds) and
- * `--now` slides underneath it, so an offset resolves to
- * `(start − now) × --chord-pps` — seconds times a length, which is a length.
- * `FrequencyMatrix` and `EqCurve` write through refs for the same reason —
- * one property write, no React render.
- *
- * The sounding chord is pinned in `.chord-now` rather than riding the lane,
- * because "what is playing" is a fixed place on the page you can look at
- * without tracking it. The caption sits beside them both, in the gutter, so the
- * row reads as `Chord | Am | F  C  G` — the same shape as `Key | A minor`.
- */
-.chord-ribbon {
-  /* The largest type in the app, on purpose: this is the one thing on the page
-     someone is reading while their hands are busy, and it has to be legible
-     from further away than a caption ever does. */
-  --chord-size: clamp(var(--text-3xl), 9cqi, var(--text-4xl));
-  --chord-size-next: clamp(var(--text-lg), 3.4cqi, var(--text-2xl));
-  --chord-lane-h: calc(var(--chord-size) * 1.15);
-
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas: 'now queue';
-  align-items: center;
-  gap: var(--sp-6);
-  margin: 0;
-  min-width: 0;
-}
-
-.chord-now {
-  position: relative;
-  grid-area: now;
-  margin: 0;
-  min-width: 4ch;
-
-  /* A rule, not a card. Nothing else on this page is a filled rectangle, and
-     the one job here is to say where "now" is — a single accent edge does that
-     without drawing the only box on screen. */
-  padding-inline-start: var(--sp-4);
-  border-inline-start: 2px solid var(--accent);
-
-  /* The departing chord is taken out of flow so the arriving one alone sizes
-     the anchor — otherwise the box would jump a character wide on every
-     change, and drag the queue beside it along with it. */
-  .chord[data-state='past'] {
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline-start: 0;
-  }
-}
-
-/*
- * The queue is marked, not faded.
- *
- * Upcoming chords used to recede in hairline type at 45% opacity, which said
- * "less important" about the only thing on the page that is about to happen.
- * They are set as marker chips instead — the same swipe the lyrics layer uses,
- * from the same two tokens, so it inverts correctly between themes. Distance
- * already carries how far away each one is; opacity was saying it twice.
- */
-.chord-queue {
-  position: relative;
-  grid-area: queue;
-  height: var(--chord-lane-h);
-  overflow: hidden;
-  margin: 0;
-  min-width: 0;
-  padding: 0;
-  list-style: none;
-
-  /* Chords arrive out of the far edge rather than appearing at it. The `#000`
-     is a mask alpha channel, not a colour, so it stays literal. */
-  mask-image: linear-gradient(to right, #000 62%, transparent);
-
-  .chord {
-    position: absolute;
-    inset-block-start: 50%;
-    inset-inline-start: calc((var(--at) - var(--now, 0)) * var(--chord-pps));
-    padding: var(--sp-1);
-
-    /* On the app's own ramp rather than the lyrics marker's. Two layers with
-       different jobs should not share a swatch — and now that `--accent` is
-       sampled from the sleeve, a chord tinted by it says *this record*, where
-       a borrowed white chip said nothing at all. */
-    background: color-mix(in oklab, var(--accent) 13%, transparent);
-    color: color-mix(in oklab, var(--text) 74%, var(--accent));
-    font-size: var(--chord-size-next);
-    font-weight: var(--font-medium);
-    letter-spacing: -0.04em;
-    translate: 0 -50%;
-
-    /* A tick down to the lane's baseline, so the row reads as a timeline that
-       the chords are standing on rather than as words floating past. */
-    &::before {
-      position: absolute;
-      inset-block-start: 100%;
-      inset-inline-start: 0;
-      width: 1px;
-      height: calc(var(--chord-lane-h) / 2 - 0.5lh);
-      background: linear-gradient(var(--border), transparent);
-      content: '';
-    }
-  }
-}
-
-.chord {
-  display: block;
-  font-family: var(--font-display);
-  font-weight: var(--font-semibold);
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.chord-now .chord {
-  font-size: var(--chord-size);
-
-  &[data-state='current'] {
-    color: var(--accent);
-    animation: chord-flash var(--duration-slow) var(--ease-emphasis);
-  }
-
-  &[data-state='past'] {
-    color: var(--text-dim);
-    animation: chord-depart var(--duration-slow) var(--ease-exit) both;
-  }
-}
-
-/*
- * Both keyframes run because their element is newly *mounted* — React keys the
- * two slots by `chord.start` — so neither needs a timer to clean up after it.
- * `both` on the departure is what keeps the outgoing chord gone once it has
- * gone, until the next change unmounts it.
- */
-@keyframes chord-flash {
-  0% { scale: 1.14; color: var(--text); text-shadow: 0 0 var(--sp-6) var(--accent); }
-  100% { scale: 1; color: var(--accent); text-shadow: 0 0 0 transparent; }
-}
-
-@keyframes chord-depart {
-  0% { opacity: 0.55; translate: 0 0; }
-  100% { opacity: 0; translate: calc(-1 * var(--sp-8)) 0; }
-}
-
-/*
- * The mesh is a block in the column, and it is the one that takes the slack.
- *
- * It used to be absolutely positioned across the page, inset 30% top and bottom
- * and 33% from the left, painting over its siblings — which is why the type
- * column had to be held 20vw inside the window, why this needed
- * `pointer-events: none` to stop swallowing clicks in the right two thirds of
- * it, and why the transport needed a `z-index` to climb back in front. All
- * three were undoing the same decision. In flow it needs none of them: it grows
- * into whatever the type and the transport have not claimed, and shrinks when
- * the DSP layer opens underneath the title, which is what keeps that page on
- * screen without a scrollbar.
- *
- * `position: relative` is only an anchor for the `<svg>`. A flex item's height
- * is resolved by the flex pass, so an in-flow child asking for `height: 100%`
- * of an `auto`-height parent gets `auto` and collapses; taking the svg out of
- * flow against this box is what lets it fill the resolved one.
- *
- * There is deliberately no `filter` here. Blurring the element would defocus
- * the whole thing evenly, labels included; the blur that matters is per-row
- * and lives in the SVG, where distance can drive it — see `matrix-dof` in
- * `FrequencyMatrix`.
- */
-.frequency-matrix {
-  position: relative;
-
-  /* Collapsed while the artwork view is showing: it must not reserve the
-     middle of a page it is not on, or the album art floats at the top of a
-     window with a hole under it. */
-  flex: 0 1 auto;
-  width: 100%;
-  height: 0;
-  min-height: 0;
-  color: var(--accent);
-  pointer-events: none;
-
-  /* `preserveAspectRatio='xMidYMid meet'` does the fitting and the centring,
-     so this only has to hand it the box.
-
-     The blend belongs to the *wireframe*, not to the element: it used to sit
-     on the section, which put the peak labels inside the blending group too
-     and burnt readable type down into the background along with the mesh. */
-  > svg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-    mix-blend-mode: var(--matrix-blend);
-  }
-
-  /*
-   * The wireframe is wallpaper.
-   *
-   * `--matrix-wallpaper` is applied to the history and the time lines, not to
-   * the section — dimming the element would take `.matrix-current` down with
-   * it, and that row is the one part of this that still has to read as live.
-   * A page about chords cannot have its loudest element be the decoration.
-   */
-  .matrix-line-x {
-    fill: none;
-    stroke: url('#matrix-age');
-    stroke-width: 1.6;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    opacity: var(--matrix-wallpaper);
-  }
-
-  /* The time lines only tie the slices together, so they sit further back. */
-  .matrix-line-z {
-    fill: none;
-    stroke: currentcolor;
-    stroke-width: 1;
-    opacity: calc(0.14 * var(--matrix-wallpaper));
-  }
-
-  /*
-   * The newest row, painted last and therefore in front of every older one —
-   * and drawn like the EQ's own curve, because it is the same reading: a flat
-   * accent stroke over a filled ground. It is deliberately outside the
-   * `<use>` pair, so neither the depth mask nor the blur reaches it.
-   */
-  .matrix-current {
-    fill: color-mix(in srgb, var(--accent) 20%, transparent);
-    stroke: var(--accent);
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    vector-effect: non-scaling-stroke;
-  }
-
-  /* It arrives and leaves with the readout rather than popping. Taking the
-     space is what pushes the type up and the transport down, so the two views
-     are one gesture: the mesh opens, and everything else is moved by it. */
-  opacity: 0;
-  transition: opacity var(--duration) var(--ease-exit);
-
-  &[data-open] {
-    flex: 1 1 auto;
-    height: auto;
-    opacity: 1;
-    transition: opacity var(--duration-slow) var(--ease-emphasis);
-  }
-}
-
-/*
- * Whatever the readout has instead of a result: the progress of an analysis,
- * the reason there will not be one, or a note that none is available.
- *
- * It does not borrow `.status-message` any more. That class is the library's
- * full-view empty state — `margin: auto`, `padding: var(--sp-12)`, centred —
- * which is the opposite of a line of text in a left-aligned gutter layout, and
- * every one of its rules had to be fought here.
- */
-.analysis-status {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  margin: 0;
-  min-height: 2.5rem;
-  padding: 0;
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  text-align: start;
-}
-
-/*
- * A native `<progress>` is two controls in one: with a value it is a bar, and
- * without one the platform draws its own indeterminate sweep. Both states are
- * wanted here — the estimate is learned from previous analyses, and the first
- * one of a session has nothing to go on — so neither is reimplemented.
- */
-.analysis-progress {
-  width: min(100%, 28ch);
-  height: var(--sp-1);
-  appearance: none;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: var(--border);
-
-  &::-webkit-progress-bar {
-    border-radius: var(--radius-full);
-    background: var(--border);
-  }
-
-  &::-webkit-progress-value {
-    border-radius: var(--radius-full);
-    background: var(--accent);
-    transition: inline-size var(--duration) var(--ease);
-  }
-
-  /* No value: the platform has nothing to fill, so the bar animates itself. */
-  &:not([value]) {
-    background: linear-gradient(
-      90deg,
-      var(--border) 0%,
-      var(--accent) 50%,
-      var(--border) 100%
-    );
-    background-size: 300% 100%;
-    animation: analysis-sweep 1.4s var(--ease) infinite;
-  }
-}
-
-@keyframes analysis-sweep {
-  from { background-position: 150% 0; }
-  to { background-position: -150% 0; }
-}
-
-/*
- * `B minor · 87.5 bpm · 4/4`.
- *
- * A caption under the album line, not a table: three facts you read once and
- * stop looking at, set on one baseline in the same mono the times use. The
- * terms are `.sr-only`, so the gutter that used to right-align `Key` and
- * `Tempo` against their values is gone with them — it existed to line up a
- * column that is now a sentence.
- *
- * The separator is generated between items rather than written into the
- * markup, so a missing meter takes its dot with it.
- */
-.track-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--sp-2);
-  margin: 0;
-
-  > div { display: flex; align-items: baseline; min-width: 0; }
-
-  > div + div::before {
-    margin-inline-end: var(--sp-2);
-    color: var(--text-muted);
-    content: '·';
-  }
-
-  dd {
-    margin: 0;
-    overflow: hidden;
-    color: var(--text-dim);
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    font-weight: var(--font-medium);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
-.matrix-peaks {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-/*
- * A peak is a label on the mesh, not a chip over it — a plate here would only
- * be one more rectangle over an image that is already a wireframe.
- *
- * One row across the top, at a fixed `top`: only the horizontal position is
- * data. Labels used to be pinned to the ridge they named, which put them at
- * whatever height the audio happened to be — and vertical position in this
- * component already means age. `spreadLabels` nudges collisions sideways
- * instead, so the row stays a row.
- *
- * `--peak-fade` is written per label from how long ago it was last heard; the
- * transition smooths the six-per-second steps it arrives in.
- */
-.matrix-peak {
-  position: absolute;
-  inset-block-start: 0;
-  display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
-  opacity: var(--peak-fade, 1);
-  text-align: start;
-  text-transform: lowercase;
-  white-space: nowrap;
-  translate: -50% 0;
-  transition:
-    left var(--duration) var(--ease),
-    opacity var(--duration) var(--ease);
-
-  dt {
-    color: var(--accent);
-    font-size: var(--text-sm);
-    font-weight: var(--font-semibold);
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-  }
-
-  dd {
-    margin: 0;
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-  }
-}
-
-/*
- * The lyrics layer.
- *
- * It hangs off the trailing edge of the player rather than taking a place in
- * the column, and `.player-content` is nudged the other way to meet it — the
- * two moves are one gesture, which is the whole reason lyrics stopped being a
- * mode. Set ragged-left against that edge.
- *
- * Marked rather than boxed: `display: inline` on the `<pre>` makes the
- * highlighter swipe follow the text's own line boxes instead of painting one
- * rectangle behind the block, and `box-decoration-break: clone` is what gives
- * every wrapped line its own padding rather than only the first and the last.
- *
- * Always mounted, shown by `data-open` — `display` transitions with
- * `allow-discrete` and `@starting-style` supplies the pre-open frame, so it
- * leaves the same way it arrives. Same pairing as `Overlay`.
- */
-.player-lyrics {
-  --lyrics-fade: var(--sp-12);
-
-  position: absolute;
-  z-index: var(--z-sticky);
-  right: var(--lyrics-inset-inline);
-  bottom: var(--lyrics-inset-block);
-  display: none;
-  width: min(40ch, 34vw);
-  max-height: 62vh;
-  overflow: auto;
-  font-size: var(--text-sm);
-  text-align: right;
-  opacity: 0;
-  translate: var(--shift-md) 0;
-
-  /*
-   * The blend belongs to the layer, not to the `<pre>` inside it. `z-index`
-   * makes this element a stacking context, which is also a blending isolation
-   * group — so a `mix-blend-mode` on a descendant would composite against this
-   * element's own (empty) backdrop and do nothing at all. Up here it meets the
-   * artwork and the type it is laid over, which is the point. Transparent
-   * pixels are unaffected either way, so only the marker itself blends.
-   */
-  mix-blend-mode: var(--lyrics-blend);
-
-  /* Playback drives the scroll position, so the scrollbar would describe a
-     control the reader does not have — until they take over, at which point
-     the fades are the affordance. */
-  scrollbar-width: none;
-
-  /*
-   * Reading position follows playback (`useLyricsScroll`), so both ends have
-   * to dissolve rather than stop at a cut: there is no scrollbar and no
-   * container edge to explain a hard boundary.
-   */
-  mask-image: linear-gradient(
-    transparent,
-    #000 var(--lyrics-fade),
-    #000 calc(100% - var(--lyrics-fade)),
-    transparent
-  );
-  transition:
-    opacity var(--duration) var(--ease-exit),
-    translate var(--duration) var(--ease-exit),
-    display var(--duration) allow-discrete;
-
-  &::-webkit-scrollbar { display: none; }
-
-  &[data-open] {
-    display: block;
-    opacity: 1;
-    translate: 0 0;
-    transition:
-      opacity var(--duration) var(--ease-emphasis),
-      translate var(--duration) var(--ease-emphasis),
-      display var(--duration) allow-discrete;
-
-    @starting-style {
-      opacity: 0;
-      translate: var(--shift-md) 0;
-    }
-  }
-
-  pre {
-    display:              inline;
-    white-space:          pre-line;
-    box-decoration-break: clone;
-    font-family:          inherit;
-    font-size:            inherit;
-    font-weight:          var(--weight-normal);
-    background:           var(--lyrics-marker);
-    color:                var(--lyrics-ink);
-    padding:              0.15em var(--sp-1);
-    line-height:          1.76;
-    letter-spacing:      -0.01em;
-  }
-}
-
-/* ─── DSP panel ────────────────────────────────────────────────────────── */
-
-/*
- * Lives here rather than in views.css because it is part of the player's tier
- * system, alongside `.player-art` and `.progress-section` above.
- *
- * It shrinks rather than scrolls. It used to be `max-height: 52cqh` with
- * `overflow-y: auto` and the scrollbar hidden, which meant a short window put
- * the low bands somewhere you could not see *or* know about — the same failure
- * the sidebar had. Every dimension in here is now a ramp against the
- * container's height, so the whole chain stays on one page down to the width
- * where the page stops being offered at all.
- *
- * Flat for the same reason. Every module used to be a raised card with its own
- * border and radius, which read as a settings dialog dropped into a screen
- * that has no other boxes on it: the panels beside it are bare type over the
- * cover. A hairline between modules separates them just as well.
- */
-/*
- * The wrapper is what animates.
- *
- * `height: auto` and `display` cannot interpolate, but `grid-template-rows`
- * between `0fr` and `1fr` can — so the blocks above this ride *up* and the
- * progress bar and transport ride *down*, instead of the page jumping around
- * a panel that appeared. That travel is the whole gesture: nothing on screen
- * is lost, it just makes room.
- */
-.dsp-layer {
-  display: grid;
-  grid-template-rows: 0fr;
-
-  /* It hangs under the track's own data at the inline edge rather than in a
-     centred sheet across the window: `.player-info` above it is the block it
-     belongs to. */
-  align-self: start;
-  width: min(100%, 52ch);
-
-  /* `0 1 auto`, not `1 …`: the layer is exactly as tall as the row it is
-     animating, and the *mesh* is what gives up the space it takes. Growing
-     both would make the two of them argue over the middle of the page. */
-  flex: 0 1 auto;
-  min-height: 0;
-
-  /*
-   * A `0fr` row collapses the panel's *height* and nothing else, so the inset
-   * that keeps the EQ's focus ring off the clip edge has to live out here. As
-   * padding on the panel it floored the closed track at its own eight pixels —
-   * `box-sizing: border-box` has no way to compress padding — and left the
-   * artwork view with a strip of nothing sitting under the title.
-   */
-  overflow: hidden;
-  padding: 0;
-  transition:
-    grid-template-rows var(--duration) var(--ease-exit),
-    padding var(--duration) var(--ease-exit);
-
-  &[data-open] {
-    grid-template-rows: 1fr;
-    padding: var(--sp-1);
-    transition:
-      grid-template-rows var(--duration) var(--ease-emphasis),
-      padding var(--duration) var(--ease-emphasis);
-  }
-}
-
-.dsp-panel {
-  /*
-   * One ramp, read by everything in the panel.
-   *
-   * `cqh` is the now-playing container's height, so these shrink with the
-   * window the way `--art-size` and `--play-size` already do — no breakpoints,
-   * and no step where the panel is suddenly a size smaller. The floors are
-   * where each control stops being operable, not where it stops being pretty.
-   */
-  --dsp-knob-size: clamp(30px, 7cqh, 52px);
-  --dsp-module-gap: clamp(var(--sp-2), 1.6cqh, var(--sp-3));
-  --dsp-module-pad: clamp(var(--sp-2), 1.8cqh, var(--sp-4));
-  --dsp-knob-gap: clamp(var(--sp-3), 2.4cqh, var(--sp-6));
-
-  display: grid;
-  gap: var(--dsp-module-gap);
-  width: 100%;
-  min-height: 0;
-}
-
-/*
- * The equaliser: one line over the chain's own output.
- *
- * `preserveAspectRatio: none` lets the box be any shape the column gives it,
- * which is why every stroke below is `non-scaling-stroke` — otherwise the
- * horizontal squash would thin the curve and fatten the grid.
- */
-.eq-curve {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1000 / 260;
-
-  /* The panel's largest block, and the one with the most to give: the curve
-     stays readable squashed, where a knob below 30px does not. */
-  max-height: clamp(64px, 16cqh, 220px);
-  border-bottom: 1px solid var(--border);
-  cursor: crosshair;
-
-  /* Drawing on the curve is a drag; the panel must not scroll out from under it. */
-  touch-action: none;
-
-  > svg { display: block; width: 100%; height: 100%; }
-
-  /* The sliders are clipped, so the curve has to carry their focus ring. */
-  &:has(input:focus-visible) { box-shadow: var(--focus-ring); }
-
-  &[data-off] { opacity: 0.4; cursor: default; }
-}
-
-/* What the chain is putting out right now — filled, so it reads as ground. */
-.eq-spectrum {
-  fill: color-mix(in srgb, var(--accent) 20%, transparent);
-  stroke: none;
-}
-
-.eq-line {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-}
-
-/* Unity, and the decade marks. Both are reference, not data. */
-.eq-zero,
-.eq-grid {
-  stroke: var(--border);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-.eq-grid { opacity: 0.6; }
-
-/*
- * The band ruler, and the sixteen real controls inside it.
- *
- * The whole list used to be clipped, which hid the band frequencies along with
- * the sliders — so the curve was a picture with three unlabelled decade lines
- * on it. The clipping moved down to the `input`s, the only part that has to be
- * invisible: they keep their place in the tab order and their names in the
- * accessibility tree, and the curve redraws as they move.
- *
- * Each item sits at its own band centre on the same log axis the curve uses
- * (`--at`, computed once in `EqCurve`), so a name lines up with the bump it
- * belongs to.
- */
-.eq-bands {
-  position: absolute;
-  inset: auto 0 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  opacity: 0;
-
-  /* The ruler is a readout, never a target — the curve underneath is what the
-     pointer is talking to. */
-  pointer-events: none;
-  transition: opacity var(--duration-fast) var(--ease);
-
-  .eq-curve:is(:hover, :focus-within) & { opacity: 1; }
-
-  /* The focused band stays legible with the pointer away: it is the band the
-     next drag, arrow key or right-click acts on, so it has to be readable
-     while you decide. Its siblings are still only up on hover. */
-  &:has(> li[data-focus]) { opacity: 1; }
-
-  &:not(:hover) > li:not([data-focus]) { opacity: 0; }
-
-  > li {
-    position: absolute;
-    inset-block-end: var(--sp-1);
-    inset-inline-start: calc(var(--at) * 100%);
-    translate: -50% 0;
-
-    /* Sixteen names across a column this narrow touch, so every other one
-       takes a second row. Staggering beats dropping half of them: the ruler is
-       only up while the pointer is on the curve. */
-    &:nth-child(even) { inset-block-end: calc(var(--sp-1) + 1.3em); }
-  }
-
-  input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-}
-
-.eq-band-hz {
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  white-space: nowrap;
-  transition: color var(--duration-fast) var(--ease);
-}
-
-/* Only the band under the pointer, or the one being worked on, says what it
-   is set to. */
-.eq-band-gain { display: none; }
-
-.eq-bands > li:is([data-hover], [data-focus]) {
-  .eq-band-hz { color: var(--accent); }
-
-  .eq-band-gain {
-    display: block;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-    white-space: nowrap;
-  }
-}
-
-/* Marked, not just tinted: `data-focus` is a selection that persists, where
-   `data-hover` is a pointer passing through. */
-.eq-bands > li[data-focus] .eq-band-hz {
-  color: var(--accent);
-  font-weight: var(--font-semibold);
-}
-
-.dsp-module {
-  display: grid;
-  gap: var(--dsp-module-gap);
-  padding: var(--dsp-module-pad) 0;
-  border: 0;
-  border-top: 1px solid var(--border);
-  background: none;
-
-  &:first-of-type { border-top: 0; padding-top: 0; }
-}
-
-.dsp-module-header {
-  display: flex;
-  gap: var(--sp-3);
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0;
-
-  /* A `<legend>` is a float in disguise; laying it out as flex needs this. */
-  float: none;
-}
-
-/*
- * The module's name and its bypass in one control. Set in the panel's label
- * voice — the same size, weight and tracking as the `dt`s in the harmony
- * summary — and muted until it is switched on, the way shuffle and repeat read
- * in the transport.
- */
-.dsp-switch {
-  display: flex;
-  gap: var(--sp-2);
-  align-items: center;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: color var(--duration-fast) var(--ease);
-
-  /*
-   * A real checkbox, painted as a switch. Not `display: none` — it stays a
-   * focusable, keyboard-operable control, the same rule `SegmentedControl`'s
-   * radios follow.
-   */
-  input {
-    width: var(--sp-8);
-    height: var(--sp-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-full);
-    appearance: none;
-    background: var(--bg-input);
-    cursor: pointer;
-    transition:
-      background var(--duration-fast) var(--ease),
-      border-color var(--duration-fast) var(--ease);
-  }
-
-  input::after {
-    display: block;
-    width: var(--sp-3);
-    height: var(--sp-3);
-    margin: 1px;
-    border-radius: 50%;
-    background: var(--text-muted);
-    content: '';
-    transition:
-      translate var(--duration-fast) var(--ease-emphasis),
-      background var(--duration-fast) var(--ease);
-  }
-
-  input:checked {
-    border-color: var(--accent);
-    background: var(--accent-muted);
-  }
-
-  input:checked::after {
-    translate: var(--sp-4) 0;
-    background: var(--accent);
-  }
-
-  input:focus-visible { box-shadow: var(--focus-ring); }
-  &:has(input:checked) { color: var(--accent); }
-}
-
-.dsp-meter {
-  width: var(--sp-12);
-  height: var(--sp-1);
-  appearance: none;
-  background: var(--bg-input);
-
-  /* Chromium paints `<meter>` through these two, and neither inherits. */
-  &::-webkit-meter-bar {
-    border: 0;
-    background: var(--bg-input);
-  }
-
-  &::-webkit-meter-optimum-value { background: var(--accent); }
-}
-
-.dsp-note {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  text-align: start;
-  text-transform: lowercase;
-}
-
-.dsp-knobs {
-  display: flex;
-  gap: var(--dsp-knob-gap);
-  flex-wrap: wrap;
-  justify-content: flex-start;
-}
-
-/*
- * The DSP page needs a column wide enough for a readable curve and six knobs.
- * Below this it is not offered at all — the button goes with the panel, rather
- * than leaving a control that opens an empty space — and the mode falls back to
- * the ordinary artwork layout until there is room again.
- */
-/*
- * The DSP layer takes the artwork's space — it is the one block wide enough to
- * need it — but keeps the progress bar and the transport, because a DSP page
- * you have to close to hear what you just changed is not a DSP page.
- *
- * Everything else shrinks by a step so the whole column still fits: the
- * transport rides down into a smaller box rather than off the bottom edge.
- */
-/*
- * With the page open, everything else gives up a step so it fits: the artwork
- * drops to a thumbnail, the transport to a smaller button, the page to less
- * margin — and the mesh, which is the flexible one, absorbs the rest. Nothing
- * is hidden. It used to `display: none` the artwork here, which is the same
- * mistake the analysis view used to make.
- */
-@container player (min-width: 481px) {
-  .player-view[data-dsp] {
-    .player-art { --art-size: clamp(48px, 9cqh, 80px); align-self: flex-start; }
-
-    .player-content {
-      --content-pad-block: clamp(var(--sp-4), 4vmin, 3rem);
-      --content-gap: var(--sp-3);
-      --play-size: 44px;
-      --play-glyph-size: var(--text-xl);
-    }
-
-    .playback-controls { gap: var(--sp-4); }
-  }
-}
-
-/*
- * Below this the page is not offered at all, rather than opening onto an empty
- * space — so the toggle goes with it. It used to cut off at 720px, which was
- * the width the *fixed-size* panel needed; with every control on a ramp there
- * is a usable chain well below that. Nothing in JS knows about this; widening
- * the window brings both back with the layer still open.
- */
-@container player (max-width: 480px) {
-  :is(.dsp-toggle, .dsp-layer) { display: none; }
-}
 
 /*
  * A narrow now-playing window has no room for a card beside the type, so the
@@ -1929,90 +655,6 @@ body::after {
   }
 }
 
-/* ─── waveform ─────────────────────────────────────────────────────────── */
-
-.waveform-progress {
-  position: relative;
-  width: 100%;
-  min-width: 60px;
-  height: 52px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: height var(--duration) var(--ease-emphasis);
-
-  /* A pointer click focuses the invisible range input too. Only keyboard focus
-     should paint the focus ring around its visible waveform proxy. */
-  &:has(:focus-visible) { box-shadow: var(--focus-ring); }
-  &.compact { height: 28px; }
-
-  &:not([data-loaded]) .waveform-shape { visibility: hidden; }
-  &[data-loaded] .waveform-shape { animation: waveform-rise var(--duration-slow) var(--ease-emphasis) both; }
-  &[data-loaded] .waveform-line { display: none; }
-
-  &.compact .waveform-svg {
-    inset-block: var(--sp-1);
-    height: calc(100% - 2 * var(--sp-1));
-  }
-}
-
-.waveform-svg {
-  position: absolute;
-  inset: calc(var(--sp-1) + var(--sp-0-5)) 0;
-  width: 100%;
-  height: calc(100% - 2 * (var(--sp-1) + var(--sp-0-5)));
-}
-
-/* Closed amplitude paths use fill only. A stroke is measured in user units,
-   and this viewBox is one unit tall, so it scales into a full-height band. */
-.waveform-shape.waveform-unplayed { fill: var(--wf-unplayed); }
-.waveform-shape.waveform-played { fill: var(--wf-played); }
-
-.waveform-shape {
-  fill-rule: nonzero;
-  stroke: none;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-/* Hairline fallbacks have no fill; their stroke stays pinned to device pixels. */
-.waveform-beats {
-  fill: none;
-  stroke: color-mix(in srgb, var(--text) 40%, transparent);
-  stroke-width: 1px;
-  vector-effect: non-scaling-stroke;
-}
-
-.waveform-downbeats {
-  stroke: var(--accent);
-  stroke-width: 1.5px;
-}
-
-.waveform-line.waveform-unplayed { stroke: var(--wf-unplayed); }
-.waveform-line.waveform-played { stroke: var(--wf-played); }
-.waveform-line { display: block; vector-effect: non-scaling-stroke; stroke-width: 1px; }
-
-.waveform-input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-
-  &:disabled { cursor: default; }
-}
-
-@keyframes waveform-rise {
-  from { transform: scaleY(0.02); }
-  to { transform: scaleY(1); }
-}
-
-@keyframes player-background-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
 /* ─── player width tiers ───────────────────────────────────────────────── */
 
 /*
@@ -2059,6 +701,35 @@ body::after {
   .time-row { margin-top: var(--sp-1); }
 }
 
+/*
+ * What the shell's copy of the player does with the panels it cannot show.
+ *
+ * `Player` renders one markup — the mesh, the readout, the lyrics and the
+ * action menu are in the DOM of the footer bar too. `.player-content` in every
+ * height tier is a **grid with named areas**, and an element that is merely
+ * *collapsed* is still a grid item: it auto-places into an implicit row and
+ * adds the grid's `gap` to it. That is what pushed the transport out of a 72px
+ * bar. Collapsed is not enough here; they have to be out of layout entirely.
+ */
+.app-shell :is(.frequency-matrix, .analysis-readout, .player-lyrics) { display: none; }
+
+/*
+ * …except the action menu, which keeps exactly one button.
+ *
+ * `useWindowScale` is the only thing in the app that can resize the window,
+ * and below the `normal` tier nothing else is on screen — `.player-promote` is
+ * `normal`-only, so a small window with no size button is a room with no door.
+ * The other three actions have nowhere to go here and are dropped.
+ */
+.app-shell .player-actions {
+  display: flex;
+  grid-area: size;
+  align-self: center;
+  justify-self: end;
+
+  > li:not(.size) { display: none; }
+}
+
 /* ─── compact + mini tiers ─────────────────────────────────────────────── */
 
 /* Compact: art left, then title; controls and progress share the second row. */
@@ -2095,8 +766,8 @@ body::after {
     --play-size: 36px;
     --play-glyph-size: var(--text-lg);
     --title-size: var(--text-sm);
-    grid-template-columns: auto auto 1fr;
-    grid-template-areas: 'art info info' 'art controls progress';
+    grid-template-columns: auto auto 1fr auto;
+    grid-template-areas: 'art info info size' 'art controls progress size';
   }
 
   .player-info .track-title { margin-bottom: var(--sp-1); }
@@ -2116,8 +787,8 @@ body::after {
   .app-shell[data-height-tier='compact'] {
     .player-content {
       --art-size: clamp(32px, 42cqh, 56px);
-      grid-template-columns: auto minmax(0, 1fr);
-      grid-template-areas: 'art info' 'art progress' 'art controls';
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas: 'art info size' 'art progress size' 'art controls size';
     }
 
     .playback-controls { justify-content: center; }
@@ -2133,8 +804,8 @@ body::after {
   .player-content {
     --art-size: clamp(32px, 70cqh, 72px);
     --title-size: var(--text-sm);
-    grid-template-columns: auto 1fr auto;
-    grid-template-areas: 'art info controls';
+    grid-template-columns: auto 1fr auto auto;
+    grid-template-areas: 'art info controls size';
     align-items: center;
     padding-bottom: var(--sp-3);
   }
@@ -2176,8 +847,8 @@ body::after {
 
     .player-content {
       --art-size: clamp(24px, 55cqh, 36px);
-      grid-template-columns: auto minmax(0, 1fr);
-      grid-template-areas: 'art info';
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas: 'art info size';
     }
   }
 }
@@ -2222,8 +893,8 @@ body::after {
     --title-size: var(--text-sm);
     z-index: var(--z-player);
     display: grid;
-    grid-template-columns: var(--titlebar-h) minmax(100px, 1fr) auto minmax(140px, 3fr);
-    grid-template-areas: 'art info controls progress';
+    grid-template-columns: var(--titlebar-h) minmax(100px, 1fr) auto minmax(140px, 3fr) auto;
+    grid-template-areas: 'art info controls progress size';
     align-items: center;
     justify-content: initial;
     gap: var(--sp-4);
@@ -2234,7 +905,7 @@ body::after {
   /* Modes don't earn their width in a 72px bar; they live in the full player. */
   .playback-controls .mode { display: none; }
 
-  :is(.player-art, .progress-section, .playback-controls) { pointer-events: auto; }
+  :is(.player-art, .progress-section, .playback-controls, .player-actions) { pointer-events: auto; }
   .player-art { grid-area: art; }
   .album-art-card { box-shadow: none; }
   .art-fallback { width: var(--text-xl); height: var(--text-xl); }
@@ -2269,7 +940,7 @@ body::after {
 @container player (max-width: 520px) {
   .app-shell[data-height-tier='normal'] {
     .player-content {
-      grid-template-columns: var(--titlebar-h) minmax(80px, 1fr) auto minmax(60px, 1fr);
+      grid-template-columns: var(--titlebar-h) minmax(80px, 1fr) auto minmax(60px, 1fr) auto;
       gap: var(--sp-2);
     }
 
@@ -2290,9 +961,9 @@ body::after {
     .player-content {
       --art-size: clamp(24px, 40cqh, 32px);
 
-      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-columns: auto minmax(0, 1fr) auto auto;
       grid-template-rows: auto 20px;
-      grid-template-areas: 'art info controls' 'progress progress progress';
+      grid-template-areas: 'art info controls size' 'progress progress progress progress';
       gap: 0 var(--sp-2);
     }
 

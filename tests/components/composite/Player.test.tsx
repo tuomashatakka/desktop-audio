@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import { Player } from '../../../src/app/components/composite/Player'
@@ -71,16 +71,15 @@ const settings = {
  * panel imports from the same barrel stay real, so this mock does not have to
  * grow a stub every time one is added.
  *
- * `useUI` has to be *stateful*: `playerMode`, `lyricsOpen` and `dspOpen` moved
- * out of `Player` and into `UIContext`, so a frozen object would leave every
- * button up there a no-op.
+ * `useUI` has to be *stateful*: `playerMode` and `lyricsOpen` moved out of
+ * `Player` and into `UIContext`, so a frozen object would leave every button up
+ * there a no-op.
  */
 vi.mock('../../../src/app/contexts', async importOriginal => ({
   ...await importOriginal<typeof import('../../../src/app/contexts')>(),
   useUI: () => {
     const [ playerMode, setPlayerMode ] = useState<PlayerMode>('default')
     const [ lyricsOpen, setLyricsOpen ] = useState(false)
-    const [ dspOpen, setDspOpen ]       = useState(false)
 
     return {
       openOverlay,
@@ -90,11 +89,6 @@ vi.mock('../../../src/app/contexts', async importOriginal => ({
       lyricsOpen,
       toggleLyrics: () =>
         setLyricsOpen(open =>
-          !open),
-      dspOpen,
-      setDspOpen,
-      toggleDsp: () =>
-        setDspOpen(open =>
           !open),
     }
   },
@@ -106,6 +100,7 @@ vi.mock('../../../src/app/hooks', () => ({
   useTrackAnalysis: () => analysisState,
   useWindowScale:   () => toggleWindowScale,
   useLyricsScroll:  () => ({ current: null }),
+  useHeightTier:    () => 'normal',
 }))
 
 vi.mock('../../../src/app/components/atomic/WaveformProgress', () => ({
@@ -139,10 +134,12 @@ describe('Player', () => {
     expect(container.querySelectorAll('.player-view')).toHaveLength(1)
   })
 
-  it('drops the promote button in the overlay, where it would be redundant', () => {
+  // It is CSS that hides it in the overlay, not a branch here — see the
+  // one-DOM test at the bottom of this file.
+  it('keeps the promote button in the tree in both copies', () => {
     render(<Player expanded />)
 
-    expect(screen.queryByRole('button', { name: 'Open now playing' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Open now playing' })).toBeInTheDocument()
   })
 
   it('names transport controls from their actions', () => {
@@ -158,15 +155,11 @@ describe('Player', () => {
     expect(screen.queryByRole('button', { name: 'Mute' })).not.toBeInTheDocument()
   })
 
-  it('has a close button in the overlay, and none in the bar', () => {
-    const { unmount } = render(<Player expanded />)
+  it('closes the overlay from its own close button', () => {
+    render(<Player expanded />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Close player' }))
     expect(closeOverlay).toHaveBeenCalled()
-    unmount()
-
-    render(<Player />)
-    expect(screen.queryByRole('button', { name: 'Close player' })).toBeNull()
   })
 
   it('names the playback modes by their current state, not their icon', () => {
@@ -224,7 +217,6 @@ describe('Player', () => {
     render(<Player expanded />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Show audio analysis' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Show audio processing' }))
     fireEvent.click(screen.getByRole('button', { name: 'Show lyrics' }))
 
     expect(screen.getByRole('heading', { name: track.title })).toBeInTheDocument()
@@ -244,27 +236,25 @@ describe('Player', () => {
     expect(screen.getByRole('region', { name: 'Frequency spectrum' })).toBeInTheDocument()
   })
 
-  it('layers the DSP page over either view rather than replacing it', () => {
+  // Audio processing is its own overlay now, reached from the sidebar. It was a
+  // layer here until sixteen faders had to share a window with a transport that
+  // could not move.
+  it('does not carry the audio-processing page at all', () => {
     render(<Player expanded />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show audio analysis' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Show audio processing' }))
-
-    // A layer, not a third mode: asking for it costs you nothing you had.
-    expect(screen.getByRole('region', { name: 'Audio processing' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Audio analysis' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Hide audio processing' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Audio processing' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /audio processing/i })).toBeNull()
   })
 
-  it('leaves the DSP button live with no track, unlike the other two', () => {
+  it('leaves the window-size button live with no track, unlike the other two', () => {
     audio.currentTrack = null
     render(<Player expanded />)
 
-    // Lyrics need tags and the analysis needs a track; an EQ curve is worth
-    // editing in silence, which is exactly when you might want to set one up.
+    // Lyrics need tags and the analysis needs a track; a window is resizable
+    // whether or not anything is playing.
     expect(screen.getByRole('button', { name: 'Show lyrics' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Show audio analysis' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Show audio processing' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Shrink to compact player' })).toBeEnabled()
   })
 
   it('returns to the artwork when the analysis view is clicked again', () => {
@@ -277,20 +267,52 @@ describe('Player', () => {
     expect(screen.queryByRole('region', { name: 'Frequency spectrum' })).toBeNull()
   })
 
-  it('shows beat markers only in the full now-playing view', () => {
+  it('shows beat markers wherever the setting asks for them', () => {
     const { unmount } = render(<Player />)
-    expect(screen.getByRole('slider', { name: 'Seek' })).toHaveAttribute('data-marker-count', '0')
+    expect(screen.getByRole('slider', { name: 'Seek' })).toHaveAttribute('data-marker-count', '1')
     unmount()
 
     render(<Player expanded />)
     expect(screen.getByRole('slider', { name: 'Seek' })).toHaveAttribute('data-marker-count', '1')
   })
 
-  it('offers neither panel in the footer bar, which has nowhere to put them', () => {
-    render(<Player />)
+  /**
+   * The invariant this whole component is built around: **the bar and the
+   * overlay are the same markup.**
+   *
+   * Nothing is conditionally rendered, so nothing can drift — every difference
+   * between the two is a `data-*` attribute CSS reads, which is also the only
+   * way a panel's enter *and* its exit can both be animated. `expanded` selects
+   * values (which copy owns the analyser's frame loop), never elements.
+   *
+   * The one attribute allowed to differ is `data-lyrics`: only the overlay has
+   * room for the layer, and that is a value too.
+   */
+  /*
+   * `useWindowScale` is the only thing in the app that can resize the window,
+   * and below the `normal` height tier nothing else is on screen —
+   * `.player-promote` is `normal`-only. When this button was reachable from the
+   * overlay alone, the compact and mini players became rooms with no door.
+   *
+   * jsdom does not load the cascade, so this cannot assert the CSS that reveals
+   * it in the bar; what it *can* pin is that the control is in both trees and
+   * that its direction follows the tier.
+   */
+  it('carries the window-size control in both copies', () => {
+    const { unmount } = render(<Player />)
+    expect(screen.getByRole('button', { name: 'Shrink to compact player' })).toBeInTheDocument()
+    unmount()
 
-    expect(screen.queryByRole('button', { name: 'Show frequency spectrum' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Show lyrics' })).toBeNull()
+    render(<Player expanded />)
+    expect(screen.getByRole('button', { name: 'Shrink to compact player' })).toBeInTheDocument()
+  })
+
+  it('renders identical markup in the bar and in the overlay', () => {
+    const bar = render(<Player />).container.innerHTML
+    cleanup()
+    const overlay = render(<Player expanded />).container.innerHTML
+
+    expect(overlay).toBe(bar)
   })
 
   it('keeps the same tree in its empty state and disables playback actions', () => {

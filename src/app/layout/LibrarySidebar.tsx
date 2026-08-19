@@ -100,7 +100,6 @@ export function LibrarySidebar () {
     selectList,
     setSidebarWidth,
     openOverlay,
-    setDspOpen,
   } = useUI()
 
   // The selected folder is always a row you can see.
@@ -363,20 +362,14 @@ export function LibrarySidebar () {
         one destination left, and this is where the rest of the library's
         navigation already lives. */}
     <footer className='sidebar-footer'>
-      {/* The one door to the DSP page that does not require a track: the
-          player bar's own promote button is disabled when nothing is playing,
-          and an EQ curve is worth editing in silence. Opening the layer first
-          means the overlay arrives with it already showing — both are plain
-          setters, so React batches them into one commit. It is `setDspOpen`
-          rather than a toggle because this entry has to *arrive* on the page
-          whatever state the overlay was last left in. */}
+      {/* The door to the DSP page, and the only one — an EQ curve is worth
+          editing in silence, so it must not hang off anything that needs a
+          track playing. */}
       <button
         className='sidebar-action'
         type='button'
-        onClick={ () => {
-          setDspOpen(true)
-          openOverlay('player')
-        } }>
+        onClick={ () =>
+          openOverlay('dsp') }>
         <Icon name='dsp' />
         <span className='name'>DSP Processing</span>
       </button>

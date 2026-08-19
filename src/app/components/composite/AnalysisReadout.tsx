@@ -2,11 +2,13 @@
  * The track's resolved harmony, read as type under its own title.
  *
  * The chords lead. Someone reading this is holding an instrument, so the lane
- * of what is sounding and what is next is the largest thing on the page, and
- * key, tempo and meter are a caption line under the album — three facts you
- * check once, not three rows of a table. The label gutter that used to line
- * `Chord`, `Key` and `Tempo` up went with them: a page with one graphic on it
- * does not need the graphic captioned.
+ * of what is sounding and what is next is the largest thing on the page. Key,
+ * tempo and meter sit above it as labelled rows.
+ *
+ * `Key`, `Tempo`, `Meter` and `Chord` are one label voice in one gutter
+ * (`--readout-label-w`), so the four line up down the page without any of the
+ * blocks being laid out together — and every value starts on the same column
+ * whatever the lane's own type size is.
  *
  * This used to live inside {@link FrequencyMatrix}, which made the track's
  * musical data a sub-detail of a spectrum widget. It is the other way round:
@@ -88,6 +90,9 @@ interface ChordRibbonProps {
   readonly chords:      readonly ChordSegment[]
   readonly currentTime: number
   readonly isPlaying:   boolean
+
+  /** False in the footer bar's copy, which never shows this. */
+  readonly animate: boolean
 }
 
 /**
@@ -113,7 +118,7 @@ interface ChordRibbonProps {
  * the left because it is new too, in a slot that animates that way. Neither
  * needs a timer to clean up after it.
  */
-function ChordRibbon ({ chords, currentTime, isPlaying }: ChordRibbonProps) {
+function ChordRibbon ({ chords, currentTime, isPlaying, animate }: ChordRibbonProps) {
   const laneRef = useRef<HTMLOListElement>(null)
 
   const index    = chordAt(chords, currentTime)
@@ -129,6 +134,13 @@ function ChordRibbon ({ chords, currentTime, isPlaying }: ChordRibbonProps) {
   // clock. Re-running on every `currentTime` change is deliberate: each tick
   // re-anchors the interpolation to the real playback position, so the lane
   // cannot drift away from the audio.
+  //
+  // Which is also why `animate` matters so much. The player is mounted twice,
+  // and this effect tears down and re-establishes a `requestAnimationFrame`
+  // loop four times a second — so an ungated version ran two permanent loops
+  // for a ribbon only one copy can ever show. `animate` is false wherever it is
+  // not on screen; the single synchronous `write` above still runs, so a paused
+  // or hidden ribbon is still in the right place when it appears.
   // eslint-disable-next-line react-strict/prefer-no-use-effect -- Owns a `requestAnimationFrame` loop; the lane is written through a ref precisely so React does not re-render sixty times a second.
   useEffect(() => {
     const lane = laneRef.current
@@ -146,7 +158,7 @@ function ChordRibbon ({ chords, currentTime, isPlaying }: ChordRibbonProps) {
     const reduced = typeof matchMedia === 'function' &&
       matchMedia('(prefers-reduced-motion: reduce)').matches
 
-    if (!isPlaying || reduced)
+    if (!animate || !isPlaying || reduced)
       return
 
     const stamp = performance.now()
@@ -158,18 +170,19 @@ function ChordRibbon ({ chords, currentTime, isPlaying }: ChordRibbonProps) {
 
     return () =>
       cancelAnimationFrame(frame)
-  }, [ currentTime, isPlaying ])
+  }, [ currentTime, isPlaying, animate ])
 
-  // A figure, not a labelled div: the ribbon is one graphic about the track.
-  // It carries an `aria-label` rather than a `figcaption` — the caption was
-  // visible type in a gutter that no longer exists, and the lane is now the
-  // largest thing on the page, which captions it well enough. The queue is a
-  // real `<ol>`
+  // A figure with a caption, not a labelled div: the ribbon is one graphic
+  // about the track, and `Chord` captions it — in the same label voice as
+  // `Key` and `Tempo`, so the three read as one column of terms whatever size
+  // the lane itself is set at. The queue is a real `<ol>`
   // because it is one — the chords in the order they will play — even though
   // only sighted readers ever see it move; the pinned pair beside it is what
   // announces, so the queue stays out of the accessibility tree rather than
   // reading a list of futures over the top of it.
-  return <figure className='chord-ribbon' aria-label='Chords'>
+  return <figure className='chord-ribbon'>
+    <figcaption className='readout-label'>Chord</figcaption>
+
     <p className='chord-now' aria-live='polite' aria-atomic='true'>
       {previous &&
         <span key={ previous.start } className='chord' data-state='past'>{previous.label}</span>}
@@ -199,25 +212,29 @@ interface KeyTempoProps {
 }
 
 /**
- * `B minor · 87.5 bpm · 4/4` — one line, read once.
+ * `Key   B minor` / `Tempo 87.5 bpm` / `Meter 4/4`.
  *
- * A description list still, because that is what it is, but the terms are for
- * screen readers only: `Key` beside `B minor` is a caption on a caption, and
- * the three used to occupy three rows and a four-em label gutter for it. The
- * separators are generated, so the line has no punctuation to strip when a
- * pair is missing.
+ * Labelled, and visibly so. A bare `B minor · 87.5 bpm · 4/4` is only
+ * unambiguous if you already know which number is which — and the reader here
+ * is looking at three unrelated facts about a piece of music, not at a
+ * sentence. The terms share `--readout-label-w` with the chord caption below,
+ * so all three line up down one gutter without any of the blocks knowing about
+ * the others.
+ *
+ * The meter comes off the beat grid the resolver already produced; when it
+ * cannot be trusted the row is simply absent — see {@link meterOf}.
  */
 function KeyTempo ({ analysis }: KeyTempoProps) {
   const meter = meterOf(analysis.beats)
 
   return <dl className='track-meta'>
     <div>
-      <dt className='sr-only'>Key</dt>
+      <dt className='readout-label'>Key</dt>
       <dd>{analysis.key.label}</dd>
     </div>
 
     <div>
-      <dt className='sr-only'>Tempo</dt>
+      <dt className='readout-label'>Tempo</dt>
 
       <dd>
         {analysis.tempo.bpm.toFixed(1)}
@@ -228,7 +245,7 @@ function KeyTempo ({ analysis }: KeyTempoProps) {
 
     {meter !== null &&
       <div>
-        <dt className='sr-only'>Meter</dt>
+        <dt className='readout-label'>Meter</dt>
         <dd>{meter}/4</dd>
       </div>
     }
@@ -254,6 +271,9 @@ function remainingLabel (remainingMs: number | null): string {
 interface AnalysisProgressProps {
   readonly startedAt:  number | null
   readonly estimateMs: number | null
+
+  /** False in the footer bar's copy, which never shows this. */
+  readonly animate: boolean
 }
 
 /**
@@ -269,12 +289,12 @@ interface AnalysisProgressProps {
  * technology already, and a countdown that announced twice a second would be
  * unusable; the error and unavailable states below are the ones worth speaking.
  */
-function AnalysisProgress ({ startedAt, estimateMs }: AnalysisProgressProps) {
+function AnalysisProgress ({ startedAt, estimateMs, animate }: AnalysisProgressProps) {
   const [ elapsed, setElapsed ] = useState(0)
 
   // eslint-disable-next-line react-strict/prefer-no-use-effect -- Owns an interval for as long as an analysis is running. Elapsed time is not derivable from a render.
   useEffect(() => {
-    if (startedAt === null)
+    if (!animate || startedAt === null)
       return
 
     const read = () =>
@@ -286,7 +306,7 @@ function AnalysisProgress ({ startedAt, estimateMs }: AnalysisProgressProps) {
 
     return () =>
       clearInterval(tick)
-  }, [ startedAt ])
+  }, [ startedAt, animate ])
 
   const ratio     = estimateMs ? Math.min(PROGRESS_CEILING, elapsed / estimateMs) : null
   const remaining = estimateMs ? Math.max(0, estimateMs - elapsed) : null
@@ -303,6 +323,17 @@ function AnalysisProgress ({ startedAt, estimateMs }: AnalysisProgressProps) {
 }
 
 interface AnalysisBodyProps {
+
+  /**
+   * Whether this copy of the readout is the one on screen.
+   *
+   * A *value*, not a branch: every element below is rendered either way, so
+   * the `display` transition still has something to animate and the two copies
+   * of the player still render identical markup. All it decides is which of
+   * them owns the timers.
+   */
+  readonly animate: boolean
+
   readonly analysis:    TrackAnalysis | null
   readonly status:      AnalysisStatus
   readonly error:       string | null
@@ -315,11 +346,11 @@ interface AnalysisBodyProps {
 }
 
 function AnalysisBody ({
-  analysis, status, error, currentTime, isPlaying, showChord, showKey,
+  analysis, status, error, currentTime, isPlaying, showChord, showKey, animate,
   startedAt = null, estimateMs = null,
 }: AnalysisBodyProps) {
   if (status === 'loading')
-    return <AnalysisProgress startedAt={ startedAt } estimateMs={ estimateMs } />
+    return <AnalysisProgress startedAt={ startedAt } estimateMs={ estimateMs } animate={ animate } />
 
   // The failure is shown, never swallowed. It arrives already phrased for a
   // reader — the worker turns the resolver's own refusal into a sentence, and
@@ -340,11 +371,15 @@ function AnalysisBody ({
     {showKey && <KeyTempo analysis={ analysis } />}
 
     {showChord && analysis.chords.length > 0 &&
-      <ChordRibbon chords={ analysis.chords } currentTime={ currentTime } isPlaying={ isPlaying } />}
+      <ChordRibbon
+        chords={ analysis.chords }
+        currentTime={ currentTime }
+        isPlaying={ isPlaying }
+        animate={ animate } />}
   </>
 }
 
-interface AnalysisReadoutProps extends AnalysisBodyProps {
+interface AnalysisReadoutProps extends Omit<AnalysisBodyProps, 'animate'> {
 
   /** True in the analysis view; the block is mounted either way. */
   readonly open: boolean
@@ -356,6 +391,8 @@ export function AnalysisReadout ({ open, ...body }: AnalysisReadoutProps) {
     data-open={ open || undefined }
     aria-label='Audio analysis'
     aria-hidden={ open ? undefined : true }>
-    <AnalysisBody { ...body } />
+    {/* `open` is what decides who owns the timers, too — this block is mounted
+        in the footer bar as well, where none of it is ever visible. */}
+    <AnalysisBody { ...body } animate={ open } />
   </section>
 }

@@ -99,6 +99,20 @@
     /* 4px spacing scale — one unit, many multiples */
     --sp-unit: 4px;
     --sp-0-5: 2px;
+
+    /*
+     * The floor on a pointer target. An icon button's glyph is 1em, which at
+     * `--text-base` in `--sp-2` of padding is a 30px box and shrinks further
+     * under compact density — so the target is stated rather than emerging
+     * from whatever the type scale happens to be.
+     */
+    --hit-target: 32px;
+    --hit-target-sm: 26px;
+
+    /* The height `content-visibility` reserves for an off-screen sidebar row.
+       An estimate, not a constraint — a row that renders taller simply takes
+       the space it needs. */
+    --tree-row-h: 28px;
     --sp-1: calc(var(--sp-unit) * 1);
     --sp-2: calc(var(--sp-unit) * 2);
     --sp-3: calc(var(--sp-unit) * 3);

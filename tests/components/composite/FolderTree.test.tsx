@@ -215,6 +215,20 @@ describe('FolderTree keyboard navigation', () => {
     expect(names()).toContain('Live')
   })
 
+  // The pair to the case above, and the one the reveal effect used to undo:
+  // a second click on an open folder closes it again.
+  it('clicking an open folder collapses it', () => {
+    render(<Harness />)
+
+    fireEvent.click(item(/Rock/))
+    expect(names()).toContain('Live')
+
+    fireEvent.click(item(/Rock/))
+
+    expect(item(/Rock/)).toHaveAttribute('aria-expanded', 'false')
+    expect(names()).not.toContain('Live')
+  })
+
   it('clicking a leaf selects it without toggling anything', () => {
     render(<Harness />)
 

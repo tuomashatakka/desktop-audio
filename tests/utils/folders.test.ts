@@ -73,3 +73,65 @@ describe('subfolderRows', () => {
     expect(subfolderRows(tree, '/elsewhere', tracks)).toEqual([])
   })
 })
+
+/*
+ * The counts used to come from a `countUnder` helper called once per child —
+ * O(children × tracks), and the memo it sits in is invalidated by every folder
+ * selection. These pin the behaviour the single-pass rewrite has to preserve.
+ */
+describe('subfolderRows counting', () => {
+  it('counts everything under a child, subfolders included', () => {
+    const rows = subfolderRows(tree, '/music', tracks)
+
+    expect(rows.map(row =>
+      [ row.name, row.trackCount ])).toEqual([ [ 'Rock', 2 ], [ 'Jazz', 1 ] ])
+  })
+
+  // `/music/top.mp3` sits in the parent, not in any child.
+  it('does not attribute a parent-level track to any child', () => {
+    const total = subfolderRows(tree, '/music', tracks)
+      .reduce((sum, row) =>
+        sum + row.trackCount, 0)
+
+    expect(total).toBe(tracks.length - 1)
+  })
+
+  it('reports zero for a folder holding nothing', () => {
+    const rows = subfolderRows(tree, '/music', [ track('/music/rock/one.mp3') ])
+
+    expect(rows.find(row =>
+      row.name === 'Jazz')?.trackCount).toBe(0)
+  })
+
+  /*
+   * One name being a prefix of another is what makes the separator part of the
+   * comparison load-bearing: `/music/rock` alone would claim
+   * `/music/rock-live/…`, and the single-pass version assigns each track to one
+   * bucket and stops, so a wrong match is a lost track rather than a double
+   * count.
+   */
+  it('does not let a shorter sibling name swallow a longer one', () => {
+    const siblings = [
+      folder('Music', '/music', [
+        folder('Rock', '/music/rock'),
+        folder('Rock Live', '/music/rock-live'),
+      ]),
+    ]
+
+    const rows = subfolderRows(siblings, '/music', [
+      track('/music/rock/a.mp3'),
+      track('/music/rock-live/b.mp3'),
+      track('/music/rock-live/c.mp3'),
+    ])
+
+    expect(rows.map(row =>
+      [ row.name, row.trackCount ])).toEqual([ [ 'Rock', 1 ], [ 'Rock Live', 2 ] ])
+  })
+
+  it('counts the roots when nothing is selected', () => {
+    expect(subfolderRows(tree, null, tracks)).toEqual([
+      { path: '/music', name: 'Music', trackCount: 4 },
+    ])
+  })
+})
+

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { findPeaks, formatHz, frequencyToPitch } from '../../utils/pitch'
 
@@ -10,10 +10,16 @@ const BANDS = 40
 const HISTORY = 28
 
 /**
- * Negative, so `1 - z * PERSPECTIVE` *grows* with age: older slices spread
- * wider as they fall away, which is what reads as depth.
+ * Positive, so `1 - z * PERSPECTIVE` *shrinks* with age: older slices narrow
+ * toward a vanishing point as they recede, which is what reads as depth.
+ *
+ * It used to be negative, with the newest row pinned to the top and history
+ * spreading wider below it — a mesh flowing *toward* the viewer, which put the
+ * oldest, faintest data closest and the live edge furthest away. The waterfall
+ * runs the other way now: newest at the bottom, in front, and history falling
+ * away behind it.
  */
-const PERSPECTIVE = -0.8
+const PERSPECTIVE = 0.55
 
 /** viewBox units. The SVG scales to its box, so these are ratios, not pixels. */
 const VIEW_W = 1200
@@ -29,11 +35,15 @@ const DOF_FOCUS_PLANE = 38
 const MAX_HEIGHT      = 150
 
 /**
- * Headroom above the newest row for its peaks to rise into. The grid starts
- * here rather than at the vertical centre so the oldest row lands *on* the
- * bottom edge — centring it instead pushed the far rows out of the viewBox.
+ * Where the two ends of the waterfall sit.
+ *
+ * The newest row's baseline is `VIEW_H - FRONT_MARGIN`, near the bottom, and
+ * the oldest is at `BACK_MARGIN`, near the top. `BACK_MARGIN` is headroom: the
+ * far rows still put peaks above their own baseline, and without it they would
+ * ride out of the viewBox.
  */
-const TOP_MARGIN = MAX_HEIGHT
+const FRONT_MARGIN = 40
+const BACK_MARGIN  = MAX_HEIGHT
 
 /** How much of the previous frame survives — smooths the FFT's jitter. */
 const SMOOTHING = 0.55
@@ -192,7 +202,8 @@ function buildGeometry (): Geometry {
   const scale = new Float32Array(HISTORY)
 
   const gridWidth  = VIEW_W / 2
-  const gridHeight = VIEW_H - TOP_MARGIN
+  const frontY     = VIEW_H - FRONT_MARGIN
+  const gridHeight = frontY - BACK_MARGIN
   const centerX    = VIEW_W / 2
 
   for (let t = 0; t < HISTORY; t++) {
@@ -200,7 +211,10 @@ function buildGeometry (): Geometry {
     const s = 1 - z * PERSPECTIVE
 
     scale[t] = s
-    baseY[t] = TOP_MARGIN + z * gridHeight
+
+    // Away from the viewer is *up*: row 0 sits at the front edge and each older
+    // slice is a step further back toward the top of the box.
+    baseY[t] = frontY - z * gridHeight
 
     for (let i = 0; i < BANDS; i++)
       xs[t * BANDS + i] = centerX + (i / (BANDS - 1) - 0.5) * gridWidth * s
@@ -233,7 +247,7 @@ function buildGeometry (): Geometry {
  * (`AnalysisReadout`) — the track's key, tempo and chords are what the analysis
  * view is *for*, and this is the backdrop they are read against.
  */
-export function FrequencyMatrix ({ analyzer, active, showNotes = false }: FrequencyMatrixProps) {
+function Matrix ({ analyzer, active, showNotes = false }: FrequencyMatrixProps) {
   const freqPathRef    = useRef<SVGPathElement>(null)
   const timePathRef    = useRef<SVGPathElement>(null)
   const currentPathRef = useRef<SVGPathElement>(null)
@@ -421,20 +435,22 @@ export function FrequencyMatrix ({ analyzer, active, showNotes = false }: Freque
       preserveAspectRatio='xMidYMid meet'
       focusable='false'>
       <defs>
-        {/* Rows recede downward, so vertical position *is* age: the newest
-              row sits at the top and the oldest at the bottom. One gradient
-              replaces the per-row opacity the mesh would otherwise need. */}
+        {/* Rows recede upward, so vertical position *is* age: the newest row
+              sits at the bottom, in front, and the oldest fades out at the top.
+              One gradient replaces the per-row opacity the mesh would otherwise
+              need. */}
         <linearGradient id='matrix-age' x1='0' y1='0' x2='0' y2='1'>
-          <stop offset='0%' stopColor='currentColor' stopOpacity='1' />
-          <stop offset='55%' stopColor='currentColor' stopOpacity='0.55' />
-          <stop offset='100%' stopColor='currentColor' stopOpacity='0.08' />
+          <stop offset='0%' stopColor='currentColor' stopOpacity='0.08' />
+          <stop offset='45%' stopColor='currentColor' stopOpacity='0.55' />
+          <stop offset='100%' stopColor='currentColor' stopOpacity='1' />
         </linearGradient>
 
         {/*
             * Depth of field. The same reasoning as the age gradient: distance
-            * is vertical position, so focus can be too — near rows stay sharp
-            * and far ones defocus, which is what makes a flat wireframe read
-            * as receding rather than as a pattern.
+            * is vertical position, so focus can be too — the near rows at the
+            * bottom stay sharp and the far ones at the top defocus, which is
+            * what makes a flat wireframe read as receding rather than as a
+            * pattern.
             *
             * It costs two nodes, not sixty-four. The geometry is written once
             * to the `<path>` below and painted twice through `<use>`, so the
@@ -453,9 +469,9 @@ export function FrequencyMatrix ({ analyzer, active, showNotes = false }: Freque
           y1='0'
           x2='0'
           y2={ VIEW_H }>
-          <stop offset='0%' stopColor='#000' />
+          <stop offset='0%' stopColor='#fff' />
           <stop offset={ `${DOF_FOCUS_PLANE}%` } stopColor='#000' />
-          <stop offset='100%' stopColor='#fff' />
+          <stop offset='100%' stopColor='#000' />
         </linearGradient>
 
         <mask id='matrix-far'>
@@ -476,9 +492,9 @@ export function FrequencyMatrix ({ analyzer, active, showNotes = false }: Freque
           y1='0'
           x2='0'
           y2={ VIEW_H }>
-          <stop offset='0%' stopColor='#fff' />
+          <stop offset='0%' stopColor='#000' />
           <stop offset={ `${DOF_FOCUS_PLANE}%` } stopColor='#fff' />
-          <stop offset='100%' stopColor='#000' />
+          <stop offset='100%' stopColor='#fff' />
         </linearGradient>
 
         <mask id='matrix-near'>
@@ -524,3 +540,14 @@ export function FrequencyMatrix ({ analyzer, active, showNotes = false }: Freque
     </dl>
   </section>
 }
+
+/**
+ * Memoised, because the player is mounted twice and neither copy is.
+ *
+ * All three props are stable — an `AnalyserNode`, and two booleans — and every
+ * pixel in here is written through a ref from the loop, so a re-render produces
+ * exactly the same tree. Without this, `Player` re-rendering four times a
+ * second on `currentTime` reconciled this SVG's `defs`, two gradients and two
+ * masks twice per tick, forever, for a picture that had not changed.
+ */
+export const FrequencyMatrix = memo(Matrix)

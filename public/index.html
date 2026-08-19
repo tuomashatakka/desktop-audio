@@ -142,7 +142,8 @@
         <div class="split-text fade-blur">
           <h2>Two Views, Two Layers</h2>
           <p>Now playing has <strong>two views</strong> — the album art, or the audio analysis — and switching between them fades the cover upward while the key, tempo and chords rise into the space it leaves.</p>
-          <p>Everything else is a <strong>layer</strong>. Lyrics step the column aside to make room. The audio processing page opens between the type and the transport, riding the title up and the controls down. Both compose, with either view and with each other — and through all of it the title, the seek bar and the transport stay exactly where they were.</p>
+          <p>Lyrics are a <strong>layer</strong> over either view, not a third one: the column steps aside to make room rather than being replaced, so reading along never costs you the cover, the seek bar or the transport.</p>
+          <p>It is <strong>one element</strong>, always. Nothing appears or disappears from the page — every change is an attribute, and CSS moves what has to move. That is what makes both directions of every transition real, and it is why the footer bar and the full window are the same markup rather than two things that look alike.</p>
         </div>
         <div class="split-image fade-blur delay-2">
           <img src="screenshots/now-playing-artwork-lyrics.png" alt="Now playing view with album art, waveform seek bar and lyrics laid alongside" loading="lazy">
@@ -179,6 +180,7 @@
         </div>
         <div class="split-text fade-blur delay-2">
           <h2>Shape The Sound, Not Just The Volume</h2>
+          <p>Its own page, reached from the sidebar — it needs the room. Whatever is playing keeps playing while you shape it, because the chain is live.</p>
           <p>A <strong>sixteen-band equaliser</strong>, a <strong>compressor</strong> and a <strong>limiter</strong>, each switchable on its own. The equaliser is <strong>one line you draw on</strong>, laid over the sound it is shaping: the curve is the filter cascade's real response, and the filled shape underneath is the analyser — which sits <em>after</em> the chain, so a band you lift lifts the ground under the bump you just drew.</p>
           <p>Bypassing a module sets neutral parameters instead of unplugging it: splicing a node in or out of a live graph shifts the sample stream in time and clicks, while a flat band and a 1:1 compressor are already transparent. Everything is a native range input underneath — the curve keeps sixteen of them for the keyboard, and each knob is one under a drawn face. Hover the curve and a ruler of the band frequencies rises under it, calling out the one beneath your pointer. Press to pick a band and the drag stays on <em>that</em> band however far sideways it wanders; right-click steps the pick to the next one, which is the only reliable way to land on the low bands, where two per cent of the axis holds four of them.</p>
         </div>

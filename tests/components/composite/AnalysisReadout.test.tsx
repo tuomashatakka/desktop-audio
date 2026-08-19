@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AnalysisReadout,
   chordAt,
@@ -125,19 +125,17 @@ describe('AnalysisReadout', () => {
   })
 
   /*
-   * The caption line is a caption, not a table: `Key` and `Tempo` are there for
-   * a screen reader and nowhere on screen, which is what let the four-em label
-   * gutter go.
+   * `Key`, `Tempo`, `Meter` and `Chord` share one label voice and one gutter
+   * (`--readout-label-w`), so the four values line up down a single column
+   * whatever type size the chord lane itself is set at.
    */
-  it('keeps the labels for assistive technology and off the page', () => {
+  it('labels every value in the shared gutter', () => {
     const { container } = render(<AnalysisReadout open currentTime={ 6 } { ...READY } />)
 
-    const terms = [ ...container.querySelectorAll('.track-meta dt') ]
+    const labels = [ ...container.querySelectorAll('.readout-label') ]
 
-    expect(terms.map(el =>
-      el.textContent)).toEqual([ 'Key', 'Tempo' ])
-    expect(terms.every(el =>
-      el.classList.contains('sr-only'))).toBe(true)
+    expect(labels.map(el =>
+      el.textContent)).toEqual([ 'Key', 'Tempo', 'Chord' ])
   })
 
   it('adds the meter when the beat grid carries one', () => {
@@ -150,15 +148,19 @@ describe('AnalysisReadout', () => {
     )
 
     expect(container.querySelector('.track-meta')).toHaveTextContent('4/4')
+
+    const labels = [ ...container.querySelectorAll('.track-meta .readout-label') ]
+    expect(labels.map(el =>
+      el.textContent)).toEqual([ 'Key', 'Tempo', 'Meter' ])
   })
 
-  // The lane is the largest thing on the page; a caption over it was the last
-  // thing holding the label gutter up.
-  it('does not caption the chord lane', () => {
+  it('captions the chord lane in that same gutter', () => {
     const { container } = render(<AnalysisReadout open currentTime={ 6 } { ...READY } />)
 
-    expect(container.querySelector('.chord-ribbon figcaption')).toBeNull()
-    expect(screen.getByRole('figure', { name: 'Chords' })).toBeInTheDocument()
+    const caption = container.querySelector('.chord-ribbon figcaption')
+
+    expect(caption).toHaveTextContent('Chord')
+    expect(caption).toHaveClass('readout-label')
   })
 
   it('pins the sounding chord and queues what is coming', () => {
@@ -183,6 +185,47 @@ describe('AnalysisReadout', () => {
 
     const queued = container.querySelector<HTMLElement>('.chord-queue .chord')
     expect(queued?.style.getPropertyValue('--at')).toBe('10.000')
+  })
+
+  /*
+   * The player is mounted twice and this block is in both, so an ungated loop
+   * ran permanently in the footer bar for a ribbon only the overlay can show —
+   * and it re-subscribed four times a second, because `currentTime` is in its
+   * dependency list on purpose (each tick re-anchors the interpolation).
+   */
+  describe('animation ownership', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('schedules no frames while closed', () => {
+      const raf = vi.fn()
+      vi.stubGlobal('requestAnimationFrame', raf)
+
+      render(<AnalysisReadout open={ false } currentTime={ 6 } { ...READY } isPlaying />)
+
+      expect(raf).not.toHaveBeenCalled()
+    })
+
+    it('schedules frames once open and playing', () => {
+      const raf = vi.fn()
+      vi.stubGlobal('requestAnimationFrame', raf)
+
+      render(<AnalysisReadout open currentTime={ 6 } { ...READY } isPlaying />)
+
+      expect(raf).toHaveBeenCalled()
+    })
+
+    // The one synchronous write still runs either way, so a ribbon that has
+    // never animated is still in the right place the moment it appears.
+    it('positions the lane even while closed', () => {
+      const { container } = render(
+        <AnalysisReadout open={ false } currentTime={ 6 } { ...READY } isPlaying />
+      )
+
+      expect(container.querySelector<HTMLElement>('.chord-queue')?.style
+        .getPropertyValue('--now')).toBe('6.000')
+    })
   })
 
   it('says so when the analysis could not be resolved', () => {
